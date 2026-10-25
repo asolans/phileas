@@ -420,6 +420,18 @@ static void c_replace(Editor *e)
     ed_msg(e, count == 1 ? "1 substitució" : "%zu substitucions", count);
 }
 
+static void c_typewriter(Editor *e)
+{
+    e->tw_mode = (e->tw_mode + 1) % 3;
+    if (e->tw_mode == TW_SALT)
+        ed_msg(e, "Màquina d'escriure: salt (en passar el %d %% de l'alçada, el cursor torna al %d %%)",
+               e->tw_limit, e->tw_anchor);
+    else if (e->tw_mode == TW_FIXA)
+        ed_msg(e, "Màquina d'escriure: línia fixa (al %d %% de l'alçada)", e->tw_anchor);
+    else
+        ed_msg(e, "Desplaçament clàssic (fins a baix de tot)");
+}
+
 static void c_colors(Editor *e)
 {
     e->colors = !e->colors;
@@ -720,6 +732,7 @@ static const Command commands[] = {
     { "enganxar",                  c_paste,          "Enganxa el porta-retalls", ACT_NONE },
 
     { "centrar",           c_center,     "Centra o no la columna de text", ACT_NONE },
+    { "maquina-escriure",  c_typewriter, "Desplaçament: salt, línia fixa o clàssic", ACT_NONE },
     { "colors",            c_colors,     "Activa o desactiva els colors de Markdown", ACT_NONE },
     { "obrir",             c_open,       "Obre un document amb el navegador de fitxers", ACT_NONE },
     { "nou",               c_new,        "Comença un document nou sense nom", ACT_NONE },

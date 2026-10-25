@@ -11,6 +11,13 @@ enum {
     ACT_DELETE,
 };
 
+/* Mode de desplaçament vertical (màquina d'escriure) */
+enum {
+    TW_SALT,    /* en passar el límit, el text salta i el cursor queda a l'ancoratge */
+    TW_FIXA,    /* el cursor es queda sempre a la fila de l'ancoratge */
+    TW_CLASSIC, /* el cursor pot arribar a dalt i a baix de tot */
+};
+
 enum {
     SEL_NONE,   /* sense selecció */
     SEL_SHIFT,  /* Maj+fletxes: un moviment sense Maj la cancel·la */
@@ -33,6 +40,9 @@ typedef struct {
 
     int     columns;           /* amplada de text configurada */
     int     center;            /* columna de text centrada a la pantalla */
+    int     tw_mode;           /* TW_* */
+    int     tw_limit;          /* % de l'alçada que el cursor no passa en baixar (salt) */
+    int     tw_anchor;         /* % de l'alçada on queda el cursor després d'un salt */
     int     colors;            /* colors de Markdown */
     int     spell;             /* marcar els errors ortogràfics */
     char    dict[64];          /* diccionari triat: "ca", "es" (F8), o el de -d o «idioma» */

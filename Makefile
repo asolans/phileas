@@ -9,7 +9,7 @@ LDLIBS    += $(shell $(PKG_CONFIG) --libs ncursesw)
 SRC  = $(wildcard src/*.c)
 OBJ  = $(SRC:src/%.c=build/%.o)
 # Mòduls sense dependència de ncurses, que es poden provar aïlladament
-CORE = build/spell.o build/dirlist.o build/utf8.o build/buffer.o build/wrap.o build/md.o build/undo.o build/search.o build/util.o
+CORE = build/editor.o build/spell.o build/dirlist.o build/utf8.o build/buffer.o build/wrap.o build/md.o build/undo.o build/search.o build/util.o
 
 phileas: $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)

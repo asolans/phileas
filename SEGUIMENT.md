@@ -4,7 +4,7 @@ Editor de text per a consola (Linux), orientat a escriure prosa en Markdown.
 
 ## Estat
 
-- **Fase actual:** 6b — Ajuda amb F1 (F6 completada)
+- **Fase actual:** 6b — Ajuda amb F1 (F6 i F6c completades)
 - **Última actualització:** 2026-10-25
 
 ## Requeriments (versió inicial)
@@ -347,7 +347,7 @@ Colors triats (provisionals, configurables a la F7):
 
 La consola de Linux no combina el subratllat ni l'atenuat amb colors (capacitat `ncv` del terminfo); en aquests casos es manté l'atribut i es treu el color. L'ordre `colors` de la paleta els activa o els desactiva.
 
-## Mode màquina d'escriure (F6c, proposta pendent de confirmar)
+## Mode màquina d'escriure (✅ confirmat i implementat a la F6c)
 
 ### Context
 
@@ -394,7 +394,7 @@ Amb aquests dos valors surten els tres modes:
 - el text es queda quiet mentre s'escriu;
 - a la Pi, amb la consola girada (sense acceleració), redibuixar la pantalla sencera a cada fila nova probablement es notaria. El salt només ho fa una vegada cada ~17 files. Aquest punt s'ha de mesurar a la consola real; si la línia fixa resultés fluida, també hi és com a mode.
 
-**Estat de la decisió:** pendent de confirmar.
+**Estat de la decisió:** ✅ Confirmada (2026-10-25).
 
 ## Arquitectura
 
@@ -406,7 +406,7 @@ src/
   buffer.c      ✅ vector de línies; inserir/esborrar/extreure; càrrega i desat atòmic
   md.c          ✅ prefixos de bloc Markdown, tipus de bloc de cada línia i estils per als colors
   wrap.c        ✅ wordwrap suau amb sagnat penjant i cache per línia
-  editor.c      ✅ estat de l'editor, cursor, moviment, edició, selecció i porta-retalls
+  editor.c      ✅ estat de l'editor, cursor, moviment, edició, selecció, porta-retalls i desplaçament de màquina d'escriure
   command.c     ✅ registre d'ordres amb nom i taula de dreceres
   keys.c        ✅ lectura de tecles, noms de tecla ("ctrl-s", "alt-<"...) i enganxat delimitat
   render.c      ✅ dibuix amb ncursesw, colors, barra d'estat i diàlegs a la línia inferior
@@ -452,7 +452,7 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 - [x] **F5** — Navegador de fitxers
 - [x] **F6** — Correcció ortogràfica amb hunspell
 - [ ] **F6b** — Ajuda: F1 obre una finestra amb una guia de totes les dreceres de teclat
-- [ ] **F6c** — Mode màquina d'escriure («typewriter»): la línia on s'escriu es manté a una altura fixa de la pantalla i el text no arriba mai a baix de tot (pensat per a una pantalla en vertical)
+- [x] **F6c** — Mode màquina d'escriure («typewriter»): la línia on s'escriu es manté a una altura fixa de la pantalla i el text no arriba mai a baix de tot (pensat per a una pantalla en vertical)
 - [ ] **F7** — Configuració i proves en Raspberry Pi
 - [ ] **F8** — Integració al projecte BYOK (`~/byok-build`), quan el processador estigui avançat:
   - afegir Phileas a la imatge com a paquet de buildroot;
@@ -724,3 +724,14 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **A la Pi, per provar-ho:** `/tmp/phileas/ph FITXER`, un guió que arrenca `phileas-nou` amb la biblioteca i els diccionaris de `/tmp/phileas`.
 - **2026-10-25** — Decisió de l'usuari: quan el processador estigui avançat, s'integrarà al projecte BYOK, i llavors s'hi afegiran `libhunspell` i els diccionaris a `/usr`. Anotat al full de ruta com a **F8**.
 - **2026-10-25** — Anàlisi del mode màquina d'escriure (F6c). Proposta: un sol mecanisme amb dos paràmetres (límit i ancoratge), amb el salt a l'estil WordGrinder per defecte (85 % → 55 %) i els modes `fixa` i `classic` com a alternatives. Pendent de confirmar.
+- **2026-10-25** — ✅ Proposta del mode màquina d'escriure confirmada. **F6c completada.**
+  - **Per defecte, salt a l'estil WordGrinder:** quan el cursor passa el 85 % de l'alçada, el text puja i el cursor queda al 55 %. Si el cursor surt per dalt, també torna al 55 %.
+  - **Final del document:** el text es pot desplaçar més enllà de l'última línia. En escriure al final, sempre hi ha espai en blanc per sota.
+  - **Salts llargs:** en obrir un document, amb Ctrl+Fi, en una cerca o anant a una línia, el cursor queda a l'ancoratge.
+  - **Ordre `maquina-escriure`** (paleta): passa per salt → línia fixa (el cursor sempre al 55 %) → clàssic (el comportament anterior).
+  - **Paràmetres:** `tw_limit` i `tw_anchor` (85 i 55), que aniran al fitxer de configuració a la F7.
+  - **Implementació:** tot a `ed_layout()`. Calcula la fila de pantalla del cursor, recorrent com a molt l'alçada de la pantalla, i hi aplica les regles.
+  - **Proves:**
+    - `editor.c` no depèn de ncurses i ara també entra a les proves unitàries: 1.579 comprovacions (salt, línia fixa, clàssic, inici i final del document, canvi de mida);
+    - proves interactives i a la Pi: 1.577 comprovacions; les dues que falten necessiten el diccionari valencià, que la Pi no té.
+  - **Pendent de verificar a la consola de la Pi:** si la línia fixa és fluida amb la pantalla girada.

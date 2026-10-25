@@ -21,6 +21,9 @@ void ed_init(Editor *e, int columns)
     e->want_x = -1;
     e->autosave_max = 300;
     e->colors = 1;
+    e->tw_mode = TW_SALT;
+    e->tw_limit = 85;
+    e->tw_anchor = 55;
 }
 
 void ed_free(Editor *e)
@@ -167,6 +170,53 @@ static int vpos_before(size_t l1, size_t r1, size_t l2, size_t r2)
     return l1 < l2 || (l1 == l2 && r1 < r2);
 }
 
+/* Posa la fila de dalt de manera que el cursor quedi row files per sota
+ * (menys, si s'arriba a l'inici del document). */
+static void put_cursor_at(Editor *e, int row)
+{
+    size_t tl = e->cy, tr = ed_cursor_row(e);
+
+    for (int i = 0; i < row && ed_vpos_prev(e, &tl, &tr); i++)
+        ;
+    e->top_line = tl;
+    e->top_row = tr;
+}
+
+/* Fila de pantalla del cursor (des de la fila de dalt), o -1 si és per
+ * sobre; si és més avall que max, retorna max + 1. */
+static int cursor_screen_row(Editor *e, int max)
+{
+    size_t tl = e->top_line, tr = e->top_row, cr = ed_cursor_row(e);
+    int row = 0;
+
+    if (vpos_before(e->cy, cr, tl, tr))
+        return -1;
+    while (tl != e->cy || tr != cr) {
+        if (row > max || !ed_vpos_next(e, &tl, &tr))
+            return max + 1;
+        row++;
+    }
+    return row;
+}
+
+/* Desplaçament de màquina d'escriure: el text no arriba a baix de la
+ * pantalla, i es pot desplaçar més enllà del final del document. */
+static void typewriter_layout(Editor *e)
+{
+    int h = e->height;
+    int anchor = h * e->tw_anchor / 100, limit = h * e->tw_limit / 100, row;
+
+    if (anchor > h - 1)
+        anchor = h - 1;
+    if (limit > h - 1)
+        limit = h - 1;
+    if (limit < anchor)
+        limit = anchor;
+    row = cursor_screen_row(e, limit);
+    if (e->tw_mode == TW_FIXA ? row != anchor : row < 0 || row > limit)
+        put_cursor_at(e, anchor);
+}
+
 void ed_layout(Editor *e, int screen_cols, int screen_lines)
 {
     size_t cr, tl, tr;
@@ -183,6 +233,10 @@ void ed_layout(Editor *e, int screen_cols, int screen_lines)
     if (e->top_row >= screen_rows(e, e->top_line))
         e->top_row = screen_rows(e, e->top_line) - 1;
 
+    if (e->tw_mode != TW_CLASSIC) {
+        typewriter_layout(e);
+        return;
+    }
     cr = ed_cursor_row(e);
     if (vpos_before(e->cy, cr, e->top_line, e->top_row)) {
         e->top_line = e->cy;

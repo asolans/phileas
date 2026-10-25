@@ -1,6 +1,7 @@
 /* Proves dels mòduls que no depenen de ncurses: make test */
 #include "buffer.h"
 #include "dirlist.h"
+#include "editor.h"
 #include "md.h"
 #include "search.h"
 #include "spell.h"
@@ -868,6 +869,59 @@ static void test_spell(void)
     CHECK(!spell_loaded("es"));
 }
 
+/* Fila de dalt després de posar el cursor a la línia y */
+static size_t top_after(Editor *e, size_t y)
+{
+    e->cy = y;
+    e->cx = 0;
+    ed_layout(e, 80, 22);   /* 20 files de text: ancoratge 11, límit 17 */
+    return e->top_line;
+}
+
+static void test_typewriter(void)
+{
+    Editor e;
+    Pos p = { 0, 0 };
+
+    ed_init(&e, 72);
+    /* 100 elements de llista: una fila per línia, sense separació */
+    for (int i = 0; i < 100; i++)
+        p = buf_insert(&e.buf, p, i ? "\n- x" : "- x", i ? 4 : 3);
+    CHECK(e.buf.nlines == 100);
+
+    /* Salt: el cursor baixa fins al límit i llavors torna a l'ancoratge */
+    CHECK(top_after(&e, 0) == 0);
+    CHECK(top_after(&e, 17) == 0);
+    CHECK(top_after(&e, 18) == 7);     /* 18 - 11 */
+    CHECK(top_after(&e, 24) == 7);
+    CHECK(top_after(&e, 25) == 14);
+    CHECK(top_after(&e, 14) == 14);    /* pujar dins la pantalla no mou res */
+    CHECK(top_after(&e, 13) == 2);     /* per sobre: torna a l'ancoratge */
+    CHECK(top_after(&e, 99) == 88);    /* al final, espai en blanc per sota */
+    CHECK(top_after(&e, 3) == 0);      /* a l'inici no hi ha espai per dalt */
+
+    /* Línia fixa: el cursor sempre a l'ancoratge */
+    e.tw_mode = TW_FIXA;
+    CHECK(top_after(&e, 50) == 39);
+    CHECK(top_after(&e, 51) == 40);
+    CHECK(top_after(&e, 49) == 38);
+    CHECK(top_after(&e, 5) == 0);
+
+    /* Clàssic: el cursor arriba a baix de tot */
+    e.tw_mode = TW_CLASSIC;
+    e.top_line = 0;
+    CHECK(top_after(&e, 30) == 11);    /* 30 - 19 */
+    CHECK(top_after(&e, 12) == 11);
+    CHECK(top_after(&e, 10) == 10);
+
+    /* Pantalla més petita: els percentatges s'apliquen a la nova alçada */
+    e.tw_mode = TW_SALT;
+    e.cy = 99;
+    ed_layout(&e, 80, 12);             /* 10 files: ancoratge 5 */
+    CHECK(e.top_line == 94);
+    ed_free(&e);
+}
+
 int main(void)
 {
     /* Qualsevol configuració UTF-8 (una Raspberry amb buildroot pot no tenir C.UTF-8) */
@@ -893,6 +947,7 @@ int main(void)
     test_search();
     test_dirlist();
     test_spell();
+    test_typewriter();
     rmdir(tmpdir);
 
     printf("%d comprovacions, %d errors\n", checks, failures);
