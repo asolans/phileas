@@ -760,6 +760,10 @@ static const char *const default_bindings[][2] = {
     { "shift-pgup", "seleccio-pagina-amunt" }, { "shift-pgdn", "seleccio-pagina-avall" },
     { "ctrl-shift-left", "seleccio-paraula-anterior" },
     { "ctrl-shift-right", "seleccio-paraula-seguent" },
+    { "ctrl-shift-up", "seleccio-paragraf-anterior" },
+    { "ctrl-shift-down", "seleccio-paragraf-seguent" },
+    { "ctrl-shift-home", "seleccio-inici-document" },
+    { "ctrl-shift-end", "seleccio-fi-document" },
     { "ctrl-space", "marca" },
     { "ctrl-a", "seleccionar-tot" },
     { "esc", "cancellar" },
@@ -837,8 +841,7 @@ void cmd_bind_defaults(void)
     for (size_t i = 0; i < sizeof default_bindings / sizeof default_bindings[0]; i++) {
         if (!cmd_find(default_bindings[i][1]))
             die("drecera per defecte amb una ordre inexistent: %s", default_bindings[i][1]);
-        /* Si el terminal no té la tecla (p. ex. Ctrl+fletxes a la consola
-         * de Linux), en queda l'alternativa amb Alt */
-        cmd_bind(default_bindings[i][0], default_bindings[i][1]);
+        if (cmd_bind(default_bindings[i][0], default_bindings[i][1]) < 0)
+            die("drecera per defecte amb una tecla desconeguda: %s", default_bindings[i][0]);
     }
 }

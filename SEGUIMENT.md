@@ -616,3 +616,14 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **Noms de diccionari:** `-d es` i l'ordre `idioma` accepten només l'idioma: `es` troba `es_ES`. Una tria com `ca_ES-valencia` es manté fins que es prem F8.
   - **Proves:** 1.552 comprovacions unitàries (codis d'idioma, `es` → `es_ES`) i proves interactives de F7, F8, la barra d'estat, Maj+F7 i el diccionari personal per idioma.
 - **2026-10-25** — Petició afegida al full de ruta (F6c): mode màquina d'escriure. La línia on s'escriu es manté a una altura fixa i el text no arriba a baix de la pantalla (l'usuari escriu amb la pantalla en vertical).
+- **2026-10-25** — **Error corregit (informat per l'usuari a la Pi):** les tecles de selecció escrivien text (`;2A`…) en lloc de seleccionar.
+  - **Causa:** el mapa de teclat de la imatge (`/usr/share/byok/teclat.map`, fet per a l'editor micro) fa que Maj/Ctrl/Alt + fletxes, Inici/Fi i RePàg/AvPàg enviïn seqüències d'estil xterm (`\e[1;2A` = Maj+↑, `\e[1;5C` = Ctrl+→, `\e[5;2~` = Maj+RePàg…). El terminfo `linux` no les té, i ncurses les passava com un Esc seguit de text.
+  - **Solució:**
+    - Phileas interpreta directament les seqüències CSI (`\e[…`) i SS3 (`\eO…`) que ncurses no reconeix, amb tots els modificadors xterm (Maj, Alt, Ctrl i les seves combinacions);
+    - les seqüències desconegudes es descarten en lloc d'escriure-les al text;
+    - cada tecla amb modificadors té un codi intern fix (`KEY_MODIFIED`), tant si arriba pel terminfo com interpretada per Phileas. Així les dreceres funcionen igual a xterm, a la consola de Linux i per SSH.
+  - **Dreceres noves de selecció:** Ctrl+Maj+↑/↓ (fins al paràgraf anterior o següent) i Ctrl+Maj+Inici/Fi (fins a l'inici o el final del document).
+  - **Proves:**
+    - tallar, copiar, enganxar i esborrar seleccions fetes amb Maj+fletxes, Ctrl+Maj+fletxes, Maj+Inici, Maj+RePàg i Ctrl+Maj+Inici/Fi, amb TERM=simple (sense les tecles al terminfo), linux i xterm-256color;
+    - les mateixes proves a la Raspberry Pi amb TERM=linux;
+    - una seqüència desconeguda (`\e[1;9Z`) no deixa rastre al text.

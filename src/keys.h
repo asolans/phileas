@@ -11,10 +11,20 @@
 #define KEY_FLAG_ALT 0x20000000
 
 /* Converteix un nom de tecla ("ctrl-s", "alt-<", "f3", "ctrl-left"...) al
- * seu codi. Retorna -1 si el nom no és vàlid o si el terminal actual no té
- * aquesta tecla (p. ex. Ctrl+fletxes a la consola de Linux). Cal que ncurses
- * estigui inicialitzat. */
+ * seu codi. Retorna -1 si el nom no és vàlid. Les tecles amb modificadors
+ * ("shift-up", "ctrl-left", "ctrl-shift-end"...) sempre tenen codi, encara
+ * que el terminal no les enviï (llavors queda l'alternativa amb Alt). */
 int key_parse(const char *name);
+
+/* Tecles de navegació que poden anar amb modificadors */
+enum { KB_UP, KB_DOWN, KB_RIGHT, KB_LEFT, KB_HOME, KB_END, KB_PGUP, KB_PGDN,
+       KB_DELETE, KB_INSERT };
+
+/* Tecla de navegació amb modificadors. mod segueix les seqüències xterm:
+ * 2 Maj, 3 Alt, 4 Maj+Alt, 5 Ctrl, 6 Ctrl+Maj, 7 Ctrl+Alt, 8 tots tres.
+ * El codi és el mateix tant si el terminfo coneix la tecla com si Phileas
+ * n'ha interpretat la seqüència directament. */
+#define KEY_MODIFIED(nav, mod) (KEY_FLAG_FN | 0x100000 | ((nav) << 4) | (mod))
 
 /* Retornat per key_read quan el terminal ha enganxat un text */
 #define KEY_PASTE    (KEY_FLAG_FN | 0xFFFFFF)
