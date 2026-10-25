@@ -428,11 +428,20 @@ static void c_colors(Editor *e)
 
 /* ---- Ortografia ---- */
 
+/* El diccionari es carrega la primera vegada que es fa servir: en una
+ * Raspberry Pi petita pot trigar uns segons i ocupa memòria. */
 static int need_dict(Editor *e)
 {
     if (spell_lang())
         return 1;
-    ed_msg(e, "No hi ha diccionari: %s", spell_error());
+    ed_msg(e, "Carregant el diccionari…");
+    render(e);
+    refresh();
+    if (spell_open(e->dict) == 0) {
+        e->msg[0] = '\0';
+        return 1;
+    }
+    ed_msg(e, "No s'ha pogut carregar el diccionari: %s", spell_error());
     return 0;
 }
 
@@ -476,6 +485,7 @@ static void c_spell_next(Editor *e)
 
     if (!need_dict(e))
         return;
+    e->spell = 1;   /* revisar implica veure els errors */
     if (!ed_selection(e, &a, &from)) {
         from.line = e->cy;
         from.col = e->cx;

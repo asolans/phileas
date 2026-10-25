@@ -381,7 +381,7 @@ make            # compila ./phileas
 make test       # proves unitàries
 make clean && make debug   # amb AddressSanitizer i UBSan
 ./phileas [-c COLUMNES] [-a SEGONS] [-d IDIOMA] [fitxer.md]
-                     # -a 0 desactiva l'autodesat; -d no desactiva l'ortografia
+                     # -a 0 desactiva l'autodesat; -d activa l'ortografia en arrencar
 ```
 
 ## Entorn de desenvolupament
@@ -570,3 +570,11 @@ make clean && make debug   # amb AddressSanitizer i UBSan
     - F7 en el document d'11 MB: 0,19 s de CPU.
   - **Proves:** 1.547 comprovacions unitàries, també amb sanititzadors (tokenització i, si hi ha el diccionari català, consultes, cache, suggeriments i paraules ignorades), i proves interactives de marcatge, F7, suggeriments, afegir, ignorar, `idioma` i `-d`.
   - **Observació:** amb la normativa del 2017, el diccionari ja no accepta «dóna» (ara «dona»).
+- **2026-10-25** — Petició de l'usuari: l'ortografia **desactivada per defecte**, pensant en una Raspberry Pi de primera generació.
+  - **En arrencar:** no es carrega cap diccionari. Phileas ocupa ~3 MB de memòria, i ~27 MB amb el diccionari català.
+  - **Per activar-la:**
+    - F7 carrega el diccionari la primera vegada, activa el marcatge i salta al primer error;
+    - l'ordre `ortografia` de la paleta l'activa o la desactiva;
+    - Alt+Enter carrega el diccionari si cal, però no activa el marcatge;
+    - `-d IDIOMA` l'activa des de l'arrencada amb aquest diccionari.
+  - **Diccionari:** sense `-d`, el de la configuració regional.
