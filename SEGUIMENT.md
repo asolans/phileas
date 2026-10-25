@@ -4,7 +4,7 @@ Editor de text per a consola (Linux), orientat a escriure prosa en Markdown.
 
 ## Estat
 
-- **Fase actual:** 0 — Decisió d'arquitectura
+- **Fase actual:** 2 — Edició bàsica (F1 completada)
 - **Última actualització:** 2026-10-25
 
 ## Requeriments (versió inicial)
@@ -273,29 +273,42 @@ Lliures per al futur: Ctrl+D, Ctrl+E, Ctrl+J, Ctrl+K, Ctrl+T, Ctrl+U, F4–F6, F
 
 **Personalització:** totes les dreceres es poden reassignar al fitxer de configuració (`tecla.ctrl-k = tallar`). Més endavant es podria oferir un perfil `nano` predefinit.
 
-**Estat de la decisió:** ⏳ pendent de confirmar.
+**Estat de la decisió:** ✅ Confirmada (2026-10-25).
 
-## Arquitectura preliminar
+## Arquitectura
 
 ```
 src/
-  main.c        arrencada, arguments, bucle principal
-  buffer.c      emmagatzematge del text (vector de línies, proposat)
-  command.c     registre d'ordres amb nom (les dreceres apunten a noms)
-  utf8.c        utilitats UTF-8 i amplada de caràcters
-  wrap.c        wordwrap suau a N columnes (línies lògiques vs. visuals)
-  render.c      dibuix amb ncursesw, colors de Markdown mínims
-  input.c       tecles i dreceres
+  main.c        ✅ arrencada, arguments, bucle principal
+  util.c        ✅ assignació de memòria i errors fatals
+  utf8.c        ✅ descodificació UTF-8, amplada de caràcters, diacrítics combinats
+  buffer.c      ✅ vector de línies; càrrega i desat atòmic
+  wrap.c        ✅ wordwrap suau amb cache per línia
+  editor.c      ✅ estat de l'editor, cursor, moviment i desplaçament
+  command.c     ✅ registre d'ordres amb nom i taula de dreceres
+  keys.c        ✅ lectura de tecles i noms de tecla ("ctrl-s", "alt-<"...)
+  render.c      ✅ dibuix amb ncursesw, barra d'estat i diàlegs a la línia inferior
   search.c      cerca i substitució
   undo.c        historial desfer/refer
   spell.c       integració amb hunspell
   filebrowser.c navegació pel disc i obertura de fitxers
   config.c      configuració (~/.config/phileas/)
+tests/
+  test.c        ✅ proves de utf8, wrap i buffer (sense ncurses)
 ```
 
 Decisions de disseny pendents:
 
 - Format del fitxer de configuració.
+
+## Compilació i ús
+
+```
+make            # compila ./phileas
+make test       # proves unitàries
+make clean && make debug   # amb AddressSanitizer i UBSan
+./phileas [-c COLUMNES] [fitxer.md]
+```
 
 ## Entorn de desenvolupament
 
@@ -305,9 +318,9 @@ Decisions de disseny pendents:
 
 ## Full de ruta (provisional)
 
-- [ ] **F0** — Confirmar llenguatge i estructura del buffer
-- [ ] **F1** — Esquelet: obrir, mostrar, desplaçar-se, desar un fitxer UTF-8
-- [ ] **F2** — Edició bàsica + wordwrap a N columnes
+- [x] **F0** — Decisions d'arquitectura: llenguatge, buffer, wordwrap, dreceres
+- [x] **F1** — Esquelet: obrir, mostrar, desplaçar-se, desar un fitxer UTF-8 (inclou el wordwrap suau, necessari per mostrar els paràgrafs)
+- [ ] **F2** — Edició bàsica, sagnat penjant de llistes i cites, columna centrada
 - [ ] **F3** — Desfer/refer, cerca i substitució
 - [ ] **F4** — Colors mínims de Markdown (capçaleres, èmfasi)
 - [ ] **F5** — Navegador de fitxers
@@ -321,3 +334,22 @@ Decisions de disseny pendents:
 - **2026-10-25** — ✅ Confirmat: C sol + configuració declarativa + registre d'ordres. Anàlisi de l'estructura del buffer; proposta: vector de línies (línia = paràgraf).
 - **2026-10-25** — ✅ Confirmat: vector de línies. Anàlisi del wordwrap; proposta: suau a 72 columnes, amb moviment per línies visuals i sagnat penjant.
 - **2026-10-25** — ✅ Confirmat: wordwrap suau a 72 columnes. Proposta de dreceres: estil CUA adaptat al terminal, amb alternatives Alt per a la consola de Linux i una paleta d'ordres (Ctrl+P).
+- **2026-10-25** — ✅ Confirmades les dreceres. **F0 tancada.**
+- **2026-10-25** — **F1 completada.**
+  - **Funcionalitat:**
+    - obrir un fitxer (o començar-ne un de nou);
+    - mostrar-lo amb wordwrap suau;
+    - moure's per caràcters, línies visuals, paraules, paràgrafs, pàgines i document;
+    - anar a una línia;
+    - desar i desar com;
+    - sortir;
+    - paleta d'ordres bàsica (sense autocompleció).
+  - **Tecles:** les Ctrl+fletxes s'activen només si el terminal les té; si no, queden les alternatives amb Alt.
+  - **Desat:**
+    - és atòmic (fitxer temporal + `rename`);
+    - conserva els permisos, els enllaços simbòlics, els salts CRLF, la BOM, el salt final i els bytes no UTF-8.
+  - **Proves:**
+    - 1.230 comprovacions unitàries, també amb sanititzadors;
+    - proves interactives en un pseudoterminal (TERM=xterm i TERM=linux), incloent-hi el canvi de mida;
+    - document de 2,7 MB (40.000 línies): navegació fluida, ~9 MB de RSS.
+  - **Pendent de verificar:** l'execució en una Raspberry Pi real.
