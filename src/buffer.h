@@ -12,6 +12,9 @@ typedef struct {
     size_t *rows;
     size_t  nrows, rows_cap;
     int     wrap_w;    /* amplada amb què s'ha calculat; 0 = per calcular */
+
+    /* Cache de l'estimació de pàgines: mitges línies impreses; 0 = per calcular */
+    size_t  print_lines;
 } Line;
 
 typedef struct {
@@ -32,5 +35,8 @@ void buf_free(Buffer *b);
 /* Retornen 0 si va bé, o -1 amb errno. Si buf_load falla, b no canvia. */
 int  buf_load(Buffer *b, const char *path);
 int  buf_save(Buffer *b, const char *path);
+
+/* Estimació orientativa de pàgines si s'imprimís en A4 a 12 punts. */
+size_t buf_pages(Buffer *b);
 
 #endif

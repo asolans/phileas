@@ -49,6 +49,16 @@ static void draw_row(Editor *e, Line *l, size_t r, int y)
     }
 }
 
+/* Bytes de s que caben en n caràcters. */
+static size_t fit_chars(const char *s, int n)
+{
+    size_t len = strlen(s), i = 0;
+
+    while (n-- > 0 && i < len)
+        i = utf8_next(s, len, i);
+    return i;
+}
+
 static void draw_status(Editor *e)
 {
     int y = LINES - 2;
@@ -59,13 +69,14 @@ static void draw_status(Editor *e)
     snprintf(left, sizeof left, " %s%s",
              e->filename ? e->filename : "[sense nom]",
              e->buf.modified ? " [+]" : "");
-    snprintf(right, sizeof right, "L %zu/%zu  C %zu ",
-             e->cy + 1, e->buf.nlines, utf8_count(l->text, e->cx) + 1);
-    rlen = (int)strlen(right);
+    snprintf(right, sizeof right, "L %zu/%zu  C %zu  ≈%zu pàg. ",
+             e->cy + 1, e->buf.nlines, utf8_count(l->text, e->cx) + 1,
+             buf_pages(&e->buf));
+    rlen = (int)utf8_count(right, strlen(right));
 
     attron(A_REVERSE);
     mvhline(y, 0, ' ', COLS);
-    mvaddnstr(y, 0, left, COLS);
+    mvaddnstr(y, 0, left, (int)fit_chars(left, COLS - rlen - 1));
     if (rlen < COLS)
         mvaddstr(y, COLS - rlen, right);
     attroff(A_REVERSE);

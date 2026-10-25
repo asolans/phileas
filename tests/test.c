@@ -194,6 +194,60 @@ static void test_buffer(void)
     buf_free(&b);
 }
 
+static void set_text(Buffer *b, size_t n, const char *fill, size_t chars)
+{
+    Line *l;
+
+    buf_free(b);
+    b->lines = malloc(n * sizeof *b->lines);
+    b->cap = b->nlines = n;
+    for (size_t i = 0; i < n; i++) {
+        l = &b->lines[i];
+        memset(l, 0, sizeof *l);
+        l->text = malloc(chars * strlen(fill) + 1);
+        l->text[0] = '\0';
+        for (size_t k = 0; k < chars; k++)
+            strcat(l->text, fill);
+        l->len = strlen(l->text);
+        l->cap = l->len + 1;
+    }
+}
+
+static void test_pages(void)
+{
+    Buffer b;
+
+    buf_init(&b);
+    CHECK(buf_pages(&b) == 1);                 /* document buit */
+
+    set_text(&b, 46, "a", 80);                 /* 46 línies plenes */
+    CHECK(buf_pages(&b) == 1);
+    set_text(&b, 47, "a", 80);
+    CHECK(buf_pages(&b) == 2);
+    set_text(&b, 23, "à", 160);                /* es compten caràcters, no bytes */
+    CHECK(buf_pages(&b) == 1);
+    set_text(&b, 23, "à", 161);
+    CHECK(buf_pages(&b) == 2);
+
+    /* Paràgrafs separats per línies en blanc (mitja línia cadascuna):
+     * 31 paràgrafs d'una línia + 30 separacions = 46 línies */
+    set_text(&b, 61, "a", 80);
+    for (size_t i = 1; i < 61; i += 2)
+        b.lines[i].len = 0;
+    CHECK(buf_pages(&b) == 1);
+    b.lines[1].len = 80;                       /* una separació passa a ser text */
+    b.lines[1].print_lines = 0;
+    CHECK(buf_pages(&b) == 2);
+
+    set_text(&b, 46, "a", 80);
+    b.lines[45].len = 0;                        /* línia en blanc final */
+    b.lines[45].print_lines = 0;
+    b.lines[0].text[0] = '#';                   /* capçalera: +1 línia */
+    b.lines[0].print_lines = 0;
+    CHECK(buf_pages(&b) == 1);
+    buf_free(&b);
+}
+
 int main(void)
 {
     if (!setlocale(LC_ALL, "C.UTF-8")) {
@@ -207,6 +261,7 @@ int main(void)
     test_utf8();
     test_wrap();
     test_buffer();
+    test_pages();
     rmdir(tmpdir);
 
     printf("%d comprovacions, %d errors\n", checks, failures);

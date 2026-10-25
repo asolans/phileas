@@ -1,4 +1,5 @@
 #include "buffer.h"
+#include "utf8.h"
 #include "util.h"
 
 #include <errno.h>
@@ -192,4 +193,42 @@ fail:
     free(real);
     errno = err;
     return -1;
+}
+
+/* A4 amb marges de 2,5 cm (16 x 24,7 cm útils) i una font convencional de
+ * 12 punts amb interlineat senzill: unes 80 lletres per línia i 46 línies
+ * per pàgina (~600 paraules). Es compta en mitges línies: cada paràgraf
+ * ocupa les línies que necessita, una línia en blanc equival a l'espai entre
+ * paràgrafs (mitja línia) i una capçalera suma una línia per l'espai que
+ * l'envolta. */
+#define PRINT_CHARS_PER_LINE 80
+#define PRINT_LINES_PER_PAGE 46
+
+static size_t print_half_lines(Line *l)
+{
+    size_t chars;
+
+    if (l->print_lines == 0) {
+        chars = utf8_count(l->text, l->len);
+        if (chars == 0) {
+            l->print_lines = 1;
+        } else {
+            l->print_lines = 2 * ((chars + PRINT_CHARS_PER_LINE - 1) / PRINT_CHARS_PER_LINE);
+            if (l->text[0] == '#')
+                l->print_lines += 2;
+        }
+    }
+    return l->print_lines;
+}
+
+size_t buf_pages(Buffer *b)
+{
+    size_t half = 0, per_page = 2 * PRINT_LINES_PER_PAGE;
+
+    for (size_t i = 0; i < b->nlines; i++)
+        half += print_half_lines(&b->lines[i]);
+    /* Les línies en blanc del final no omplen cap pàgina */
+    for (size_t i = b->nlines; i > 0 && b->lines[i - 1].len == 0; i--)
+        half--;
+    return half ? (half + per_page - 1) / per_page : 1;
 }

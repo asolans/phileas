@@ -353,3 +353,9 @@ make clean && make debug   # amb AddressSanitizer i UBSan
     - proves interactives en un pseudoterminal (TERM=xterm i TERM=linux), incloent-hi el canvi de mida;
     - document de 2,7 MB (40.000 línies): navegació fluida, ~9 MB de RSS.
   - **Pendent de verificar:** l'execució en una Raspberry Pi real.
+- **2026-10-25** — Prova de l'usuari: el wordwrap i el moviment del cursor són correctes. La prova en una Raspberry Pi queda pendent.
+- **2026-10-25** — Barra d'estat: estimació orientativa de pàgines (`≈N pàg.`).
+  - **Model:** A4 amb marges de 2,5 cm, font de 12 punts amb interlineat senzill, 80 caràcters per línia i 46 línies per pàgina (~600 paraules).
+  - **Compte:** les línies en blanc compten mitja línia (l'espai entre paràgrafs) i les capçaleres, una línia més.
+  - **Rendiment:** el resultat es guarda per línia, de manera que només es recompta el que canvia.
+  - **Correcció:** els noms de fitxer llargs es retallen i ja no se superposen a la part dreta de la barra.
