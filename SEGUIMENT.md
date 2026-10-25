@@ -627,3 +627,26 @@ make clean && make debug   # amb AddressSanitizer i UBSan
     - tallar, copiar, enganxar i esborrar seleccions fetes amb Maj+fletxes, Ctrl+Maj+fletxes, Maj+Inici, Maj+RePàg i Ctrl+Maj+Inici/Fi, amb TERM=simple (sense les tecles al terminfo), linux i xterm-256color;
     - les mateixes proves a la Raspberry Pi amb TERM=linux;
     - una seqüència desconeguda (`\e[1;9Z`) no deixa rastre al text.
+- **2026-10-25** — **Ortografia a la Raspberry Pi 1.**
+  - **hunspell 1.7.2** compilat amb la toolchain de buildroot, a partir del codi font oficial (SHA-256 `11ddfa39…65b8`). Només la biblioteca: `libhunspell-1.7.so.0`, 711 KB sense símbols, que depèn de `libstdc++` (ja és a la imatge).
+  - **A la Pi, a `/tmp/phileas`:** la biblioteca a `lib/` i els diccionaris `ca` i `es_ES` a `dict/`, copiats del PC. Phileas els troba amb `LD_LIBRARY_PATH` i `DICPATH`, sense tocar la imatge.
+  - **Proves unitàries a la Pi:** 1.552 comprovacions, 0 errors, ara també amb hunspell (5 s, sobretot per la càrrega dels diccionaris).
+  - **Mesures** (temps real per SSH):
+
+    | Acció | Temps | Memòria (RSS) |
+    |-------|-------|---------------|
+    | Obrir un document, sense ortografia | — | 2,4 MB |
+    | F7: carregar el català i activar | 2,4 s | 16 MB |
+    | F8: passar al castellà | 1,4 s | 20 MB |
+    | F8: tornar al català | 3,1 s | 20 MB |
+    | F7: desactivar o reactivar (sense recarregar) | instantani | 20 MB |
+    | Maj+F7: error següent | 0,04 s | 20 MB |
+    | Alt+Enter: suggeriments | 1,3 s | 20 MB |
+    | Escriure amb l'ortografia activa | ~6 ms per lletra | 20 MB |
+
+  - **Conclusions:**
+    - desactivar l'ortografia per defecte és encertat: sense ortografia, Phileas ocupa 2,4 MB;
+    - escriure amb l'ortografia activa no es nota, gràcies a la cache de paraules;
+    - el cost és cada canvi d'idioma amb F8 (1,4–3,1 s), perquè es torna a carregar el diccionari;
+    - els suggeriments triguen ~1,3 s, i mentrestant la barra diu «Buscant suggeriments…».
+  - **Per fer-ho permanent a la imatge** (decisió de l'usuari): afegir `libhunspell-1.7.so.0` i els diccionaris a l'arrel (p. ex. `/usr/lib` i `/usr/share/hunspell`), o deixar-los a `/data` i exportar `LD_LIBRARY_PATH` i `DICPATH` al perfil.
