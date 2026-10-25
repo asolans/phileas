@@ -405,6 +405,11 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 - [ ] **F6b** — Ajuda: F1 obre una finestra amb una guia de totes les dreceres de teclat
 - [ ] **F6c** — Mode màquina d'escriure («typewriter»): la línia on s'escriu es manté a una altura fixa de la pantalla i el text no arriba mai a baix de tot (pensat per a una pantalla en vertical)
 - [ ] **F7** — Configuració i proves en Raspberry Pi
+- [ ] **F8** — Integració al projecte BYOK (`~/byok-build`), quan el processador estigui avançat:
+  - afegir Phileas a la imatge com a paquet de buildroot;
+  - afegir-hi la biblioteca `libhunspell-1.7.so.0` (compilada com a la prova del 2026-10-25) a `/usr/lib`;
+  - posar els diccionaris `ca` i `es_ES` (`.aff` i `.dic`) a `/usr/share/hunspell`, on Phileas els troba sense variables d'entorn;
+  - tenir en compte el mapa de teclat de la imatge (`/usr/share/byok/teclat.map`), que Phileas ja interpreta.
 
 ## Registre
 
@@ -668,3 +673,4 @@ make clean && make debug   # amb AddressSanitizer i UBSan
     La memòria és la mateixa que abans: la glibc no retornava al sistema la memòria del diccionari descarregat.
   - **Proves:** 1.561 comprovacions unitàries, també amb sanititzadors (dos diccionaris, cache independent per idioma, paraules ignorades compartides, descart del menys usat).
   - **A la Pi, per provar-ho:** `/tmp/phileas/ph FITXER`, un guió que arrenca `phileas-nou` amb la biblioteca i els diccionaris de `/tmp/phileas`.
+- **2026-10-25** — Decisió de l'usuari: quan el processador estigui avançat, s'integrarà al projecte BYOK, i llavors s'hi afegiran `libhunspell` i els diccionaris a `/usr`. Anotat al full de ruta com a **F8**.
