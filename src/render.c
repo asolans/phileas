@@ -243,7 +243,7 @@ void render(Editor *e)
     tr = e->top_row;
     crow = ed_cursor_row(e);
     has_sel = ed_selection(e, &sa, &sz);
-    for (int y = 0; y < e->height; y++) {
+    for (int y = e->top_blank; y < e->height; y++) {
         size_t s0 = 0, s1 = 0;
 
         if (has_sel && tl >= sa.line && tl <= sz.line) {

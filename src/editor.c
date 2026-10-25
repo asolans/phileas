@@ -20,6 +20,7 @@ void ed_init(Editor *e, int columns)
     e->height = 1;
     e->want_x = -1;
     e->autosave_max = 300;
+    e->recenter = 1;
     e->colors = 1;
     e->tw_mode = TW_SALT;
     e->tw_limit = 85;
@@ -47,6 +48,8 @@ int ed_open(Editor *e, const char *path)
     e->filename = path ? xstrdup(path) : NULL;
     e->cy = e->cx = 0;
     e->top_line = e->top_row = 0;
+    e->top_blank = 0;
+    e->recenter = 1;   /* el final del text (o el document buit) a l'ancoratge */
     e->want_x = -1;
     e->sel_mode = SEL_NONE;
     e->last_act = ACT_NONE;
@@ -170,16 +173,19 @@ static int vpos_before(size_t l1, size_t r1, size_t l2, size_t r2)
     return l1 < l2 || (l1 == l2 && r1 < r2);
 }
 
-/* Posa la fila de dalt de manera que el cursor quedi row files per sota
- * (menys, si s'arriba a l'inici del document). */
+/* Posa la fila de dalt de manera que el cursor quedi row files per sota.
+ * Si abans s'arriba a l'inici del document, la resta són files en blanc
+ * per sobre, com un full que comença a mitja pantalla. */
 static void put_cursor_at(Editor *e, int row)
 {
     size_t tl = e->cy, tr = ed_cursor_row(e);
+    int i;
 
-    for (int i = 0; i < row && ed_vpos_prev(e, &tl, &tr); i++)
+    for (i = 0; i < row && ed_vpos_prev(e, &tl, &tr); i++)
         ;
     e->top_line = tl;
     e->top_row = tr;
+    e->top_blank = row - i;
 }
 
 /* Fila de pantalla del cursor (des de la fila de dalt), o -1 si és per
@@ -187,7 +193,7 @@ static void put_cursor_at(Editor *e, int row)
 static int cursor_screen_row(Editor *e, int max)
 {
     size_t tl = e->top_line, tr = e->top_row, cr = ed_cursor_row(e);
-    int row = 0;
+    int row = e->top_blank;
 
     if (vpos_before(e->cy, cr, tl, tr))
         return -1;
@@ -212,6 +218,13 @@ static void typewriter_layout(Editor *e)
         limit = h - 1;
     if (limit < anchor)
         limit = anchor;
+    if (e->top_blank > anchor)   /* p. ex. si la pantalla s'ha fet més petita */
+        e->top_blank = anchor;
+    if (e->recenter) {
+        e->recenter = 0;
+        put_cursor_at(e, anchor);
+        return;
+    }
     row = cursor_screen_row(e, limit);
     if (e->tw_mode == TW_FIXA ? row != anchor : row < 0 || row > limit)
         put_cursor_at(e, anchor);
@@ -237,6 +250,8 @@ void ed_layout(Editor *e, int screen_cols, int screen_lines)
         typewriter_layout(e);
         return;
     }
+    e->top_blank = 0;
+    e->recenter = 0;
     cr = ed_cursor_row(e);
     if (vpos_before(e->cy, cr, e->top_line, e->top_row)) {
         e->top_line = e->cy;
@@ -343,7 +358,10 @@ void ed_page_up(Editor *e)
 void ed_page_down(Editor *e)
 {
     for (int i = 0; i < (e->height > 1 ? e->height - 1 : 1); i++) {
-        ed_vpos_next(e, &e->top_line, &e->top_row);
+        if (e->top_blank > 0)
+            e->top_blank--;
+        else
+            ed_vpos_next(e, &e->top_line, &e->top_row);
         ed_move_down(e);
     }
 }

@@ -735,3 +735,12 @@ make clean && make debug   # amb AddressSanitizer i UBSan
     - `editor.c` no depèn de ncurses i ara també entra a les proves unitàries: 1.579 comprovacions (salt, línia fixa, clàssic, inici i final del document, canvi de mida);
     - proves interactives i a la Pi: 1.577 comprovacions; les dues que falten necessiten el diccionari valencià, que la Pi no té.
   - **Pendent de verificar a la consola de la Pi:** si la línia fixa és fluida amb la pantalla girada.
+- **2026-10-25** — Prova de l'usuari de la F6c: tot correcte. Ajust visual a l'estil WordGrinder: **en obrir o crear un document, el cursor va a l'ancoratge** (55 %).
+  - **Document nou o buit:** el cursor comença a mitja pantalla.
+  - **Document existent:** el final del text queda a l'ancoratge, encara que el document no ompli la pantalla. En aquest cas, per sobre del text hi ha espai en blanc.
+  - **En escriure:** el text va baixant des d'aquest punt i entra en la lògica del salt (85 % → 55 %), que es menja l'espai en blanc de dalt.
+  - **En pujar dins la primera pantalla:** el text no es mou.
+  - **AvPàg:** primer consumeix l'espai en blanc.
+  - **Mode clàssic:** sense espai en blanc a dalt.
+  - **Implementació:** `top_blank`, les files en blanc per sobre de l'inici del document, i `recenter`, que activen `ed_open` i `ed_init`.
+  - **Proves:** 1.587 comprovacions unitàries (1.585 a la Pi) i proves interactives: sense fitxer, fitxer nou, document curt, Ctrl+N i Ctrl+O.

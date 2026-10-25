@@ -31,6 +31,8 @@ typedef struct {
     size_t  cy, cx;            /* cursor: línia i byte dins la línia */
     int     want_x;            /* columna visual desitjada per a ↑/↓; -1 = la del cursor */
     size_t  top_line, top_row; /* primera fila visual a dalt de la pantalla */
+    int     top_blank;         /* files en blanc per sobre de l'inici del document */
+    int     recenter;          /* posar el cursor a l'ancoratge en el pròxim ed_layout */
 
     int     sel_mode;
     Pos     anchor;            /* extrem fix de la selecció */
