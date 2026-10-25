@@ -482,3 +482,4 @@ make clean && make debug   # amb AddressSanitizer i UBSan
     - els documents sense nom no es desen sols, i la barra avisa una vegada que cal desar-los amb un nom;
     - l'espera es fa amb el temps límit de ncurses: no consumeix CPU en repòs.
   - **Proves:** 1.467 comprovacions unitàries, també amb sanititzadors, i proves interactives de totes les funcions.
+- **2026-10-25** — Prova de l'usuari de la F3: tot correcte. La barra d'estat mostra les pàgines sense el signe ≈ (`N pàg.`).

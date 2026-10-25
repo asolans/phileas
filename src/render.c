@@ -87,7 +87,7 @@ static void draw_status(Editor *e)
     snprintf(left, sizeof left, " %s%s",
              e->filename ? e->filename : "[sense nom]",
              e->buf.modified ? " [+]" : "");
-    snprintf(right, sizeof right, "L %zu/%zu  C %zu  ≈%zu pàg. ",
+    snprintf(right, sizeof right, "L %zu/%zu  C %zu  %zu pàg. ",
              e->cy + 1, e->buf.nlines, utf8_count(l->text, e->cx) + 1,
              buf_pages(&e->buf));
     rlen = (int)utf8_count(right, strlen(right));
