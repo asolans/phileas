@@ -1,0 +1,7 @@
+simple|terminal mínim per a proves,
+	am, cols#80, lines#24, colors#8, pairs#64,
+	cup=\E[%i%p1%d;%p2%dH, clear=\E[H\E[J, el=\E[K, cr=\r, ind=\n,
+	sgr0=\E[0m, rev=\E[7m, bold=\E[1m, dim=\E[2m, smul=\E[4m, rmul=\E[24m,
+	setaf=\E[3%p1%dm, setab=\E[4%p1%dm, op=\E[39;49m,
+	kcuu1=\E[A, kcud1=\E[B, kcub1=\E[D, kcuf1=\E[C, khome=\E[H, kend=\E[F,
+	kpp=\E[5~, knp=\E[6~, kdch1=\E[3~, kbs=^?, kf1=\EOP, kf7=\E[18~, kf8=\E[19~, kf19=\E[18;2~,

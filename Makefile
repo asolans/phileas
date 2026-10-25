@@ -31,9 +31,14 @@ debug: OPT = -O0 -g -fsanitize=address,undefined
 debug: LDFLAGS += -fsanitize=address,undefined
 debug: phileas build/test_phileas
 
+# Instal·lació (també per a un paquet de buildroot: make DESTDIR=... install)
+PREFIX  ?= /usr
+install: phileas
+	install -D -m 0755 phileas $(DESTDIR)$(PREFIX)/bin/phileas
+
 clean:
 	rm -rf build phileas
 
 -include $(OBJ:.o=.d)
 
-.PHONY: test debug clean
+.PHONY: test debug clean install

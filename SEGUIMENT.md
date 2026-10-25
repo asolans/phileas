@@ -533,6 +533,14 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - tenir en compte el mapa de teclat de la imatge (`/usr/share/byok/teclat.map`), que Phileas ja interpreta;
   - exportar `PHILEAS_CONFIG=/data/phileas` al perfil (l'arrel és de només lectura), i posar els valors per defecte de la imatge a `/etc/phileas/phileasrc`.
 
+  **Notes per a la integració** (2026-10-25):
+  - **Compilació:** el Makefile ja accepta `CC` i `PKG_CONFIG`, i té `make DESTDIR=… PREFIX=/usr install`. Només depèn de ncursesw en compilar; hunspell es carrega en temps d'execució (`dlopen`) i no cal en compilar.
+  - **hunspell:** el buildroot de `~/byok-build` no en té paquet. Cal un paquet propi (font oficial `hunspell-1.7.2.tar.gz`, SHA-256 `11ddfa39afe28c28539fe65fc4f1592d410c1e9b6dd7d8a91ca25d85e9ec65b8`, `--disable-nls --without-ui --without-readline`). Només s'ha d'instal·lar `libhunspell-1.7.so.0`, ~711 KB, que depèn de `libstdc++`, ja present.
+  - **Diccionaris:** `ca.aff/.dic` (3,1 MB) i `es_ES.aff/.dic` (0,9 MB) a `/usr/share/hunspell`. **L'arrel (squashfs) és plena** (41,5 MB al 100 %): caldrà fer lloc o fer-la créixer en uns 5 MB (menys un cop comprimits).
+  - **Arrencada:** al missatge de `tty1` (`/etc/profile.d/byok.sh`), afegir Phileas al costat de `wg`.
+  - **Eines de prova** a `tools/`: `ptyrun.c` (pseudoterminal a la Pi, on dropbear no n'obre), `screen.py` i `simple.ti` (emulador de pantalla mínim per a les proves interactives).
+  - **A la Pi, `/tmp/phileas`** (es perd en reiniciar): `phileas-nou`, el guió `ph`, `lib/libhunspell-1.7.so.0`, `dict/` i `config/phileasrc`.
+
 ## Registre
 
 - **2026-10-25** — Inici del projecte. Repositori git creat. Anàlisi de llenguatges; proposta: C + ncursesw + hunspell.
@@ -865,3 +873,4 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **Causa:** els terminfo `linux` (la consola) i `screen` declaren Ctrl+Z com a tecla de suspendre (`kspd=^Z`). ncurses el convertia en el codi `KEY_SUSPEND`, que no té cap ordre. No era el mapa de teclat (Ctrl+Z hi envia 0x1A) ni els senyals (el terminal té `-isig`). A xterm funcionava perquè `xterm-256color` no té `kspd`.
   - **Solució:** `keyok(KEY_SUSPEND, FALSE)` a `key_init()`, perquè ncurses no tradueixi aquesta tecla. És l'única tecla d'un sol caràcter de control en aquesta situació: `kbs`, el Retrocés, ja es tractava.
   - **Proves:** desfer després d'escriure i d'esborrar amb Supr, i refer, amb TERM=linux, screen i xterm-256color al PC, i a la Pi amb TERM=linux.
+- **2026-10-25** — Final de la jornada: totes les fases F0–F7 completades i provades a la Raspberry Pi 1. Afegits `make install` (per al paquet de buildroot) i les eines de prova a `tools/`. **Pla:** l'endemà s'integra Phileas al projecte BYOK, i tots dos projectes evolucionaran junts des d'allà (vegeu les notes de la F8).
