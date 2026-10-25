@@ -396,6 +396,79 @@ Amb aquests dos valors surten els tres modes:
 
 **Estat de la decisió:** ✅ Confirmada (2026-10-25).
 
+## Configuració (F7, proposta pendent de confirmar)
+
+Ja decidit a la F0: C sol, amb un fitxer declaratiu (`clau = valor`) i les dreceres apuntant a ordres amb nom.
+
+### On és el fitxer
+
+Per ordre de prioritat (el primer que mana):
+
+1. **Línia d'ordres:** `-c`, `-a`, `-d`… manen sobre el fitxer.
+2. **Fitxer de l'usuari:** `$PHILEAS_CONFIG/phileasrc` si existeix aquesta variable; si no, `$XDG_CONFIG_HOME/phileas/phileasrc`; si no, `~/.config/phileas/phileasrc`.
+3. **Fitxer del sistema:** `/etc/phileas/phileasrc`, amb els valors per defecte d'una instal·lació (p. ex. la imatge BYOK).
+4. **Valors interns:** els d'ara.
+
+**Per què `PHILEAS_CONFIG`:** a la Pi, `/root` és de només lectura i només es pot escriure a `/data` (a la imatge, micro ja fa servir `MICRO_CONFIG_HOME=/data/micro`). Amb `PHILEAS_CONFIG=/data/phileas`, la configuració i els diccionaris personals hi van a parar. Ara mateix, a la Pi, afegir una paraula al diccionari personal falla per aquest motiu.
+
+### Format
+
+```
+# Phileas: configuració. Les línies que comencen per # són comentaris.
+# Els valors de sí/no admeten: si, sí, no.
+
+# Text
+columnes = 72
+centrar = no
+colors = si
+
+# Màquina d'escriure: salt, fixa o classic
+maquina-escriure = salt
+maquina-escriure-limit = 80        # % de l'alçada
+maquina-escriure-ancoratge = 50    # % de l'alçada
+
+# Desat
+autodesat = 30                     # segons sense escriure; 0 = desactivat
+autodesat-maxim = 300
+
+# Ortografia
+ortografia = no                    # activa en arrencar?
+idiomes = ca es                    # rotació de F8; el primer és el de l'arrencada
+
+# Colors: negre, vermell, verd, groc, blau, magenta, cian, blanc o cap
+color-capcalera-1 = magenta
+color-capcalera-2 = cian
+color-capcalera-3 = verd
+color-codi = groc
+color-cita = verd
+color-error = vermell
+
+# Dreceres: tecla.NOM = ordre (buit = sense drecera)
+tecla.ctrl-t = maquina-escriure
+tecla.f9 = colors
+tecla.ctrl-h =
+```
+
+- **Errors:** una línia incorrecta no impedeix arrencar. La línia s'ignora i la barra d'estat avisa: «phileasrc, línia 12: opció desconeguda «colums»». Si n'hi ha més d'una, avisa de la primera i en diu el total.
+- **Noms de tecla:** els que ja fa servir el registre (`ctrl-s`, `alt-<`, `f7`, `shift-f7`, `ctrl-shift-left`…).
+- **Ordres noves:**
+  - `recarregar-configuracio` (paleta): torna a llegir el fitxer sense sortir de Phileas;
+  - `phileas --config` escriu a la sortida estàndard un fitxer complet amb tots els valors per defecte comentats, per fer-ne una còpia i retocar-la.
+
+### Un problema que cal resoldre abans: els fitxers que no són Markdown
+
+En carregar un fitxer, Phileas ajunta les línies seguides d'un paràgraf (text tallat a mà) i, en desar-lo, hi posa una línia en blanc entre blocs. Per a un `.md` és el comportament desitjat. Per a un fitxer de configuració (`columnes = 72` i `centrar = no` en dues línies seguides), en canvi, el desfaria: quedaria `columnes = 72 centrar = no`.
+
+**Proposta:** els fitxers que no acaben en `.md`, `.markdown` o `.txt` s'obren en **mode text pla**:
+- cada línia del fitxer és una línia, i no s'ajunten;
+- no hi ha separació visual de paràgrafs;
+- no hi ha colors de Markdown ni continuació de llistes;
+- la barra d'estat diu `text`.
+
+Així el fitxer de configuració (i qualsevol altre) es pot editar amb el mateix Phileas sense fer-lo malbé. És una mica més de feina, però avui obrir un fitxer qualsevol el pot alterar en desar-lo.
+
+**Estat de la decisió:** pendent de confirmar.
+
 ## Arquitectura
 
 ```
@@ -748,3 +821,4 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **Nous valors per defecte:** límit 80 % i ancoratge 50 %. El salt manté la mida (un 30 % de l'alçada).
   - **A la pantalla vertical de la Pi** (58 files de text): en passar la fila 46, el cursor torna a la 29.
   - **Proves:** 1.588 comprovacions unitàries (1.586 a la Pi).
+- **2026-10-25** — Prova de l'usuari del salt 80 % → 50 %: va bé. Proposta de la configuració (F7): fitxer `phileasrc` declaratiu, amb prioritats (línia d'ordres > usuari > `/etc/phileas` > valors interns) i `PHILEAS_CONFIG` per a la Pi, on només `/data` és escrivible. Detectat un problema previ: els fitxers que no són Markdown es poden alterar en desar-los (s'ajunten línies); proposta de mode text pla. Pendent de confirmar.
