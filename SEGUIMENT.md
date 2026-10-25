@@ -857,3 +857,7 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **Pensada per a 75 columnes** (la consola vertical de la Pi): el nom d'ordre només es mostra si hi cap sencer.
   - **Proves:** interactives a 80 i a 75 columnes (filtre, tecles del `phileasrc`, Esc), i a la Pi amb TERM=linux. Unitàries: 1.628 (1.626 a la Pi).
 - **2026-10-25** — Fases F0–F7 completades. Pla de l'usuari: començar la integració al projecte BYOK (F8) l'endemà.
+- **2026-10-25** — Petició de l'usuari: l'ajuda inclou ara les **ordres de la paleta**.
+  - **Secció pròpia, al principi:** «Ordres de la paleta», amb les ordres que no tenen cap tecla assignada. A la primera columna hi ha el nom que cal escriure després de Ctrl+P.
+  - **Es genera sola:** si al `phileasrc` s'assigna una tecla a una d'aquestes ordres, deixa de sortir en aquesta secció.
+  - **A les seccions per temes**, les ordres sense tecla es marquen amb «paleta».

@@ -52,7 +52,7 @@ static const char *const intro[] = {
 #define NINTRO (sizeof intro / sizeof intro[0])
 
 typedef struct {
-    int  kind;          /* 0 = text, 1 = títol de secció, 2 = ordre */
+    int  kind;          /* 0 = text, 1 = títol de secció, 2 = ordre, 3 = ordre de la paleta */
     char keys[96];
     const char *name;   /* ordre */
     const char *text;   /* descripció o text */
@@ -100,6 +100,20 @@ static void build(void)
     memset(shown, 0, ncmd);
     for (size_t i = 0; i < NINTRO; i++)
         add_row(0)->text = intro[i];
+
+    /* Les ordres sense tecla, que només es poden fer servir amb la paleta */
+    add_row(1)->text = "Ordres de la paleta (Ctrl+P i el nom; no tenen tecla)";
+    for (size_t i = 0; i < ncmd; i++) {
+        int k;
+
+        if (cmd_keys(cmd_at(i), &k, 1) == 0) {
+            Row *r = add_row(3);
+
+            r->name = cmd_at(i)->name;
+            r->text = cmd_at(i)->desc;
+        }
+    }
+
     for (size_t s = 0; s < NSECTIONS; s++) {
         add_row(1)->text = sections[s].title;
         for (const char *const *n = sections[s].names; *n; n++) {
@@ -151,7 +165,7 @@ static int row_matches(const Row *r, const char *filter)
 {
     if (!*filter)
         return 1;
-    if (r->kind != 2)
+    if (r->kind < 2)
         return 0;
     return contains(r->keys, filter) || contains(r->name, filter) || contains(r->text, filter);
 }
@@ -202,13 +216,24 @@ static void draw(size_t *vis, size_t nvis, size_t top, const char *filter)
             move(y + 1, 1);
             put(r->text, COLS - 2);
             attroff(A_BOLD);
+        } else if (r->kind == 3) {
+            /* El nom és el que s'escriu a la paleta: a la primera columna */
+            int namew = (int)utf8_count(r->name, strlen(r->name));
+            int w = namew + 2 > keyw ? namew + 2 : keyw;
+
+            move(y + 1, 3);
+            put(r->name, COLS - 4);
+            if (3 + w < COLS - 1) {
+                move(y + 1, 3 + w);
+                put(r->text, COLS - 4 - w);
+            }
         } else {
             move(y + 1, 3);
             if (r->keys[0])
                 put(r->keys, keyw - 1);
             else {
                 attron(A_DIM);
-                put("—", keyw - 1);
+                put("paleta", keyw - 1);
                 attroff(A_DIM);
             }
             move(y + 1, 3 + keyw);
