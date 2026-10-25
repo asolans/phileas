@@ -45,6 +45,138 @@ void buf_free(Buffer *b)
     memset(b, 0, sizeof *b);
 }
 
+/* ---- Edició ----
+ * Tota modificació del text passa per buf_insert i buf_delete: és el punt
+ * on el desfer/refer (F3) enregistrarà les operacions. */
+
+static void line_changed(Buffer *b, Line *l)
+{
+    l->wrap_w = 0;
+    l->print_lines = 0;
+    b->modified = 1;
+}
+
+static void line_reserve(Line *l, size_t len)
+{
+    if (len + 1 > l->cap) {
+        while (len + 1 > l->cap)
+            l->cap *= 2;
+        l->text = xrealloc(l->text, l->cap);
+    }
+}
+
+static void line_splice(Line *l, size_t at, size_t del, const char *s, size_t n)
+{
+    line_reserve(l, l->len - del + n);
+    memmove(l->text + at + n, l->text + at + del, l->len - at - del + 1);
+    memcpy(l->text + at, s, n);
+    l->len = l->len - del + n;
+}
+
+/* Obre k línies buides (sense inicialitzar) a partir de la posició at. */
+static void open_lines(Buffer *b, size_t at, size_t k)
+{
+    if (b->nlines + k > b->cap) {
+        while (b->nlines + k > b->cap)
+            b->cap *= 2;
+        b->lines = xrealloc(b->lines, b->cap * sizeof *b->lines);
+    }
+    memmove(b->lines + at + k, b->lines + at, (b->nlines - at) * sizeof *b->lines);
+    b->nlines += k;
+}
+
+Pos buf_insert(Buffer *b, Pos at, const char *s, size_t n)
+{
+    Line *l = &b->lines[at.line];
+    const char *nl = memchr(s, '\n', n);
+    size_t k = 0, tail_len, seg;
+    char *tail;
+    Pos end;
+
+    if (!nl) {
+        line_splice(l, at.col, 0, s, n);
+        line_changed(b, l);
+        return (Pos){ at.line, at.col + n };
+    }
+
+    for (size_t i = 0; i < n; i++)
+        k += s[i] == '\n';
+    /* El que hi ha darrere del cursor passa al final de l'última línia nova */
+    tail_len = l->len - at.col;
+    tail = xmalloc(tail_len + 1);
+    memcpy(tail, l->text + at.col, tail_len);
+    seg = (size_t)(nl - s);
+    l->len = at.col;
+    l->text[at.col] = '\0';
+    line_splice(l, at.col, 0, s, seg);
+    line_changed(b, l);
+
+    open_lines(b, at.line + 1, k);
+    s = nl + 1;
+    n -= seg + 1;
+    for (size_t j = 1; j <= k; j++) {
+        nl = memchr(s, '\n', n);
+        seg = nl ? (size_t)(nl - s) : n;
+        line_init(&b->lines[at.line + j], s, seg);
+        if (nl) {
+            s = nl + 1;
+            n -= seg + 1;
+        }
+    }
+    end.line = at.line + k;
+    end.col = b->lines[end.line].len;
+    line_splice(&b->lines[end.line], end.col, 0, tail, tail_len);
+    free(tail);
+    return end;
+}
+
+void buf_delete(Buffer *b, Pos a, Pos z)
+{
+    Line *la = &b->lines[a.line], *lz;
+
+    if (a.line == z.line) {
+        line_splice(la, a.col, z.col - a.col, "", 0);
+        line_changed(b, la);
+        return;
+    }
+    lz = &b->lines[z.line];
+    la->len = a.col;
+    la->text[a.col] = '\0';
+    line_splice(la, a.col, 0, lz->text + z.col, lz->len - z.col);
+    line_changed(b, la);
+    for (size_t i = a.line + 1; i <= z.line; i++) {
+        free(b->lines[i].text);
+        free(b->lines[i].rows);
+    }
+    memmove(b->lines + a.line + 1, b->lines + z.line + 1,
+            (b->nlines - z.line - 1) * sizeof *b->lines);
+    b->nlines -= z.line - a.line;
+}
+
+char *buf_extract(const Buffer *b, Pos a, Pos z, size_t *n)
+{
+    size_t len = 0, k = 0;
+    char *out;
+
+    for (size_t i = a.line; i <= z.line; i++) {
+        size_t from = i == a.line ? a.col : 0;
+        size_t to = i == z.line ? z.col : b->lines[i].len;
+        len += to - from + (i < z.line);
+    }
+    out = xmalloc(len + 1);
+    for (size_t i = a.line; i <= z.line; i++) {
+        size_t from = i == a.line ? a.col : 0;
+        size_t to = i == z.line ? z.col : b->lines[i].len;
+        memcpy(out + k, b->lines[i].text + from, to - from);
+        k += to - from;
+        if (i < z.line)
+            out[k++] = '\n';
+    }
+    out[k] = '\0';
+    *n = k;
+    return out;
+}
+
 static char *read_file(const char *path, size_t *len)
 {
     FILE *f;

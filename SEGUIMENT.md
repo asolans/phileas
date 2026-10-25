@@ -4,7 +4,7 @@ Editor de text per a consola (Linux), orientat a escriure prosa en Markdown.
 
 ## Estat
 
-- **Fase actual:** 2 — Edició bàsica (F1 completada)
+- **Fase actual:** 3 — Desfer/refer, cerca i substitució (F2 completada)
 - **Última actualització:** 2026-10-25
 
 ## Requeriments (versió inicial)
@@ -282,11 +282,12 @@ src/
   main.c        ✅ arrencada, arguments, bucle principal
   util.c        ✅ assignació de memòria i errors fatals
   utf8.c        ✅ descodificació UTF-8, amplada de caràcters, diacrítics combinats
-  buffer.c      ✅ vector de línies; càrrega i desat atòmic
-  wrap.c        ✅ wordwrap suau amb cache per línia
-  editor.c      ✅ estat de l'editor, cursor, moviment i desplaçament
+  buffer.c      ✅ vector de línies; inserir/esborrar/extreure; càrrega i desat atòmic
+  md.c          ✅ prefixos de bloc Markdown (llistes, cites, tasques)
+  wrap.c        ✅ wordwrap suau amb sagnat penjant i cache per línia
+  editor.c      ✅ estat de l'editor, cursor, moviment, edició, selecció i porta-retalls
   command.c     ✅ registre d'ordres amb nom i taula de dreceres
-  keys.c        ✅ lectura de tecles i noms de tecla ("ctrl-s", "alt-<"...)
+  keys.c        ✅ lectura de tecles, noms de tecla ("ctrl-s", "alt-<"...) i enganxat delimitat
   render.c      ✅ dibuix amb ncursesw, barra d'estat i diàlegs a la línia inferior
   search.c      cerca i substitució
   undo.c        historial desfer/refer
@@ -294,7 +295,7 @@ src/
   filebrowser.c navegació pel disc i obertura de fitxers
   config.c      configuració (~/.config/phileas/)
 tests/
-  test.c        ✅ proves de utf8, wrap i buffer (sense ncurses)
+  test.c        ✅ proves de utf8, wrap, buffer, edició i md (sense ncurses)
 ```
 
 Decisions de disseny pendents:
@@ -320,7 +321,7 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 
 - [x] **F0** — Decisions d'arquitectura: llenguatge, buffer, wordwrap, dreceres
 - [x] **F1** — Esquelet: obrir, mostrar, desplaçar-se, desar un fitxer UTF-8 (inclou el wordwrap suau, necessari per mostrar els paràgrafs)
-- [ ] **F2** — Edició bàsica, sagnat penjant de llistes i cites, columna centrada
+- [x] **F2** — Edició bàsica, sagnat penjant de llistes i cites, columna centrada
 - [ ] **F3** — Desfer/refer, cerca i substitució
 - [ ] **F4** — Colors mínims de Markdown (capçaleres, èmfasi)
 - [ ] **F5** — Navegador de fitxers
@@ -359,3 +360,28 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **Compte:** les línies en blanc compten mitja línia (l'espai entre paràgrafs) i les capçaleres, una línia més.
   - **Rendiment:** el resultat es guarda per línia, de manera que només es recompta el que canvia.
   - **Correcció:** els noms de fitxer llargs es retallen i ja no se superposen a la part dreta de la barra.
+- **2026-10-25** — **F2 completada.**
+  - **Edició:**
+    - escriure i Enter;
+    - Retrocés i Supr, que uneixen línies als extrems;
+    - esborrar paraules amb Ctrl+W, Alt+D i Ctrl+Supr;
+    - Tab insereix un tabulador.
+  - **Markdown:**
+    - Enter continua llistes (`- `, `* `, `1. ` → `2. `), cites (`> `), tasques (`- [ ] `) i el sagnat;
+    - Enter sobre un element buit acaba la llista.
+  - **Selecció:**
+    - Maj+fletxes, que es cancel·la amb qualsevol moviment sense Maj;
+    - Ctrl+Espai (marca), que s'amplia amb qualsevol moviment i funciona també a la consola de Linux;
+    - Ctrl+A per seleccionar-ho tot i Esc per cancel·lar;
+    - escriure amb una selecció activa la substitueix.
+  - **Porta-retalls intern:** Ctrl+X, Ctrl+C i Ctrl+V. No comparteix el porta-retalls del sistema.
+  - **Enganxat del terminal:** amb el mode delimitat («bracketed paste»), el text enganxat amb el ratolí o amb Ctrl+Maj+V s'insereix tal qual i d'una sola vegada, sense continuació automàtica de llistes.
+  - **Pantalla:**
+    - sagnat penjant: les files de continuació de llistes i cites s'alineen amb el text;
+    - columna centrada (Alt+C), quan el terminal és més ample que la columna de text.
+  - **Sortir:** Ctrl+Q avisa si hi ha canvis sense desar; una segona pulsació surt.
+  - **Limitació coneguda:** en terminals que envien ^H com a Retrocés, Ctrl+Retrocés fa de Retrocés normal. Ctrl+W és l'alternativa fiable.
+  - **Proves:**
+    - 1.281 comprovacions unitàries, també amb sanititzadors;
+    - proves interactives de totes les operacions;
+    - escriure al mig d'un document de 2,7 MB: ~60 ms de CPU per a 210 pulsacions, càrrega inclosa.

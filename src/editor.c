@@ -1,4 +1,5 @@
 #include "editor.h"
+#include "md.h"
 #include "utf8.h"
 #include "util.h"
 #include "wrap.h"
@@ -23,6 +24,7 @@ void ed_free(Editor *e)
 {
     buf_free(&e->buf);
     free(e->filename);
+    free(e->clip);
 }
 
 void ed_msg(Editor *e, const char *fmt, ...)
@@ -64,7 +66,9 @@ int ed_cursor_x(Editor *e)
 {
     Line *l = ed_line(e, e->cy);
 
-    return span_width(l, l->rows[wrap_row_of(l, e->cx)], e->cx);
+    size_t r = wrap_row_of(l, e->cx);
+
+    return wrap_row_indent(l, r) + span_width(l, l->rows[r], e->cx);
 }
 
 /* Posició de la fila r més propera a la columna x. En una fila que no és
@@ -74,6 +78,8 @@ static size_t offset_at_x(const Line *l, size_t r, int x)
     size_t i = l->rows[r], end = wrap_row_end(l, r);
     int last = r + 1 == l->nrows;
     int col = 0;
+
+    x -= wrap_row_indent(l, r);
 
     while (i < end) {
         wchar_t wc;
@@ -134,7 +140,7 @@ void ed_layout(Editor *e, int screen_cols, int screen_lines)
     if (e->width < 1)
         e->width = 1;
     e->height = screen_lines - 2 > 0 ? screen_lines - 2 : 1;
-    e->margin = 0;
+    e->margin = e->center && screen_cols > e->width ? (screen_cols - e->width) / 2 : 0;
 
     /* La fila de dalt pot haver quedat fora de rang si ha canviat l'amplada */
     if (e->top_line >= e->buf.nlines)
@@ -363,4 +369,190 @@ void ed_goto_line(Editor *e, size_t n)
     e->cy = n - 1;
     e->cx = 0;
     e->want_x = -1;
+}
+
+/* ---- Selecció ---- */
+
+static Pos cursor(const Editor *e)
+{
+    return (Pos){ e->cy, e->cx };
+}
+
+static void set_cursor(Editor *e, Pos p)
+{
+    e->cy = p.line;
+    e->cx = p.col;
+    e->want_x = -1;
+}
+
+int ed_selection(Editor *e, Pos *a, Pos *z)
+{
+    Pos c = cursor(e);
+
+    if (e->sel_mode == SEL_NONE)
+        return 0;
+    if (vpos_before(c.line, c.col, e->anchor.line, e->anchor.col)) {
+        *a = c;
+        *z = e->anchor;
+    } else {
+        *a = e->anchor;
+        *z = c;
+    }
+    return a->line != z->line || a->col != z->col;
+}
+
+void ed_sel_start(Editor *e, int mode)
+{
+    e->sel_mode = mode;
+    e->anchor = cursor(e);
+}
+
+void ed_sel_clear(Editor *e)
+{
+    e->sel_mode = SEL_NONE;
+}
+
+void ed_select_all(Editor *e)
+{
+    ed_doc_start(e);
+    ed_sel_start(e, SEL_MARK);
+    ed_doc_end(e);
+}
+
+/* ---- Edició ---- */
+
+static int delete_selection(Editor *e)
+{
+    Pos a, z;
+    int had = ed_selection(e, &a, &z);
+
+    ed_sel_clear(e);
+    if (!had)
+        return 0;
+    buf_delete(&e->buf, a, z);
+    set_cursor(e, a);
+    return 1;
+}
+
+void ed_insert(Editor *e, const char *s, size_t n)
+{
+    delete_selection(e);
+    set_cursor(e, buf_insert(&e->buf, cursor(e), s, n));
+}
+
+void ed_newline(Editor *e)
+{
+    Line *l;
+    size_t p;
+    char prefix[256];
+
+    delete_selection(e);
+    l = &e->buf.lines[e->cy];
+    p = md_prefix(l->text, l->len);
+
+    /* Enter en un element de llista o cita buit: s'acaba la llista */
+    if (p == l->len && e->cx == l->len && md_marker(l->text, l->len)) {
+        buf_delete(&e->buf, (Pos){ e->cy, 0 }, cursor(e));
+        set_cursor(e, (Pos){ e->cy, 0 });
+        return;
+    }
+    if (p > 0 && e->cx >= p) {
+        prefix[0] = '\n';
+        p = 1 + md_continue(l->text, l->len, prefix + 1, sizeof prefix - 1);
+        ed_insert(e, prefix, p);
+    } else {
+        ed_insert(e, "\n", 1);
+    }
+}
+
+void ed_backspace(Editor *e)
+{
+    Pos c = cursor(e), a;
+
+    if (delete_selection(e))
+        return;
+    if (c.col > 0)
+        a = (Pos){ c.line, utf8_prev_cluster(e->buf.lines[c.line].text, c.col) };
+    else if (c.line > 0)
+        a = (Pos){ c.line - 1, e->buf.lines[c.line - 1].len };
+    else
+        return;
+    buf_delete(&e->buf, a, c);
+    set_cursor(e, a);
+}
+
+void ed_delete(Editor *e)
+{
+    Pos c = cursor(e), z;
+    Line *l = &e->buf.lines[c.line];
+
+    if (delete_selection(e))
+        return;
+    if (c.col < l->len)
+        z = (Pos){ c.line, utf8_next_cluster(l->text, l->len, c.col) };
+    else if (c.line + 1 < e->buf.nlines)
+        z = (Pos){ c.line + 1, 0 };
+    else
+        return;
+    buf_delete(&e->buf, c, z);
+}
+
+void ed_delete_word_prev(Editor *e)
+{
+    Pos z = cursor(e), a;
+
+    if (delete_selection(e))
+        return;
+    ed_word_prev(e);
+    a = cursor(e);
+    if (a.line != z.line || a.col != z.col)
+        buf_delete(&e->buf, a, z);
+}
+
+void ed_delete_word_next(Editor *e)
+{
+    Pos a = cursor(e), z;
+
+    if (delete_selection(e))
+        return;
+    ed_word_next(e);
+    z = cursor(e);
+    set_cursor(e, a);
+    if (a.line != z.line || a.col != z.col)
+        buf_delete(&e->buf, a, z);
+}
+
+/* ---- Porta-retalls ---- */
+
+size_t ed_copy(Editor *e)
+{
+    Pos a, z;
+
+    if (!ed_selection(e, &a, &z))
+        return 0;
+    free(e->clip);
+    e->clip = buf_extract(&e->buf, a, z, &e->clip_len);
+    ed_sel_clear(e);
+    return utf8_count(e->clip, e->clip_len);
+}
+
+size_t ed_cut(Editor *e)
+{
+    Pos a, z;
+    size_t n;
+
+    if (!ed_selection(e, &a, &z))
+        return 0;
+    n = ed_copy(e);
+    buf_delete(&e->buf, a, z);
+    set_cursor(e, a);
+    return n;
+}
+
+size_t ed_paste(Editor *e)
+{
+    if (!e->clip_len)
+        return 0;
+    ed_insert(e, e->clip, e->clip_len);
+    return utf8_count(e->clip, e->clip_len);
 }

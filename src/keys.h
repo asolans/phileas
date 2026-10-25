@@ -1,6 +1,8 @@
 #ifndef PHILEAS_KEYS_H
 #define PHILEAS_KEYS_H
 
+#include <stddef.h>
+
 /* Codificació interna d'una tecla en un int:
  *   caràcter Unicode (Ctrl+lletra = 1..26, Ctrl+Espai = 0)
  *   KEY_FLAG_FN  | codi KEY_* de ncurses (fletxes, F1..., Ctrl+fletxes)
@@ -14,7 +16,18 @@
  * estigui inicialitzat. */
 int key_parse(const char *name);
 
-/* Llegeix una tecla (bloquejant). Retorna -1 si hi ha hagut un error. */
+/* Retornat per key_read quan el terminal ha enganxat un text */
+#define KEY_PASTE    (KEY_FLAG_FN | 0xFFFFFF)
+
+/* Preparen i restauren el terminal per a la lectura de tecles. */
+void key_init(void);
+void key_end(void);
+
+/* Llegeix una tecla (bloquejant). Retorna -1 si hi ha hagut un error.
+ * Enter arriba sempre com a '\n' i Retrocés com a KEY_FLAG_FN | KEY_BACKSPACE. */
 int key_read(void);
+
+/* Text de l'últim KEY_PASTE, en UTF-8 i amb salts '\n'. */
+const char *key_paste_text(size_t *n);
 
 #endif

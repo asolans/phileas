@@ -3,6 +3,7 @@
 #include "keys.h"
 #include "render.h"
 #include "tui.h"
+#include "utf8.h"
 #include "util.h"
 
 #include <errno.h>
@@ -89,10 +90,17 @@ int main(int argc, char **argv)
             continue;
         e.msg[0] = '\0';
         confirm = e.quit_confirm;
-        if ((c = cmd_for_key(key)))
+        if (key == KEY_PASTE) {
+            size_t n;
+            const char *text = key_paste_text(&n);
+            if (n > 0)
+                ed_insert(&e, text, n);
+        } else if ((c = cmd_for_key(key))) {
             c->fn(&e);
-        else if (!(key & (KEY_FLAG_FN | KEY_FLAG_ALT)) && key >= ' ')
-            ed_msg(&e, "Mode de només lectura: l'edició arriba a la fase 2");
+        } else if (!(key & (KEY_FLAG_FN | KEY_FLAG_ALT)) && utf8_printable((wchar_t)key)) {
+            char s[4];
+            ed_insert(&e, s, utf8_encode((wchar_t)key, s));
+        }
         /* L'avís de sortida només val per a la pulsació següent */
         if (e.quit_confirm == confirm)
             e.quit_confirm = 0;

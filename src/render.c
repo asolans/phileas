@@ -1,4 +1,5 @@
 #include "render.h"
+#include "keys.h"
 #include "tui.h"
 #include "utf8.h"
 #include "wrap.h"
@@ -13,27 +14,35 @@ void ui_init(void)
     noecho();
     keypad(stdscr, TRUE);
     set_escdelay(25);
+    key_init();
 }
 
 void ui_end(void)
 {
-    if (!isendwin())
+    if (!isendwin()) {
         endwin();
+        key_end();
+    }
 }
 
-static void draw_row(Editor *e, Line *l, size_t r, int y)
+/* Dibuixa la fila r de la línia y. [s0, s1) és la part seleccionada. */
+static void draw_row(Editor *e, Line *l, size_t r, int y, size_t s0, size_t s1)
 {
     size_t i = l->rows[r], end = wrap_row_end(l, r);
+    int indent = wrap_row_indent(l, r);
     int col = 0;
 
-    move(y, e->margin);
+    move(y, e->margin + indent);
     while (i < end) {
         wchar_t wc;
         size_t n = utf8_decode(l->text, l->len, i, &wc);
         int w = utf8_width(wc, col);
+        int sel = i >= s0 && i < s1;
 
-        if (col + w > e->width)
+        if (col + w > e->width - indent)
             break;
+        if (sel)
+            attron(A_REVERSE);
         if (wc == L'\t') {
             for (int k = 0; k < w; k++)
                 addch(' ');
@@ -44,8 +53,16 @@ static void draw_row(Editor *e, Line *l, size_t r, int y)
         } else {
             addnwstr(&wc, 1);
         }
+        if (sel)
+            attroff(A_REVERSE);
         col += w;
         i += n;
+    }
+    /* El salt de línia seleccionat es mostra com un espai al final */
+    if (end == l->len && s1 > l->len && col < e->width - indent) {
+        attron(A_REVERSE);
+        addch(' ');
+        attroff(A_REVERSE);
     }
 }
 
@@ -85,7 +102,8 @@ static void draw_status(Editor *e)
 void render(Editor *e)
 {
     size_t tl, tr, crow;
-    int cur_y = -1, cur_x = 0;
+    int cur_y = -1, cur_x = 0, has_sel;
+    Pos sa, sz;
 
     ed_layout(e, COLS, LINES);
     erase();
@@ -93,8 +111,15 @@ void render(Editor *e)
     tl = e->top_line;
     tr = e->top_row;
     crow = ed_cursor_row(e);
+    has_sel = ed_selection(e, &sa, &sz);
     for (int y = 0; y < e->height; y++) {
-        draw_row(e, ed_line(e, tl), tr, y);
+        size_t s0 = 0, s1 = 0;
+
+        if (has_sel && tl >= sa.line && tl <= sz.line) {
+            s0 = tl == sa.line ? sa.col : 0;
+            s1 = tl == sz.line ? sz.col : (size_t)-1;
+        }
+        draw_row(e, ed_line(e, tl), tr, y, s0, s1);
         if (tl == e->cy && tr == crow) {
             cur_y = y;
             cur_x = e->margin + ed_cursor_x(e);

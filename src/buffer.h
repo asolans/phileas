@@ -12,6 +12,7 @@ typedef struct {
     size_t *rows;
     size_t  nrows, rows_cap;
     int     wrap_w;    /* amplada amb què s'ha calculat; 0 = per calcular */
+    int     hang;      /* sagnat penjant de les files 2a i següents (llistes, cites) */
 
     /* Cache de l'estimació de pàgines: mitges línies impreses; 0 = per calcular */
     size_t  print_lines;
@@ -29,8 +30,23 @@ typedef struct {
     int     modified;
 } Buffer;
 
+/* Posició al text: línia i byte dins la línia (sempre a l'inici d'un
+ * caràcter UTF-8). */
+typedef struct {
+    size_t line, col;
+} Pos;
+
 void buf_init(Buffer *b);
 void buf_free(Buffer *b);
+
+/* Insereix s (pot contenir '\n') a at. Retorna la posició just després. */
+Pos  buf_insert(Buffer *b, Pos at, const char *s, size_t n);
+
+/* Esborra el text entre a i z (a anterior a z). */
+void buf_delete(Buffer *b, Pos a, Pos z);
+
+/* Còpia del text entre a i z, amb '\n' entre línies (cal alliberar-la). */
+char *buf_extract(const Buffer *b, Pos a, Pos z, size_t *n);
 
 /* Retornen 0 si va bé, o -1 amb errno. Si buf_load falla, b no canvia. */
 int  buf_load(Buffer *b, const char *path);

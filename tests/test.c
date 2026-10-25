@@ -1,5 +1,6 @@
 /* Proves dels mòduls que no depenen de ncurses: make test */
 #include "buffer.h"
+#include "md.h"
 #include "utf8.h"
 #include "wrap.h"
 
@@ -109,6 +110,25 @@ static void test_wrap(void)
     CHECK(l.nrows == 3 && l.rows[1] == 9 && l.rows[2] == 14);
     free(l.rows);
 
+    /* Sagnat penjant: les files de continuació s'alineen amb el text */
+    l = make_line("- un element de llista llarg");
+    wrap_line(&l, 12);
+    CHECK(l.hang == 2);
+    CHECK(l.nrows == 3 && l.rows[1] == 13 && l.rows[2] == 23);
+    CHECK(wrap_row_indent(&l, 0) == 0 && wrap_row_indent(&l, 1) == 2);
+    free(l.rows);
+
+    l = make_line("> cita llarga que fa wrap");
+    wrap_line(&l, 10);
+    CHECK(l.hang == 2 && l.nrows == 4);
+    free(l.rows);
+
+    /* Prefix més ample que mitja columna: sense sagnat */
+    l = make_line("12345678. massa ample");
+    wrap_line(&l, 12);
+    CHECK(l.hang == 0);
+    free(l.rows);
+
     /* Caràcters amples: 中文 = 4 columnes */
     l = make_line("中文中文");
     wrap_line(&l, 5);
@@ -194,6 +214,117 @@ static void test_buffer(void)
     buf_free(&b);
 }
 
+/* Contingut del buffer com a text amb '\n' */
+static char *dump(Buffer *b)
+{
+    size_t n;
+    Line *last = &b->lines[b->nlines - 1];
+
+    return buf_extract(b, (Pos){ 0, 0 }, (Pos){ b->nlines - 1, last->len }, &n);
+}
+
+static int dump_is(Buffer *b, const char *expect)
+{
+    char *s = dump(b);
+    int ok = strcmp(s, expect) == 0;
+
+    if (!ok)
+        fprintf(stderr, "  buffer: \"%s\"\n  esperat: \"%s\"\n", s, expect);
+    free(s);
+    return ok;
+}
+
+static void test_edit(void)
+{
+    Buffer b;
+    Pos p;
+    char *s;
+    size_t n;
+
+    buf_init(&b);
+    p = buf_insert(&b, (Pos){ 0, 0 }, "hola", 4);
+    CHECK(p.line == 0 && p.col == 4 && b.modified);
+    p = buf_insert(&b, (Pos){ 0, 2 }, "XY", 2);
+    CHECK(dump_is(&b, "hoXYla") && p.col == 4);
+
+    /* Inserció amb salts: el que hi havia darrere passa a l'última línia */
+    p = buf_insert(&b, (Pos){ 0, 2 }, "1\n2\n3", 5);
+    CHECK(dump_is(&b, "ho1\n2\n3XYla") && b.nlines == 3);
+    CHECK(p.line == 2 && p.col == 1);
+    p = buf_insert(&b, (Pos){ 2, 5 }, "\n", 1);
+    CHECK(dump_is(&b, "ho1\n2\n3XYla\n") && p.line == 3 && p.col == 0);
+
+    s = buf_extract(&b, (Pos){ 0, 1 }, (Pos){ 2, 2 }, &n);
+    CHECK(n == 7 && strcmp(s, "o1\n2\n3X") == 0);
+    free(s);
+
+    /* Esborrar dins una línia i entre línies */
+    buf_delete(&b, (Pos){ 2, 1 }, (Pos){ 2, 3 });
+    CHECK(dump_is(&b, "ho1\n2\n3la\n"));
+    buf_delete(&b, (Pos){ 0, 2 }, (Pos){ 2, 1 });
+    CHECK(dump_is(&b, "hola\n") && b.nlines == 2);
+    buf_delete(&b, (Pos){ 0, 4 }, (Pos){ 1, 0 });
+    CHECK(dump_is(&b, "hola") && b.nlines == 1);
+
+    /* Les caches s'invaliden en editar */
+    wrap_line(&b.lines[0], 10);
+    CHECK(b.lines[0].wrap_w == 10);
+    buf_insert(&b, (Pos){ 0, 4 }, " i adéu", 8);
+    CHECK(b.lines[0].wrap_w == 0 && b.lines[0].print_lines == 0);
+
+    /* Moltes línies de cop (fa créixer el vector) */
+    {
+        char big[2000];
+        for (int i = 0; i < 1000; i++) {
+            big[2 * i] = 'a';
+            big[2 * i + 1] = '\n';
+        }
+        p = buf_insert(&b, (Pos){ 0, 0 }, big, sizeof big);
+        CHECK(b.nlines == 1001 && p.line == 1000 && p.col == 0);
+        buf_delete(&b, (Pos){ 0, 0 }, p);
+        CHECK(dump_is(&b, "hola i adéu") && b.nlines == 1);
+    }
+    buf_free(&b);
+}
+
+static void test_md(void)
+{
+    char out[64];
+    const char *s;
+
+#define PREFIX(str) md_prefix(str, strlen(str))
+#define CONT(str) (md_continue(str, strlen(str), out, sizeof out), out)
+    CHECK(PREFIX("text normal") == 0);
+    CHECK(PREFIX("- element") == 2);
+    CHECK(PREFIX("*èmfasi*") == 0);
+    CHECK(PREFIX("-guió") == 0);
+    CHECK(PREFIX("  * niat") == 4);
+    CHECK(PREFIX("12. dotze") == 4);
+    CHECK(PREFIX("3) tres") == 3);
+    CHECK(PREFIX("> cita") == 2);
+    CHECK(PREFIX("> > - dins") == 6);
+    CHECK(PREFIX("- [ ] tasca") == 6);
+    CHECK(PREFIX("- [x] feta") == 6);
+    CHECK(PREFIX("    sagnat") == 4);
+    CHECK(PREFIX("2024. any") == 6);        /* sembla una llista: és Markdown estàndard */
+    CHECK(md_marker("    sagnat", 10) == 0);
+    CHECK(md_marker("- ", 2) == 2);
+
+    CHECK(strcmp(CONT("- a"), "- ") == 0);
+    CHECK(strcmp(CONT("  * b"), "  * ") == 0);
+    CHECK(strcmp(CONT("9. nou"), "10. ") == 0);
+    CHECK(strcmp(CONT("1) u"), "2) ") == 0);
+    CHECK(strcmp(CONT("> cita"), "> ") == 0);
+    CHECK(strcmp(CONT("> 1. x"), "> 2. ") == 0);
+    CHECK(strcmp(CONT("- [x] feta"), "- [ ] ") == 0);
+    CHECK(strcmp(CONT("    codi"), "    ") == 0);
+    CHECK(strcmp(CONT("text"), "") == 0);
+    s = "- a";
+    CHECK(md_continue(s, 3, out, 2) == 1 && strcmp(out, "-") == 0);
+#undef PREFIX
+#undef CONT
+}
+
 static void set_text(Buffer *b, size_t n, const char *fill, size_t chars)
 {
     Line *l;
@@ -262,6 +393,8 @@ int main(void)
     test_wrap();
     test_buffer();
     test_pages();
+    test_edit();
+    test_md();
     rmdir(tmpdir);
 
     printf("%d comprovacions, %d errors\n", checks, failures);
