@@ -142,7 +142,44 @@ Motius:
 
 Salvaguarda: la resta de l'editor només accedirà al text a través de l'API de `buffer.c` (`buf_insert`, `buf_delete`, `buf_line`, `buf_nlines`…). Si mai calgués canviar a un gap buffer o una piece table, el canvi quedaria localitzat en aquest mòdul.
 
-**Estat de la decisió:** ⏳ pendent de confirmar.
+**Estat de la decisió:** ✅ Confirmada (2026-10-25): **vector de línies** (línia = paràgraf).
+
+## Decisió de wordwrap
+
+### Punt de partida: totes dues opcions són Markdown vàlid
+
+En Markdown, un salt de línia simple dins d'un paràgraf es converteix en un espai en el resultat final. Un paràgraf en una sola línia i el mateix paràgraf tallat a 72 columnes donen el mateix resultat. La diferència és només de **com s'edita** i de **com es veu el fitxer** fora de Phileas.
+
+### Comparativa
+
+| Aspecte | Suau (visual) | Dur (salts reals al fitxer) |
+|---------|---------------|-----------------------------|
+| Editar al mig d'un paràgraf | El text es reorganitza sol | Cal reformatar el paràgraf (automàticament o amb una ordre, com `gq` a vim) |
+| Canviar el nombre de columnes | Instantani, el fitxer no canvia | Cal reformatar tot el document |
+| Encaix amb el vector de línies | Perfecte: 1 línia = 1 paràgraf | Un paràgraf són N línies: cal agrupar-les per a la cache, l'ortografia i el reformatat |
+| Cerca | Una frase mai queda partida | «de la casa» no es troba si hi ha un salt entre «la» i «casa» |
+| Reformatar sense trencar el Markdown | No cal | Cal reconèixer llistes, capçaleres, blocs de codi, taules i cites per no ajuntar-los |
+| Fitxer vist amb `cat`, `less` o el correu | Línies molt llargues | Es veu ben formatat |
+| Diffs de git | Un canvi petit marca tot el paràgraf | Diffs més fins (però reformatar també genera soroll) |
+| Complexitat del codi | Baixa | Mitjana-alta |
+
+### Proposta: **wordwrap suau** com a model d'edició
+
+Detalls de comportament proposats:
+
+1. **Amplada:** `columnes = 72` per defecte, configurable. Si el terminal és més estret, s'ajusta a l'amplada del terminal.
+2. **Talls:** a les fronteres de paraula, mesurant l'amplada real dels caràcters amb `wcwidth()`. Les paraules més llargues que l'amplada (URL) es tallen per caràcter. No es talla mai per dins d'un caràcter UTF-8 ni d'una seqüència combinada.
+3. **Moviment del cursor:** ↑/↓ i Inici/Fi es mouen per **línies visuals**, que és com s'espera quan s'escriu prosa.
+4. **Sagnat penjant:** les línies de continuació d'un element de llista (`- `, `1. `) o d'una cita (`> `) s'alineen amb el text, no amb el marcador.
+5. **Columna centrada** (opcional, `centrar = si`): si el terminal és més ample que `columnes`, el text es dibuixa centrat, en mode escriptura.
+6. **Cache:** les posicions de tall es guarden a cada `Line` i només es recalculen quan s'edita la línia o canvien les columnes o l'amplada del terminal.
+
+Interoperabilitat amb fitxers tallats a mà (fases posteriors):
+
+- Ordre `desfer-salts`: ajunta les línies de cada paràgraf d'un fitxer amb salts durs, respectant l'estructura Markdown.
+- Ordre `reformatar` (opcional): genera una còpia amb salts durs a N columnes, per si cal enviar el text per correu o a un repositori amb aquesta convenció.
+
+**Estat de la decisió:** ⏳ pendent de confirmar (incloent-hi l'amplada per defecte, 72).
 
 ## Arquitectura preliminar
 
@@ -164,7 +201,6 @@ src/
 
 Decisions de disseny pendents:
 
-- Wordwrap: suau (només visual) — recomanat per a prosa en Markdown — o dur (insereix salts).
 - Format del fitxer de configuració.
 - Joc de dreceres de teclat (estil nano? propi?).
 
@@ -190,3 +226,4 @@ Decisions de disseny pendents:
 - **2026-10-25** — Inici del projecte. Repositori git creat. Anàlisi de llenguatges; proposta: C + ncursesw + hunspell.
 - **2026-10-25** — Anàlisi C sol vs. C + Lua per a la configuració. Recomanació: C sol amb registre d'ordres, deixant Lua com a ampliació opcional.
 - **2026-10-25** — ✅ Confirmat: C sol + configuració declarativa + registre d'ordres. Anàlisi de l'estructura del buffer; proposta: vector de línies (línia = paràgraf).
+- **2026-10-25** — ✅ Confirmat: vector de línies. Anàlisi del wordwrap; proposta: suau a 72 columnes, amb moviment per línies visuals i sagnat penjant.
