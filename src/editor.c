@@ -18,6 +18,7 @@ void ed_init(Editor *e, int columns)
     e->width = columns;
     e->height = 1;
     e->want_x = -1;
+    e->autosave_max = 300;
 }
 
 void ed_free(Editor *e)
@@ -563,4 +564,54 @@ size_t ed_paste(Editor *e)
         return 0;
     ed_insert(e, e->clip, e->clip_len);
     return utf8_count(e->clip, e->clip_len);
+}
+
+/* ---- Desfer/refer ---- */
+
+void ed_begin(Editor *e, int act, wchar_t ch)
+{
+    int same = act != ACT_NONE && act == e->last_act && e->sel_mode == SEL_NONE &&
+               e->cy == e->act_end.line && e->cx == e->act_end.col;
+
+    /* Escrivint, cada paraula és un pas de desfer */
+    if (same && act == ACT_TYPE && ch != L' ' && e->last_ch == L' ')
+        same = 0;
+    if (!same)
+        buf_undo_mark(&e->buf);
+    e->last_act = act;
+    e->last_ch = ch;
+}
+
+void ed_end(Editor *e)
+{
+    e->act_end = cursor(e);
+}
+
+int ed_undo(Editor *e)
+{
+    Pos c;
+
+    if (!buf_undo(&e->buf, &c))
+        return 0;
+    ed_sel_clear(e);
+    set_cursor(e, c);
+    return 1;
+}
+
+int ed_redo(Editor *e)
+{
+    Pos c;
+
+    if (!buf_redo(&e->buf, &c))
+        return 0;
+    ed_sel_clear(e);
+    set_cursor(e, c);
+    return 1;
+}
+
+void ed_select(Editor *e, Pos a, Pos z)
+{
+    set_cursor(e, a);
+    ed_sel_start(e, SEL_SHIFT);
+    set_cursor(e, z);
 }

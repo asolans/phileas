@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <wctype.h>
 
 void ui_init(void)
 {
@@ -145,10 +146,12 @@ static void draw_prompt(const char *label, const char *buf)
     addstr(buf);
 }
 
-int prompt(Editor *e, const char *label, char *buf, size_t size)
+int prompt(Editor *e, const char *label, char *buf, size_t size,
+           void (*changed)(Editor *e, const char *text))
 {
-    size_t len = strlen(buf);
+    size_t len = strlen(buf), old;
 
+    key_set_timeout(-1);
     for (;;) {
         wint_t wc;
         int r;
@@ -159,18 +162,17 @@ int prompt(Editor *e, const char *label, char *buf, size_t size)
         r = get_wch(&wc);
         if (r == ERR)
             continue;
+        old = len;
         if (r == KEY_CODE_YES) {
             if (wc == KEY_ENTER)
                 return 1;
             if (wc == KEY_BACKSPACE && len > 0)
                 buf[len = utf8_prev(buf, len)] = '\0';
-            continue;
-        }
-        if (wc == 27)
+        } else if (wc == 27) {
             return 0;
-        if (wc == '\n' || wc == '\r')
+        } else if (wc == '\n' || wc == '\r') {
             return 1;
-        if (wc == 127 || wc == 8) {
+        } else if (wc == 127 || wc == 8) {
             if (len > 0)
                 buf[len = utf8_prev(buf, len)] = '\0';
         } else if (utf8_printable((wchar_t)wc)) {
@@ -182,11 +184,34 @@ int prompt(Editor *e, const char *label, char *buf, size_t size)
                 buf[len += n] = '\0';
             }
         }
+        if (changed && len != old)
+            changed(e, buf);
+    }
+}
+
+int prompt_choice(Editor *e, const char *question, const char *choices)
+{
+    key_set_timeout(-1);
+    for (;;) {
+        wint_t wc;
+        int r;
+
+        render(e);
+        draw_prompt(question, "");
+        refresh();
+        r = get_wch(&wc);
+        if (r != OK)
+            continue;
+        if (wc == 27)
+            return 0;
+        if (wc < 128 && strchr(choices, towlower(wc)))
+            return (int)towlower(wc);
     }
 }
 
 int prompt_yesno(Editor *e, const char *question)
 {
+    key_set_timeout(-1);
     for (;;) {
         wint_t wc;
         int r;

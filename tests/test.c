@@ -1,6 +1,7 @@
 /* Proves dels mòduls que no depenen de ncurses: make test */
 #include "buffer.h"
 #include "md.h"
+#include "search.h"
 #include "utf8.h"
 #include "wrap.h"
 
@@ -549,6 +550,79 @@ static void test_blocks(void)
     buf_free(&b);
 }
 
+static void test_undo(void)
+{
+    Buffer b;
+    Pos c;
+    char path[64];
+
+    buf_init(&b);
+    CHECK(!buf_undo(&b, &c) && !buf_redo(&b, &c));
+
+    buf_undo_mark(&b);
+    buf_insert(&b, (Pos){ 0, 0 }, "hola", 4);
+    buf_insert(&b, (Pos){ 0, 4 }, " món", 5);       /* mateix grup */
+    buf_undo_mark(&b);
+    buf_insert(&b, (Pos){ 0, 9 }, "\nsegon", 6);
+    buf_undo_mark(&b);
+    buf_delete(&b, (Pos){ 0, 2 }, (Pos){ 1, 2 });
+    CHECK(dump_is(&b, "hogon"));
+
+    CHECK(buf_undo(&b, &c) && dump_is(&b, "hola món\nsegon"));
+    CHECK(c.line == 1 && c.col == 2);
+    CHECK(buf_undo(&b, &c) && dump_is(&b, "hola món") && c.line == 0 && c.col == 9);
+    CHECK(buf_undo(&b, &c) && dump_is(&b, "") && c.col == 0);
+    CHECK(!buf_undo(&b, &c) && !b.modified);
+    CHECK(buf_redo(&b, &c) && dump_is(&b, "hola món") && c.col == 9 && b.modified);
+    CHECK(buf_redo(&b, &c) && dump_is(&b, "hola món\nsegon"));
+
+    /* Una edició nova descarta el que es podia refer */
+    buf_undo_mark(&b);
+    buf_insert(&b, (Pos){ 1, 5 }, "!", 1);
+    CHECK(!buf_redo(&b, &c) && dump_is(&b, "hola món\nsegon!"));
+
+    /* El document desat torna a estar «sense canvis» si s'hi torna desfent */
+    snprintf(path, sizeof path, "%s/undo", tmpdir);
+    CHECK(buf_save(&b, path) == 0 && !b.modified);
+    buf_undo_mark(&b);
+    buf_insert(&b, (Pos){ 0, 0 }, "X", 1);
+    CHECK(b.modified);
+    CHECK(buf_undo(&b, &c) && !b.modified);
+    CHECK(buf_undo(&b, &c) && b.modified);
+    CHECK(buf_redo(&b, &c) && !b.modified);
+    unlink(path);
+    buf_free(&b);
+}
+
+static void test_search(void)
+{
+    Buffer b;
+    Pos a, z;
+    int w;
+
+    buf_init(&b);
+    buf_insert(&b, (Pos){ 0, 0 }, "La Casa i la casa\nUna altra CASA\nfinal", 39);
+
+    /* Sense majúscules al patró: no distingeix majúscules */
+    CHECK(search_find(&b, (Pos){ 0, 0 }, "casa", 1, &a, &z, &w) && a.col == 3 && z.col == 7 && !w);
+    CHECK(search_find(&b, (Pos){ 0, 4 }, "casa", 1, &a, &z, &w) && a.col == 13);
+    CHECK(search_find(&b, (Pos){ 0, 14 }, "casa", 1, &a, &z, &w) && a.line == 1 && a.col == 10);
+    CHECK(search_find(&b, (Pos){ 1, 11 }, "casa", 1, &a, &z, &w) && a.line == 0 && a.col == 3 && w);
+    /* Amb majúscules: les distingeix */
+    CHECK(search_find(&b, (Pos){ 0, 4 }, "Casa", 1, &a, &z, &w) && a.line == 0 && a.col == 3 && w);
+    CHECK(!search_find(&b, (Pos){ 0, 0 }, "cASA", 1, &a, &z, &w));
+    /* Enrere */
+    CHECK(search_find(&b, (Pos){ 0, 13 }, "casa", -1, &a, &z, &w) && a.col == 3 && !w);
+    CHECK(search_find(&b, (Pos){ 0, 3 }, "casa", -1, &a, &z, &w) && a.line == 1 && w);
+    /* Accents i caràcters de diversos bytes */
+    buf_insert(&b, (Pos){ 2, 5 }, " ÀVIA àvia", 13);
+    CHECK(search_find(&b, (Pos){ 0, 0 }, "àvia", 1, &a, &z, &w) && a.line == 2 && a.col == 6);
+    CHECK(z.col == 11);
+    CHECK(!search_find(&b, (Pos){ 0, 0 }, "", 1, &a, &z, &w));
+    CHECK(!search_find(&b, (Pos){ 0, 0 }, "inexistent", 1, &a, &z, &w));
+    buf_free(&b);
+}
+
 int main(void)
 {
     if (!setlocale(LC_ALL, "C.UTF-8")) {
@@ -567,6 +641,8 @@ int main(void)
     test_md();
     test_blocks();
     test_paste();
+    test_undo();
+    test_search();
     rmdir(tmpdir);
 
     printf("%d comprovacions, %d errors\n", checks, failures);

@@ -19,11 +19,14 @@ int key_parse(const char *name);
 /* Retornat per key_read quan el terminal ha enganxat un text */
 #define KEY_PASTE    (KEY_FLAG_FN | 0xFFFFFF)
 
+/* Temps màxim d'espera de key_read en mil·lisegons (-1 = sense límit). */
+void key_set_timeout(int ms);
+
 /* Preparen i restauren el terminal per a la lectura de tecles. */
 void key_init(void);
 void key_end(void);
 
-/* Llegeix una tecla (bloquejant). Retorna -1 si hi ha hagut un error.
+/* Llegeix una tecla. Retorna -1 si s'acaba el temps d'espera o hi ha un error.
  * Enter arriba sempre com a '\n' i Retrocés com a KEY_FLAG_FN | KEY_BACKSPACE. */
 int key_read(void);
 

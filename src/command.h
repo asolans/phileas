@@ -10,6 +10,7 @@ typedef struct {
     const char *name;
     void (*fn)(Editor *e);
     const char *desc;
+    int act;            /* ACT_* per agrupar el desfer; 0 = acció pròpia */
 } Command;
 
 const Command *cmd_find(const char *name);

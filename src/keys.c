@@ -15,6 +15,7 @@
 #define PASTE_BEGIN (KEY_MAX + 0x200)
 #define PASTE_END   (KEY_MAX + 0x201)
 
+static int    wait_ms = -1;
 static char  *paste;
 static size_t paste_len, paste_cap;
 
@@ -115,6 +116,12 @@ int key_parse(const char *name)
     return -1;
 }
 
+void key_set_timeout(int ms)
+{
+    wait_ms = ms;
+    timeout(ms);
+}
+
 void key_init(void)
 {
     define_key("\033[200~", PASTE_BEGIN);
@@ -153,6 +160,7 @@ static void read_paste(void)
     int r;
 
     paste_len = 0;
+    timeout(-1);
     while ((r = get_wch(&wc)) != ERR) {
         if (r == KEY_CODE_YES) {
             if (wc == PASTE_END)
@@ -163,6 +171,7 @@ static void read_paste(void)
             paste_add(wc == '\r' ? L'\n' : (wchar_t)wc);
         }
     }
+    timeout(wait_ms);
 }
 
 const char *key_paste_text(size_t *n)
@@ -194,7 +203,7 @@ int key_read(void)
     if (wc == 27) {
         timeout(ALT_WAIT);
         r = get_wch(&wc2);
-        timeout(-1);
+        timeout(wait_ms);
         if (r == OK)
             return KEY_FLAG_ALT | (int)(wc2 == '\r' ? '\n' : wc2);
         if (r == KEY_CODE_YES)

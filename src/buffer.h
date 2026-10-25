@@ -2,6 +2,7 @@
 #define PHILEAS_BUFFER_H
 
 #include "md.h"
+#include "undo.h"
 
 #include <stddef.h>
 
@@ -38,6 +39,8 @@ typedef struct {
 
     /* Interval de línies modificades des de l'últim buf_scan() */
     size_t  scan_from, scan_to;
+
+    Undo    undo;
 } Buffer;
 
 /* Posició al text: línia i byte dins la línia (sempre a l'inici d'un
@@ -54,6 +57,14 @@ Pos  buf_insert(Buffer *b, Pos at, const char *s, size_t n);
 
 /* Esborra el text entre a i z (a anterior a z). */
 void buf_delete(Buffer *b, Pos a, Pos z);
+
+/* Desfer/refer: tota modificació feta amb buf_insert i buf_delete queda a
+ * l'historial. buf_undo_mark separa grups (una ordre, una paraula escrita).
+ * buf_undo i buf_redo retornen 0 si no hi havia res i deixen a *cursor la
+ * posició on ha tingut lloc el canvi. */
+void buf_undo_mark(Buffer *b);
+int  buf_undo(Buffer *b, Pos *cursor);
+int  buf_redo(Buffer *b, Pos *cursor);
 
 /* Còpia del text entre a i z, amb '\n' entre línies (cal alliberar-la). */
 char *buf_extract(const Buffer *b, Pos a, Pos z, size_t *n);

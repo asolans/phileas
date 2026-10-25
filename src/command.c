@@ -1,6 +1,7 @@
 #include "command.h"
 #include "keys.h"
 #include "render.h"
+#include "search.h"
 #include "tui.h"
 #include "util.h"
 
@@ -113,7 +114,7 @@ static void c_goto_line(Editor *e)
     char *end;
     unsigned long n;
 
-    if (!prompt(e, "Anar a la línia: ", buf, sizeof buf) || !buf[0])
+    if (!prompt(e, "Anar a la línia: ", buf, sizeof buf, NULL) || !buf[0])
         return;
     n = strtoul(buf, &end, 10);
     if (*end) {
@@ -144,7 +145,7 @@ static void c_save_as(Editor *e)
     struct stat st;
 
     snprintf(path, sizeof path, "%s", e->filename ? e->filename : "");
-    if (!prompt(e, "Desa com: ", path, sizeof path) || !path[0]) {
+    if (!prompt(e, "Desa com: ", path, sizeof path, NULL) || !path[0]) {
         ed_msg(e, "No s'ha desat");
         return;
     }
@@ -185,7 +186,7 @@ static void c_palette(Editor *e)
     char name[64] = "";
     const Command *c;
 
-    if (!prompt(e, "Ordre: ", name, sizeof name) || !name[0])
+    if (!prompt(e, "Ordre: ", name, sizeof name, NULL) || !name[0])
         return;
     if (!(c = cmd_find(name))) {
         ed_msg(e, "Ordre desconeguda: %s", name);
@@ -194,57 +195,232 @@ static void c_palette(Editor *e)
     c->fn(e);
 }
 
+static void c_undo(Editor *e)
+{
+    if (!ed_undo(e))
+        ed_msg(e, "No hi ha res per desfer");
+}
+
+static void c_redo(Editor *e)
+{
+    if (!ed_redo(e))
+        ed_msg(e, "No hi ha res per refer");
+}
+
+/* ---- Cerca ---- */
+
+static Pos search_origin;   /* on era el cursor en començar la cerca */
+static char find_label[sizeof ((Editor *)0)->search + 32];
+
+/* Etiqueta de la pregunta: mostra l'última cerca, que es reutilitza si es
+ * prem Enter sense escriure res, i avisa si no es troba res */
+static void set_find_label(Editor *e, const char *what, int found)
+{
+    if (e->search[0])
+        snprintf(find_label, sizeof find_label, "%s%s [%s]: ", what,
+                 found ? "" : " (no trobat)", e->search);
+    else
+        snprintf(find_label, sizeof find_label, "%s%s: ", what, found ? "" : " (no trobat)");
+}
+
+static int find_and_select(Editor *e, Pos from, const char *pat, int dir)
+{
+    Pos a, z;
+    int wrapped;
+
+    if (!search_find(&e->buf, from, pat, dir, &a, &z, &wrapped)) {
+        ed_sel_clear(e);
+        if (pat[0])
+            ed_msg(e, "No s'ha trobat «%s»", pat);
+        return 0;
+    }
+    ed_select(e, a, z);
+    if (wrapped)
+        ed_msg(e, dir > 0 ? "Cerca des del principi del document" : "Cerca des del final del document");
+    return 1;
+}
+
+static void search_changed(Editor *e, const char *text)
+{
+    int found;
+
+    e->cy = search_origin.line;
+    e->cx = search_origin.col;
+    found = !text[0] || find_and_select(e, search_origin, text, 1);
+    if (!found) {
+        e->cy = search_origin.line;
+        e->cx = search_origin.col;
+    }
+    e->msg[0] = '\0';
+    set_find_label(e, "Cerca", found);
+}
+
+static void c_find(Editor *e)
+{
+    char pat[sizeof e->search] = "";
+
+    search_origin = (Pos){ e->cy, e->cx };
+    ed_sel_clear(e);
+    set_find_label(e, "Cerca", 1);
+    if (!prompt(e, find_label, pat, sizeof pat, search_changed)) {
+        /* Esc: el cursor torna on era */
+        ed_sel_clear(e);
+        e->cy = search_origin.line;
+        e->cx = search_origin.col;
+        e->want_x = -1;
+        e->msg[0] = '\0';
+        return;
+    }
+    if (pat[0]) {
+        snprintf(e->search, sizeof e->search, "%s", pat);
+    } else if (e->search[0]) {
+        /* Enter sense escriure res: torna a cercar l'última */
+        find_and_select(e, search_origin, e->search, 1);
+    }
+}
+
+static void c_find_next(Editor *e)
+{
+    if (!e->search[0]) {
+        c_find(e);
+        return;
+    }
+    find_and_select(e, (Pos){ e->cy, e->cx }, e->search, 1);
+}
+
+static void c_find_prev(Editor *e)
+{
+    Pos a, z, from = { e->cy, e->cx };
+
+    if (!e->search[0]) {
+        c_find(e);
+        return;
+    }
+    if (ed_selection(e, &a, &z))
+        from = a;
+    find_and_select(e, from, e->search, -1);
+}
+
+static void c_replace(Editor *e)
+{
+    char pat[sizeof e->search] = "", rep[256] = "";
+    Pos origin = { e->cy, e->cx }, from = origin, a, z;
+    size_t plen, rlen, count = 0;
+    int wrapped, passed = 0, all = 0, answer;
+
+    set_find_label(e, "Substitueix", 1);
+    if (!prompt(e, find_label, pat, sizeof pat, NULL))
+        return;
+    if (!pat[0])
+        snprintf(pat, sizeof pat, "%s", e->search);
+    if (!pat[0])
+        return;
+    snprintf(e->search, sizeof e->search, "%s", pat);
+    if (!prompt(e, "Substitueix per: ", rep, sizeof rep, NULL))
+        return;
+    rlen = strlen(rep);
+
+    while (search_find(&e->buf, from, pat, 1, &a, &z, &wrapped)) {
+        /* S'acaba en tornar al punt de partida després de donar la volta */
+        passed |= wrapped;
+        if (passed && (a.line > origin.line || (a.line == origin.line && a.col >= origin.col)))
+            break;
+        if (!all) {
+            ed_select(e, a, z);
+            answer = prompt_choice(e, "Substituir? (s)í, (n)o, (t)ots, Esc: acabar", "snt");
+            if (answer == 0)
+                break;
+            if (answer == 'n') {
+                from = z;
+                continue;
+            }
+            all = answer == 't';
+        }
+        plen = a.line == z.line ? z.col - a.col : 0;
+        buf_delete(&e->buf, a, z);
+        from = buf_insert(&e->buf, a, rep, rlen);
+        if (a.line == origin.line && a.col < origin.col)
+            origin.col = origin.col + rlen - plen;
+        count++;
+    }
+    ed_sel_clear(e);
+    if (count)
+        e->cy = from.line, e->cx = from.col;
+    e->want_x = -1;
+    ed_msg(e, count == 1 ? "1 substitució" : "%zu substitucions", count);
+}
+
+static void c_autosave(Editor *e)
+{
+    if (e->autosave) {
+        e->autosave_last = e->autosave;
+        e->autosave = 0;
+        ed_msg(e, "Autodesat desactivat");
+    } else {
+        e->autosave = e->autosave_last > 0 ? e->autosave_last : 30;
+        ed_msg(e, "Autodesat després de %d s sense escriure", e->autosave);
+    }
+}
+
 static const Command commands[] = {
-    { "moure-amunt",       c_up,         "Puja una línia de pantalla" },
-    { "moure-avall",       c_down,       "Baixa una línia de pantalla" },
-    { "moure-esquerra",    c_left,       "Un caràcter a l'esquerra" },
-    { "moure-dreta",       c_right,      "Un caràcter a la dreta" },
-    { "inici-linia",       c_row_start,  "Inici de la línia de pantalla" },
-    { "fi-linia",          c_row_end,    "Final de la línia de pantalla" },
-    { "pagina-amunt",      c_page_up,    "Una pantalla amunt" },
-    { "pagina-avall",      c_page_down,  "Una pantalla avall" },
-    { "paraula-anterior",  c_word_prev,  "Inici de la paraula anterior" },
-    { "paraula-seguent",   c_word_next,  "Inici de la paraula següent" },
-    { "paragraf-anterior", c_par_prev,   "Inici del paràgraf anterior" },
-    { "paragraf-seguent",  c_par_next,   "Inici del paràgraf següent" },
-    { "inici-document",    c_doc_start,  "Inici del document" },
-    { "fi-document",       c_doc_end,    "Final del document" },
-    { "anar-a-linia",      c_goto_line,  "Salta a una línia (paràgraf) pel número" },
+    { "moure-amunt",       c_up,         "Puja una línia de pantalla", ACT_NONE },
+    { "moure-avall",       c_down,       "Baixa una línia de pantalla", ACT_NONE },
+    { "moure-esquerra",    c_left,       "Un caràcter a l'esquerra", ACT_NONE },
+    { "moure-dreta",       c_right,      "Un caràcter a la dreta", ACT_NONE },
+    { "inici-linia",       c_row_start,  "Inici de la línia de pantalla", ACT_NONE },
+    { "fi-linia",          c_row_end,    "Final de la línia de pantalla", ACT_NONE },
+    { "pagina-amunt",      c_page_up,    "Una pantalla amunt", ACT_NONE },
+    { "pagina-avall",      c_page_down,  "Una pantalla avall", ACT_NONE },
+    { "paraula-anterior",  c_word_prev,  "Inici de la paraula anterior", ACT_NONE },
+    { "paraula-seguent",   c_word_next,  "Inici de la paraula següent", ACT_NONE },
+    { "paragraf-anterior", c_par_prev,   "Inici del paràgraf anterior", ACT_NONE },
+    { "paragraf-seguent",  c_par_next,   "Inici del paràgraf següent", ACT_NONE },
+    { "inici-document",    c_doc_start,  "Inici del document", ACT_NONE },
+    { "fi-document",       c_doc_end,    "Final del document", ACT_NONE },
+    { "anar-a-linia",      c_goto_line,  "Salta a una línia (paràgraf) pel número", ACT_NONE },
 
-    { "seleccio-amunt",            c_sel_up,         "Amplia la selecció una línia amunt" },
-    { "seleccio-avall",            c_sel_down,       "Amplia la selecció una línia avall" },
-    { "seleccio-esquerra",         c_sel_left,       "Amplia la selecció un caràcter a l'esquerra" },
-    { "seleccio-dreta",            c_sel_right,      "Amplia la selecció un caràcter a la dreta" },
-    { "seleccio-inici-linia",      c_sel_row_start,  "Amplia la selecció fins a l'inici de la línia" },
-    { "seleccio-fi-linia",         c_sel_row_end,    "Amplia la selecció fins al final de la línia" },
-    { "seleccio-pagina-amunt",     c_sel_page_up,    "Amplia la selecció una pantalla amunt" },
-    { "seleccio-pagina-avall",     c_sel_page_down,  "Amplia la selecció una pantalla avall" },
-    { "seleccio-paraula-anterior", c_sel_word_prev,  "Amplia la selecció fins a la paraula anterior" },
-    { "seleccio-paraula-seguent",  c_sel_word_next,  "Amplia la selecció fins a la paraula següent" },
-    { "seleccio-paragraf-anterior", c_sel_par_prev,  "Amplia la selecció fins al paràgraf anterior" },
-    { "seleccio-paragraf-seguent", c_sel_par_next,   "Amplia la selecció fins al paràgraf següent" },
-    { "seleccio-inici-document",   c_sel_doc_start,  "Amplia la selecció fins a l'inici del document" },
-    { "seleccio-fi-document",      c_sel_doc_end,    "Amplia la selecció fins al final del document" },
-    { "marca",                     c_mark,           "Comença o cancel·la una selecció" },
-    { "seleccionar-tot",           c_select_all,     "Selecciona tot el document" },
-    { "cancellar",                 c_cancel,         "Cancel·la la selecció" },
+    { "seleccio-amunt",            c_sel_up,         "Amplia la selecció una línia amunt", ACT_NONE },
+    { "seleccio-avall",            c_sel_down,       "Amplia la selecció una línia avall", ACT_NONE },
+    { "seleccio-esquerra",         c_sel_left,       "Amplia la selecció un caràcter a l'esquerra", ACT_NONE },
+    { "seleccio-dreta",            c_sel_right,      "Amplia la selecció un caràcter a la dreta", ACT_NONE },
+    { "seleccio-inici-linia",      c_sel_row_start,  "Amplia la selecció fins a l'inici de la línia", ACT_NONE },
+    { "seleccio-fi-linia",         c_sel_row_end,    "Amplia la selecció fins al final de la línia", ACT_NONE },
+    { "seleccio-pagina-amunt",     c_sel_page_up,    "Amplia la selecció una pantalla amunt", ACT_NONE },
+    { "seleccio-pagina-avall",     c_sel_page_down,  "Amplia la selecció una pantalla avall", ACT_NONE },
+    { "seleccio-paraula-anterior", c_sel_word_prev,  "Amplia la selecció fins a la paraula anterior", ACT_NONE },
+    { "seleccio-paraula-seguent",  c_sel_word_next,  "Amplia la selecció fins a la paraula següent", ACT_NONE },
+    { "seleccio-paragraf-anterior", c_sel_par_prev,  "Amplia la selecció fins al paràgraf anterior", ACT_NONE },
+    { "seleccio-paragraf-seguent", c_sel_par_next,   "Amplia la selecció fins al paràgraf següent", ACT_NONE },
+    { "seleccio-inici-document",   c_sel_doc_start,  "Amplia la selecció fins a l'inici del document", ACT_NONE },
+    { "seleccio-fi-document",      c_sel_doc_end,    "Amplia la selecció fins al final del document", ACT_NONE },
+    { "marca",                     c_mark,           "Comença o cancel·la una selecció", ACT_NONE },
+    { "seleccionar-tot",           c_select_all,     "Selecciona tot el document", ACT_NONE },
+    { "cancellar",                 c_cancel,         "Cancel·la la selecció", ACT_NONE },
 
-    { "nova-linia",                c_newline,        "Parteix la línia; continua llistes i cites" },
-    { "tabulador",                 c_tab,            "Insereix un tabulador" },
-    { "esborrar-enrere",           c_backspace,      "Esborra el caràcter anterior" },
-    { "esborrar-endavant",         c_delete,         "Esborra el caràcter següent" },
-    { "esborrar-paraula-anterior", c_delete_word_prev, "Esborra fins a l'inici de la paraula" },
-    { "esborrar-paraula-seguent",  c_delete_word_next, "Esborra fins a la paraula següent" },
-    { "tallar",                    c_cut,            "Talla la selecció" },
-    { "copiar",                    c_copy,           "Copia la selecció" },
-    { "enganxar",                  c_paste,          "Enganxa el porta-retalls" },
+    { "nova-linia",                c_newline,        "Parteix la línia; continua llistes i cites", ACT_NONE },
+    { "tabulador",                 c_tab,            "Insereix un tabulador", ACT_NONE },
+    { "esborrar-enrere",           c_backspace,      "Esborra el caràcter anterior", ACT_BACKSPACE },
+    { "esborrar-endavant",         c_delete,         "Esborra el caràcter següent", ACT_DELETE },
+    { "esborrar-paraula-anterior", c_delete_word_prev, "Esborra fins a l'inici de la paraula", ACT_NONE },
+    { "esborrar-paraula-seguent",  c_delete_word_next, "Esborra fins a la paraula següent", ACT_NONE },
+    { "tallar",                    c_cut,            "Talla la selecció", ACT_NONE },
+    { "copiar",                    c_copy,           "Copia la selecció", ACT_NONE },
+    { "enganxar",                  c_paste,          "Enganxa el porta-retalls", ACT_NONE },
 
-    { "centrar",           c_center,     "Centra o no la columna de text" },
-    { "desar",             c_save,       "Desa el document" },
-    { "desar-com",         c_save_as,    "Desa el document amb un altre nom" },
-    { "sortir",            c_quit,       "Surt de Phileas" },
-    { "redibuixar",        c_redraw,     "Torna a dibuixar la pantalla" },
-    { "paleta",            c_palette,    "Executa una ordre pel nom" },
+    { "centrar",           c_center,     "Centra o no la columna de text", ACT_NONE },
+    { "desar",             c_save,       "Desa el document", ACT_NONE },
+    { "desar-com",         c_save_as,    "Desa el document amb un altre nom", ACT_NONE },
+    { "sortir",            c_quit,       "Surt de Phileas", ACT_NONE },
+    { "redibuixar",        c_redraw,     "Torna a dibuixar la pantalla", ACT_NONE },
+    { "paleta",            c_palette,    "Executa una ordre pel nom", ACT_NONE },
+
+    { "desfer",            c_undo,       "Desfà l'últim canvi", ACT_NONE },
+    { "refer",             c_redo,       "Refà el que s'ha desfet", ACT_NONE },
+    { "cercar",            c_find,       "Cerca un text (mentre s'escriu)", ACT_NONE },
+    { "cercar-seguent",    c_find_next,  "Següent coincidència", ACT_NONE },
+    { "cercar-anterior",   c_find_prev,  "Coincidència anterior", ACT_NONE },
+    { "substituir",        c_replace,    "Substitueix un text, amb confirmació", ACT_NONE },
+    { "autodesat",         c_autosave,   "Activa o desactiva l'autodesat", ACT_NONE },
 };
 
 static const char *const default_bindings[][2] = {
@@ -283,6 +459,12 @@ static const char *const default_bindings[][2] = {
     { "ctrl-q", "sortir" },
     { "ctrl-l", "redibuixar" },
     { "ctrl-p", "paleta" },
+
+    { "ctrl-z", "desfer" },           { "ctrl-y", "refer" },
+    { "ctrl-f", "cercar" },
+    { "ctrl-g", "cercar-seguent" },   { "f3", "cercar-seguent" },
+    { "alt-g", "cercar-anterior" },   { "shift-f3", "cercar-anterior" },
+    { "ctrl-r", "substituir" },
 };
 
 #define MAX_BINDINGS 256

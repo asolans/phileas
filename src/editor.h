@@ -3,6 +3,14 @@
 
 #include "buffer.h"
 
+/* Accions que s'agrupen en un sol pas de desfer si es repeteixen seguides */
+enum {
+    ACT_NONE,
+    ACT_TYPE,       /* escriure: una paraula per pas */
+    ACT_BACKSPACE,
+    ACT_DELETE,
+};
+
 enum {
     SEL_NONE,   /* sense selecció */
     SEL_SHIFT,  /* Maj+fletxes: un moviment sense Maj la cancel·la */
@@ -27,6 +35,19 @@ typedef struct {
     int     center;            /* columna de text centrada a la pantalla */
     int     width, height;     /* àrea de text real */
     int     margin;            /* columna de pantalla on comença el text */
+
+    int     last_act;          /* ACT_* de l'última acció, per agrupar el desfer */
+    wchar_t last_ch;
+    Pos     act_end;           /* on va quedar el cursor després de l'última acció */
+
+    char    search[256];       /* últim text cercat */
+
+    int     autosave;          /* segons d'inactivitat abans de desar; 0 = desactivat */
+    int     autosave_max;      /* màxim de segons amb canvis sense desar */
+    int     autosave_last;     /* últim valor actiu, per tornar a activar-lo */
+    double  last_input;        /* moment de l'última tecla */
+    double  dirty_since;       /* primer canvi sense desar; 0 = cap */
+    int     autosave_warned;   /* ja s'ha avisat que el document no té nom */
 
     char    msg[256];          /* missatge de la línia inferior */
     int     quit;
@@ -79,6 +100,17 @@ void  ed_backspace(Editor *e);
 void  ed_delete(Editor *e);
 void  ed_delete_word_prev(Editor *e);
 void  ed_delete_word_next(Editor *e);
+
+/* Desfer/refer. ed_begin s'ha de cridar abans de cada acció: decideix si
+ * comença un grup nou de desfer o continua l'anterior (escriure seguit,
+ * esborrar seguit). ed_end recorda on ha quedat el cursor. */
+void  ed_begin(Editor *e, int act, wchar_t ch);
+void  ed_end(Editor *e);
+int   ed_undo(Editor *e);
+int   ed_redo(Editor *e);
+
+/* Selecciona el tram [a, z), amb el cursor al final. */
+void  ed_select(Editor *e, Pos a, Pos z);
 
 /* Porta-retalls: retornen el nombre de caràcters, o 0 si no hi havia res */
 size_t ed_copy(Editor *e);

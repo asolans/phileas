@@ -4,7 +4,7 @@ Editor de text per a consola (Linux), orientat a escriure prosa en Markdown.
 
 ## Estat
 
-- **Fase actual:** 3 — Desfer/refer, cerca i substitució, autodesat (F2b completada)
+- **Fase actual:** 4 — Colors mínims de Markdown (F3 completada)
 - **Última actualització:** 2026-10-25
 
 ## Requeriments (versió inicial)
@@ -304,7 +304,7 @@ Lliures per al futur: Ctrl+D, Ctrl+E, Ctrl+J, Ctrl+K, Ctrl+T, Ctrl+U, F4–F6, F
 
 **Estimació de pàgines:** cada separació compta mitja línia.
 
-## Autodesat (planificat a la F3)
+## Autodesat (✅ implementat a la F3)
 
 - **Comportament:** desa sobre el mateix document, sense còpies de seguretat. Fa servir el mateix desat atòmic que Ctrl+S.
 - **Quan desa:** quan hi ha canvis sense desar i fa *N* segons que no es prem cap tecla. Si s'escriu sense parar, desa com a molt cada *M* segons, perquè no es perdi feina en una sessió llarga.
@@ -347,8 +347,9 @@ src/
   command.c     ✅ registre d'ordres amb nom i taula de dreceres
   keys.c        ✅ lectura de tecles, noms de tecla ("ctrl-s", "alt-<"...) i enganxat delimitat
   render.c      ✅ dibuix amb ncursesw, barra d'estat i diàlegs a la línia inferior
-  search.c      cerca i substitució
-  undo.c        historial desfer/refer
+  search.c      ✅ cerca (sense distingir majúscules si el patró no en té), endavant i enrere
+  undo.c        ✅ historial desfer/refer per grups, amb límit de memòria (8 MB)
+  autosave.c    ✅ autodesat per inactivitat i interval màxim
   spell.c       integració amb hunspell
   filebrowser.c navegació pel disc i obertura de fitxers
   config.c      configuració (~/.config/phileas/)
@@ -366,7 +367,7 @@ Decisions de disseny pendents:
 make            # compila ./phileas
 make test       # proves unitàries
 make clean && make debug   # amb AddressSanitizer i UBSan
-./phileas [-c COLUMNES] [fitxer.md]
+./phileas [-c COLUMNES] [-a SEGONS] [fitxer.md]   # -a 0 desactiva l'autodesat
 ```
 
 ## Entorn de desenvolupament
@@ -381,7 +382,7 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 - [x] **F1** — Esquelet: obrir, mostrar, desplaçar-se, desar un fitxer UTF-8 (inclou el wordwrap suau, necessari per mostrar els paràgrafs)
 - [x] **F2** — Edició bàsica, sagnat penjant de llistes i cites, columna centrada
 - [x] **F2b** — Separació visual de paràgrafs (vegeu «Model de paràgrafs»)
-- [ ] **F3** — Desfer/refer, cerca i substitució, **autodesat**
+- [x] **F3** — Desfer/refer, cerca i substitució, autodesat
 - [ ] **F4** — Colors mínims de Markdown (capçaleres, èmfasi)
 - [ ] **F5** — Navegador de fitxers
 - [ ] **F6** — Correcció ortogràfica amb hunspell
@@ -459,3 +460,25 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **En obrir un fitxer:** el cursor es col·loca al final del document.
   - **Copiar:** el cursor queda al final del bloc copiat, encara que la selecció s'hagi fet cap enrere.
   - **Enter al final del document:** la fila de separació es mostra de seguida. El cursor espera a l'inici del paràgraf nou i no es mou en escriure la primera lletra. També passa en acabar una llista.
+- **2026-10-25** — **F3 completada.**
+  - **Desfer/refer** (Ctrl+Z / Ctrl+Y):
+    - totes les modificacions passen per `buf_insert`/`buf_delete` i queden a l'historial, agrupades per acció;
+    - escrivint, cada paraula és un pas; els Retrocés o Supr seguits, també;
+    - una substitució de tot el document es desfà d'un sol cop;
+    - el desfer recol·loca el cursor;
+    - si es desfà fins a l'estat desat, el document torna a constar com a «sense canvis»;
+    - l'historial té un límit de 8 MB, i en passar-lo s'obliden els grups més antics.
+  - **Cerca** (Ctrl+F):
+    - la coincidència se selecciona mentre s'escriu, i la pregunta indica «(no trobat)»;
+    - Esc torna on era el cursor;
+    - l'última cerca es mostra entre claudàtors, i Enter sense escriure res la reutilitza;
+    - Ctrl+G / F3 busquen la següent i Alt+G / Maj+F3 l'anterior, fent la volta al document amb un avís;
+    - si el text cercat no té majúscules, no les distingeix.
+  - **Substitució** (Ctrl+R): demana el text i el substitut, i per a cada coincidència pregunta (s)í, (n)o, (t)ots o Esc. Acaba en tornar al punt de partida.
+  - **Autodesat:**
+    - per defecte, 30 s sense escriure (`-a SEGONS`, i `-a 0` el desactiva), i com a molt cada 300 s si s'escriu sense parar;
+    - desa sobre el mateix fitxer amb el desat atòmic;
+    - l'ordre `autodesat` de la paleta l'activa o el desactiva;
+    - els documents sense nom no es desen sols, i la barra avisa una vegada que cal desar-los amb un nom;
+    - l'espera es fa amb el temps límit de ncurses: no consumeix CPU en repòs.
+  - **Proves:** 1.467 comprovacions unitàries, també amb sanititzadors, i proves interactives de totes les funcions.

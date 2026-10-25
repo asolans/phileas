@@ -45,6 +45,7 @@ void buf_free(Buffer *b)
         free(b->lines[i].rows);
     }
     free(b->lines);
+    undo_free(&b->undo);
     memset(b, 0, sizeof *b);
 }
 
@@ -103,7 +104,7 @@ static void open_lines(Buffer *b, size_t at, size_t k)
     b->nlines += k;
 }
 
-Pos buf_insert(Buffer *b, Pos at, const char *s, size_t n)
+static Pos do_insert(Buffer *b, Pos at, const char *s, size_t n)
 {
     Line *l = &b->lines[at.line];
     const char *nl = memchr(s, '\n', n);
@@ -151,7 +152,7 @@ Pos buf_insert(Buffer *b, Pos at, const char *s, size_t n)
     return end;
 }
 
-void buf_delete(Buffer *b, Pos a, Pos z)
+static void do_delete(Buffer *b, Pos a, Pos z)
 {
     Line *la = &b->lines[a.line], *lz;
 
@@ -215,6 +216,109 @@ void buf_scan(Buffer *b)
             break;
     }
     b->scan_from = SIZE_MAX;
+}
+
+/* ---- Desfer/refer ---- */
+
+static UndoPos upos(Pos p)
+{
+    return (UndoPos){ p.line, p.col };
+}
+
+static Pos bpos(UndoPos p)
+{
+    return (Pos){ p.line, p.col };
+}
+
+static void update_modified(Buffer *b)
+{
+    b->modified = undo_state(&b->undo) != b->undo.saved_seq;
+}
+
+Pos buf_insert(Buffer *b, Pos at, const char *s, size_t n)
+{
+    Pos end = do_insert(b, at, s, n);
+    char *copy;
+
+    if (!b->undo.applying && n > 0) {
+        copy = xmalloc(n);
+        memcpy(copy, s, n);
+        undo_push(&b->undo, UNDO_INSERT, upos(at), upos(end), copy, n);
+        update_modified(b);
+    }
+    return end;
+}
+
+void buf_delete(Buffer *b, Pos a, Pos z)
+{
+    char *text;
+    size_t n;
+
+    if (a.line == z.line && a.col == z.col)
+        return;
+    if (b->undo.applying) {
+        do_delete(b, a, z);
+        return;
+    }
+    text = buf_extract(b, a, z, &n);
+    do_delete(b, a, z);
+    undo_push(&b->undo, UNDO_DELETE, upos(a), upos(z), text, n);
+    update_modified(b);
+}
+
+void buf_undo_mark(Buffer *b)
+{
+    undo_mark(&b->undo);
+}
+
+int buf_undo(Buffer *b, Pos *cursor)
+{
+    Undo *u = &b->undo;
+    unsigned long g;
+
+    if (u->pos == 0)
+        return 0;
+    g = u->recs[u->pos - 1].group;
+    u->applying = 1;
+    while (u->pos > 0 && u->recs[u->pos - 1].group == g) {
+        UndoRec *r = &u->recs[--u->pos];
+
+        if (r->type == UNDO_INSERT) {
+            do_delete(b, bpos(r->a), bpos(r->z));
+            *cursor = bpos(r->a);
+        } else {
+            *cursor = do_insert(b, bpos(r->a), r->text, r->len);
+        }
+    }
+    u->applying = 0;
+    undo_mark(u);
+    update_modified(b);
+    return 1;
+}
+
+int buf_redo(Buffer *b, Pos *cursor)
+{
+    Undo *u = &b->undo;
+    unsigned long g;
+
+    if (u->pos == u->n)
+        return 0;
+    g = u->recs[u->pos].group;
+    u->applying = 1;
+    while (u->pos < u->n && u->recs[u->pos].group == g) {
+        UndoRec *r = &u->recs[u->pos++];
+
+        if (r->type == UNDO_INSERT) {
+            *cursor = do_insert(b, bpos(r->a), r->text, r->len);
+        } else {
+            do_delete(b, bpos(r->a), bpos(r->z));
+            *cursor = bpos(r->a);
+        }
+    }
+    u->applying = 0;
+    undo_mark(u);
+    update_modified(b);
+    return 1;
 }
 
 char *buf_paste_text(Buffer *b, size_t line, const char *s, size_t n, size_t *out_n)
@@ -497,6 +601,7 @@ int buf_save(Buffer *b, const char *path)
 
     free(tmp);
     free(real);
+    b->undo.saved_seq = undo_state(&b->undo);
     b->modified = 0;
     return 0;
 
