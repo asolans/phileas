@@ -455,3 +455,7 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **Classificació:** cada línia té un tipus de bloc que es manté al dia amb un escaneig incremental. S'atura quan l'estat de bloc de codi i de metadades torna a coincidir.
   - **Prova amb el mateix SEGUIMENT.md:** en desar-lo, només afegeix les dues línies en blanc de la normalització paràgraf → llista.
   - **Proves:** 1.439 comprovacions unitàries, també amb sanititzadors, i proves interactives de pantalla, moviment, desplaçament en el document gran, Retrocés entre paràgrafs i enganxat.
+- **2026-10-25** — Prova de l'usuari de la F2b. Ajustos:
+  - **En obrir un fitxer:** el cursor es col·loca al final del document.
+  - **Copiar:** el cursor queda al final del bloc copiat, encara que la selecció s'hagi fet cap enrere.
+  - **Enter al final del document:** la fila de separació es mostra de seguida. El cursor espera a l'inici del paràgraf nou i no es mou en escriure la primera lletra. També passa en acabar una llista.

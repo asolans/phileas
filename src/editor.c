@@ -540,6 +540,7 @@ size_t ed_copy(Editor *e)
     free(e->clip);
     e->clip = buf_extract(&e->buf, a, z, &e->clip_len);
     ed_sel_clear(e);
+    set_cursor(e, z);   /* el cursor queda al final del bloc copiat */
     return utf8_count(e->clip, e->clip_len);
 }
 

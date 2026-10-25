@@ -533,6 +533,10 @@ static void test_blocks(void)
     buf_init(&b);
     buf_insert(&b, (Pos){ 0, 0 }, "u\ndos", 6);
     CHECK(buf_gap_after(&b, 0) && !buf_gap_after(&b, 1));
+    /* Enter al final: la separació es veu abans d'escriure res */
+    buf_insert(&b, (Pos){ 1, 3 }, "\n", 1);
+    CHECK(buf_gap_after(&b, 1) && !buf_gap_after(&b, 2));
+    buf_delete(&b, (Pos){ 1, 3 }, (Pos){ 2, 0 });
     buf_insert(&b, (Pos){ 0, 0 }, "- ", 2);
     buf_insert(&b, (Pos){ 1, 0 }, "- ", 2);
     CHECK(!buf_gap_after(&b, 0));                 /* ara són una llista */

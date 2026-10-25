@@ -70,6 +70,8 @@ int main(int argc, char **argv)
             }
             ed_msg(&e, "Fitxer nou: %s", path);
         }
+        /* Normalment s'obre un document per continuar-lo: cursor al final */
+        ed_doc_end(&e);
         e.filename = xstrdup(path);
     }
     if (strcmp(nl_langinfo(CODESET), "UTF-8") != 0)

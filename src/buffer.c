@@ -282,7 +282,11 @@ int buf_gap_after(Buffer *b, size_t i)
         return 0;
     while (j < b->nlines && MD_BASE(b->lines[j].kind) == MD_EMPTY)
         j++;
-    return j < b->nlines && !md_tight(b->lines[i].kind, b->lines[j].kind);
+    /* Si només hi ha línies buides fins al final (p. ex. just després de
+     * prémer Enter), s'hi espera un paràgraf nou: la separació ja es mostra */
+    if (j == b->nlines)
+        return i + 1 < b->nlines;
+    return !md_tight(b->lines[i].kind, b->lines[j].kind);
 }
 
 char *buf_extract(const Buffer *b, Pos a, Pos z, size_t *n)
