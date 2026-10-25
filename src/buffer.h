@@ -1,6 +1,8 @@
 #ifndef PHILEAS_BUFFER_H
 #define PHILEAS_BUFFER_H
 
+#include "md.h"
+
 #include <stddef.h>
 
 /* Una línia lògica: en Markdown, un paràgraf sencer. */
@@ -16,6 +18,11 @@ typedef struct {
 
     /* Cache de l'estimació de pàgines: mitges línies impreses; 0 = per calcular */
     size_t  print_lines;
+
+    /* Tipus de bloc Markdown (MD_*); -1 = per calcular. st és l'estat
+     * després d'aquesta línia. Els manté al dia buf_scan(). */
+    int     kind;
+    MdState st;
 } Line;
 
 typedef struct {
@@ -28,6 +35,9 @@ typedef struct {
     int     final_newline; /* el fitxer acaba amb salt de línia */
 
     int     modified;
+
+    /* Interval de línies modificades des de l'últim buf_scan() */
+    size_t  scan_from, scan_to;
 } Buffer;
 
 /* Posició al text: línia i byte dins la línia (sempre a l'inici d'un
@@ -48,7 +58,27 @@ void buf_delete(Buffer *b, Pos a, Pos z);
 /* Còpia del text entre a i z, amb '\n' entre línies (cal alliberar-la). */
 char *buf_extract(const Buffer *b, Pos a, Pos z, size_t *n);
 
-/* Retornen 0 si va bé, o -1 amb errno. Si buf_load falla, b no canvia. */
+/* Adapta un text enganxat des de fora per inserir-lo a la línia line: com en
+ * carregar un fitxer, cada línia en blanc entre blocs és una separació de
+ * paràgraf (no una línia buida), excepte dins de blocs de codi. No ajunta
+ * línies. Retorna una còpia nova (cal alliberar-la). */
+char *buf_paste_text(Buffer *b, size_t line, const char *s, size_t n, size_t *out_n);
+
+/* Actualitza el tipus de bloc de les línies modificades. */
+void buf_scan(Buffer *b);
+
+/* Marca tot el buffer per tornar-lo a classificar. */
+void buf_rescan_all(Buffer *b);
+
+/* 1 si després de la línia i hi ha una separació de paràgraf: al fitxer
+ * és una línia en blanc i a la pantalla, una fila buida que no existeix al
+ * buffer. */
+int  buf_gap_after(Buffer *b, size_t i);
+
+/* Retornen 0 si va bé, o -1 amb errno. Si buf_load falla, b no canvia.
+ * En carregar, cada línia en blanc entre blocs es converteix en una
+ * separació de paràgraf, i les línies d'un paràgraf tallat a mà s'ajunten.
+ * En desar, cada separació torna a ser una línia en blanc. */
 int  buf_load(Buffer *b, const char *path);
 int  buf_save(Buffer *b, const char *path);
 

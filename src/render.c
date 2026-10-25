@@ -119,7 +119,8 @@ void render(Editor *e)
             s0 = tl == sa.line ? sa.col : 0;
             s1 = tl == sz.line ? sz.col : (size_t)-1;
         }
-        draw_row(e, ed_line(e, tl), tr, y, s0, s1);
+        if (tr < ed_line(e, tl)->nrows)   /* si no, és la fila de separació */
+            draw_row(e, ed_line(e, tl), tr, y, s0, s1);
         if (tl == e->cy && tr == crow) {
             cur_y = y;
             cur_x = e->margin + ed_cursor_x(e);

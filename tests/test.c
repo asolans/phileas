@@ -168,6 +168,29 @@ static void roundtrip(const char *data, size_t nlines)
     CHECK(b.nlines == nlines);
     CHECK(buf_save(&b, out) == 0);
     CHECK(file_equals(out, data, n));
+    if (b.nlines != nlines || !file_equals(out, data, n))
+        fprintf(stderr, "  fitxer: \"%s\" (%zu línies)\n", data, b.nlines);
+    buf_free(&b);
+    unlink(in);
+    unlink(out);
+}
+
+/* Carrega data i comprova el nombre de línies i el que es desa. */
+static void normalized(const char *data, size_t nlines, const char *expect)
+{
+    char in[64], out[64];
+    Buffer b;
+
+    snprintf(in, sizeof in, "%s/in", tmpdir);
+    snprintf(out, sizeof out, "%s/out", tmpdir);
+    write_file(in, data, strlen(data));
+    buf_init(&b);
+    CHECK(buf_load(&b, in) == 0);
+    CHECK(b.nlines == nlines);
+    CHECK(buf_save(&b, out) == 0);
+    CHECK(file_equals(out, expect, strlen(expect)));
+    if (!file_equals(out, expect, strlen(expect)))
+        fprintf(stderr, "  entrada: \"%s\"\n", data);
     buf_free(&b);
     unlink(in);
     unlink(out);
@@ -182,16 +205,58 @@ static void test_buffer(void)
     roundtrip("\n", 1);
     roundtrip("hola\n", 1);
     roundtrip("hola", 1);
-    roundtrip("# Títol\n\nUn paràgraf llarg.\n", 3);
-    roundtrip("a\r\nb\r\n", 2);
-    roundtrip("a\r\nb\n", 2);             /* salts barrejats: es conserva el \r */
+    roundtrip("# Títol\n\nUn paràgraf llarg.\n", 2);
+    roundtrip("a\r\n\r\nb\r\n", 2);
+    roundtrip("a\r\n\nb\n", 2);           /* salts barrejats: es conserva el \r */
     roundtrip("\xEF\xBB\xBF" "amb BOM\n", 1);
     roundtrip("bytes \xFF\xFE invàlids\n", 1);
 
+    /* Model de paràgrafs: aquests fitxers també queden idèntics */
+    roundtrip("u\n\ndos\n\ntres\n", 3);
+    roundtrip("- a\n- b\n  - niat\n\nText\n", 4);
+    roundtrip("1. u\n2. dos\n", 2);
+    roundtrip("> cita\n>\n> segona\n", 3);
+    roundtrip("| a | b |\n|---|---|\n| 1 | 2 |\n", 3);
+    roundtrip("```\ncodi\n\n\nmés codi\n```\n\nText\n", 7);
+    roundtrip("~~~~\n```\n~~~~\n", 3);          /* tanca de la mateixa mena */
+    roundtrip("---\ntitol: x\n\nautor: y\n---\n\nText\n", 6);
+    roundtrip("línia amb salt  \nsegona\n", 2);
+    roundtrip("barra\\\nsegona\n", 2);
+    roundtrip("Títol\n=====\n\nText\n", 3);
+    roundtrip("    codi sagnat\n    més\n", 2);
+    roundtrip("<div>\n<p>html</p>\n</div>\n", 3);
+    roundtrip("a\n\n\nb\n", 3);                  /* dues línies en blanc: una línia buida */
+    roundtrip("a\n\n\n\nb\n", 4);
+    roundtrip("\n\na\n", 3);                      /* en blanc al principi */
+    roundtrip("```\nsense tancar\n\nfinal\n", 4);
+    roundtrip("| a |\n\n| b |\n", 3);              /* dues taules separades */
+    roundtrip("- a\n\n- b\n", 3);
+    roundtrip("- a\n\n\nText\n", 3);
+    roundtrip("- u\n    - niat\n        - més\n", 3);  /* llistes niades a 4 espais */
+    roundtrip("- u\n\n    paràgraf de l'element\n", 3);
+    roundtrip("- u\n    continuació sagnada\n", 2);
+
+    /* Normalitzacions: el significat Markdown es manté */
+    normalized("línia u\nlínia dos\n", 1, "línia u línia dos\n");
+    normalized("- element\n  que continua\n", 1, "- element que continua\n");
+    normalized("> cita\ncontinua\n", 1, "> cita continua\n");
+    normalized("# Títol\nText\n", 2, "# Títol\n\nText\n");
+    normalized("Intro:\n- a\n- b\n", 3, "Intro:\n\n- a\n- b\n");
+    normalized("a\n\n\n", 1, "a\n");
+    normalized("a\n   \nb\n", 2, "a\n\nb\n");       /* línia només amb espais */
+
+    /* Línies buides afegides al final del buffer: no es desen */
+    buf_init(&b);
+    buf_insert(&b, (Pos){ 0, 0 }, "a\n\n", 3);
+    snprintf(path, sizeof path, "%s/final", tmpdir);
+    CHECK(buf_save(&b, path) == 0 && file_equals(path, "a\n", 2));
+    unlink(path);
+    buf_free(&b);
+
     buf_init(&b);
     snprintf(path, sizeof path, "%s/crlf", tmpdir);
-    write_file(path, "x\r\ny\r\n", 6);
-    CHECK(buf_load(&b, path) == 0 && b.crlf && b.lines[0].len == 1);
+    write_file(path, "x\r\n\r\ny\r\n", 8);
+    CHECK(buf_load(&b, path) == 0 && b.crlf && b.nlines == 2 && b.lines[0].len == 1);
     unlink(path);
 
     /* Errors: el buffer no canvia */
@@ -207,7 +272,7 @@ static void test_buffer(void)
         snprintf(link, sizeof link, "%s/enllac", tmpdir);
         CHECK(symlink("real", link) == 0);
         CHECK(buf_save(&b, link) == 0);
-        CHECK(file_equals(path, "x\r\ny\r\n", 6));
+        CHECK(file_equals(path, "x\r\n\r\ny\r\n", 8));
         unlink(link);
     }
     unlink(path);
@@ -342,6 +407,7 @@ static void set_text(Buffer *b, size_t n, const char *fill, size_t chars)
         l->len = strlen(l->text);
         l->cap = l->len + 1;
     }
+    buf_rescan_all(b);
 }
 
 static void test_pages(void)
@@ -351,31 +417,131 @@ static void test_pages(void)
     buf_init(&b);
     CHECK(buf_pages(&b) == 1);                 /* document buit */
 
-    set_text(&b, 46, "a", 80);                 /* 46 línies plenes */
+    set_text(&b, 1, "a", 80 * 46);             /* un paràgraf de 46 línies */
     CHECK(buf_pages(&b) == 1);
-    set_text(&b, 47, "a", 80);
+    set_text(&b, 1, "a", 80 * 46 + 1);
     CHECK(buf_pages(&b) == 2);
-    set_text(&b, 23, "à", 160);                /* es compten caràcters, no bytes */
+    set_text(&b, 1, "à", 80 * 46);             /* es compten caràcters, no bytes */
     CHECK(buf_pages(&b) == 1);
-    set_text(&b, 23, "à", 161);
+
+    /* Paràgrafs d'una línia separats (mitja línia cada separació):
+     * 31 paràgrafs + 30 separacions = 46 línies */
+    set_text(&b, 31, "a", 80);
+    CHECK(buf_pages(&b) == 1);
+    set_text(&b, 32, "a", 80);
     CHECK(buf_pages(&b) == 2);
 
-    /* Paràgrafs separats per línies en blanc (mitja línia cadascuna):
-     * 31 paràgrafs d'una línia + 30 separacions = 46 línies */
-    set_text(&b, 61, "a", 80);
-    for (size_t i = 1; i < 61; i += 2)
-        b.lines[i].len = 0;
-    CHECK(buf_pages(&b) == 1);
-    b.lines[1].len = 80;                       /* una separació passa a ser text */
-    b.lines[1].print_lines = 0;
-    CHECK(buf_pages(&b) == 2);
-
+    /* Els elements d'una llista van units: 46 línies sense separació */
     set_text(&b, 46, "a", 80);
-    b.lines[45].len = 0;                        /* línia en blanc final */
-    b.lines[45].print_lines = 0;
-    b.lines[0].text[0] = '#';                   /* capçalera: +1 línia */
-    b.lines[0].print_lines = 0;
+    for (size_t i = 0; i < 46; i++)
+        memcpy(b.lines[i].text, "- ", 2);
+    buf_rescan_all(&b);
     CHECK(buf_pages(&b) == 1);
+
+    /* Capçalera: una línia de més */
+    set_text(&b, 1, "a", 80 * 45);
+    b.lines[0].text[0] = '#';
+    b.lines[0].text[1] = ' ';
+    CHECK(buf_pages(&b) == 1);
+    set_text(&b, 1, "a", 80 * 45 + 1);
+    b.lines[0].text[0] = '#';
+    b.lines[0].text[1] = ' ';
+    CHECK(buf_pages(&b) == 2);
+    buf_free(&b);
+}
+
+/* Classifica un text de diverses línies i retorna els tipus base. */
+static size_t kinds(const char *text, int *out, size_t max)
+{
+    MdState st;
+    size_t n = 0;
+
+    memset(&st, 0, sizeof st);
+    while (n < max) {
+        const char *nl = strchr(text, '\n');
+        size_t len = nl ? (size_t)(nl - text) : strlen(text);
+        out[n++] = md_kind(text, len, &st);
+        if (!nl)
+            break;
+        text = nl + 1;
+    }
+    return n;
+}
+
+static int paste_is(Buffer *b, const char *in, const char *expect)
+{
+    size_t n;
+    char *out = buf_paste_text(b, 0, in, strlen(in), &n);
+    int ok = n == strlen(expect) && !memcmp(out, expect, n);
+
+    if (!ok)
+        fprintf(stderr, "  enganxat: \"%s\" -> \"%s\"\n", in, out);
+    free(out);
+    return ok;
+}
+
+static void test_paste(void)
+{
+    Buffer b;
+
+    buf_init(&b);
+    CHECK(paste_is(&b, "a\n\nb", "a\nb"));
+    CHECK(paste_is(&b, "a\nb", "a\nb"));                 /* no s'ajunta */
+    CHECK(paste_is(&b, "a\n\n\nb", "a\n\nb"));
+    CHECK(paste_is(&b, "a\n", "a\n"));
+    CHECK(paste_is(&b, "a\n\n", "a\n"));
+    CHECK(paste_is(&b, "a\n\n\n", "a\n\n"));
+    CHECK(paste_is(&b, "\n\na", "\n\na"));
+    CHECK(paste_is(&b, "\n", "\n"));
+    CHECK(paste_is(&b, "x", "x"));
+    CHECK(paste_is(&b, "```\nu\n\ndos\n```\n\nText", "```\nu\n\ndos\n```\nText"));
+    CHECK(paste_is(&b, "a\n   \nb", "a\nb"));
+    buf_free(&b);
+}
+
+static void test_blocks(void)
+{
+    int k[16];
+    Buffer b;
+
+    CHECK(kinds("text\n# Cap\n- l\n> c\n| t |\n<p>\n    codi\n===\n", k, 16) == 9);
+    CHECK(k[0] == MD_TEXT && k[1] == MD_HEADING && k[2] == MD_LIST && k[3] == MD_QUOTE);
+    CHECK(k[4] == MD_TABLE && k[5] == MD_HTML && k[6] == MD_INDENT && k[7] == MD_UNDERLINE);
+    CHECK(k[8] == MD_EMPTY);
+
+    CHECK(kinds("```c\nx\n\n```\ndesprés", k, 16) == 5);
+    CHECK(k[0] == MD_FENCE_OPEN && k[1] == MD_CODE && k[2] == MD_CODE);
+    CHECK(k[3] == MD_FENCE_CLOSE && k[4] == MD_TEXT);
+
+    CHECK(kinds("---\na: 1\n---\n---", k, 16) == 4);
+    CHECK(k[0] == MD_META && k[1] == MD_META && k[2] == MD_META && k[3] == MD_UNDERLINE);
+    CHECK(kinds("text\n---", k, 16) == 2 && k[0] == MD_TEXT);   /* no són metadades */
+
+    CHECK(kinds("#etiqueta\n####### set", k, 16) == 2);
+    CHECK(k[0] == MD_TEXT && k[1] == MD_TEXT);
+    CHECK(kinds("salt  \nbarra\\", k, 16) == 2);
+    CHECK(k[0] == (MD_TEXT | MD_HARDBREAK) && k[1] == (MD_TEXT | MD_HARDBREAK));
+
+    CHECK(md_tight(MD_LIST, MD_LIST) && md_tight(MD_QUOTE, MD_QUOTE));
+    CHECK(!md_tight(MD_TEXT, MD_TEXT) && !md_tight(MD_TEXT, MD_LIST));
+    CHECK(!md_tight(MD_LIST, MD_EMPTY) && md_tight(MD_CODE, MD_CODE));
+    CHECK(kinds("    - niat\n    codi", k, 16) == 2 && k[0] == MD_LIST && k[1] == MD_INDENT);
+    CHECK(md_tight(MD_TEXT | MD_HARDBREAK, MD_TEXT));
+    CHECK(md_joinable(MD_TEXT, MD_TEXT) && !md_joinable(MD_HEADING, MD_TEXT));
+
+    /* Les separacions s'actualitzen en editar */
+    buf_init(&b);
+    buf_insert(&b, (Pos){ 0, 0 }, "u\ndos", 6);
+    CHECK(buf_gap_after(&b, 0) && !buf_gap_after(&b, 1));
+    buf_insert(&b, (Pos){ 0, 0 }, "- ", 2);
+    buf_insert(&b, (Pos){ 1, 0 }, "- ", 2);
+    CHECK(!buf_gap_after(&b, 0));                 /* ara són una llista */
+    buf_insert(&b, (Pos){ 0, 0 }, "```\n", 4);   /* obre un bloc de codi */
+    CHECK(MD_BASE(b.lines[1].kind) == MD_CODE || (buf_scan(&b), MD_BASE(b.lines[1].kind) == MD_CODE));
+    CHECK(!buf_gap_after(&b, 0) && !buf_gap_after(&b, 1));
+    buf_delete(&b, (Pos){ 0, 0 }, (Pos){ 1, 0 }); /* el torna a treure */
+    buf_scan(&b);
+    CHECK(MD_BASE(b.lines[0].kind) == MD_LIST && MD_BASE(b.lines[1].kind) == MD_LIST);
     buf_free(&b);
 }
 
@@ -395,6 +561,8 @@ int main(void)
     test_pages();
     test_edit();
     test_md();
+    test_blocks();
+    test_paste();
     rmdir(tmpdir);
 
     printf("%d comprovacions, %d errors\n", checks, failures);

@@ -44,7 +44,8 @@ Line *ed_line(Editor *e, size_t y);      /* línia amb el wordwrap calculat */
 size_t ed_cursor_row(Editor *e);
 int   ed_cursor_x(Editor *e);            /* columna dins l'àrea de text */
 
-/* Avancen o recules una fila visual; retornen 0 als extrems del document. */
+/* Avancen o recules una fila de pantalla (incloses les files buides de
+ * separació de paràgraf); retornen 0 als extrems del document. */
 int   ed_vpos_next(Editor *e, size_t *line, size_t *row);
 int   ed_vpos_prev(Editor *e, size_t *line, size_t *row);
 

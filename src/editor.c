@@ -99,9 +99,16 @@ static size_t offset_at_x(const Line *l, size_t r, int x)
     return i;
 }
 
+/* Files de pantalla de la línia y: les del wordwrap més la fila buida de
+ * separació de paràgraf, si n'hi ha. */
+static size_t screen_rows(Editor *e, size_t y)
+{
+    return ed_line(e, y)->nrows + (size_t)buf_gap_after(&e->buf, y);
+}
+
 int ed_vpos_next(Editor *e, size_t *line, size_t *row)
 {
-    if (*row + 1 < ed_line(e, *line)->nrows) {
+    if (*row + 1 < screen_rows(e, *line)) {
         ++*row;
         return 1;
     }
@@ -121,7 +128,7 @@ int ed_vpos_prev(Editor *e, size_t *line, size_t *row)
     }
     if (*line > 0) {
         --*line;
-        *row = ed_line(e, *line)->nrows - 1;
+        *row = screen_rows(e, *line) - 1;
         return 1;
     }
     return 0;
@@ -145,8 +152,8 @@ void ed_layout(Editor *e, int screen_cols, int screen_lines)
     /* La fila de dalt pot haver quedat fora de rang si ha canviat l'amplada */
     if (e->top_line >= e->buf.nlines)
         e->top_line = e->buf.nlines - 1;
-    if (e->top_row >= ed_line(e, e->top_line)->nrows)
-        e->top_row = ed_line(e, e->top_line)->nrows - 1;
+    if (e->top_row >= screen_rows(e, e->top_line))
+        e->top_row = screen_rows(e, e->top_line) - 1;
 
     cr = ed_cursor_row(e);
     if (vpos_before(e->cy, cr, e->top_line, e->top_row)) {

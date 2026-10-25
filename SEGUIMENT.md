@@ -4,7 +4,7 @@ Editor de text per a consola (Linux), orientat a escriure prosa en Markdown.
 
 ## Estat
 
-- **Fase actual:** 3 — Desfer/refer, cerca i substitució (F2 completada)
+- **Fase actual:** 3 — Desfer/refer, cerca i substitució, autodesat (F2b completada)
 - **Última actualització:** 2026-10-25
 
 ## Requeriments (versió inicial)
@@ -275,7 +275,7 @@ Lliures per al futur: Ctrl+D, Ctrl+E, Ctrl+J, Ctrl+K, Ctrl+T, Ctrl+U, F4–F6, F
 
 **Estat de la decisió:** ✅ Confirmada (2026-10-25).
 
-## Model de paràgrafs (proposta, pendent de confirmar)
+## Model de paràgrafs (✅ confirmat i implementat a la F2b)
 
 **Petició:** un Enter separa paràgrafs. A la pantalla, la separació es veu com una fila en blanc que no existeix al buffer. Al fitxer Markdown hi ha la separació normal de paràgrafs: una línia en blanc real.
 
@@ -294,6 +294,13 @@ Lliures per al futur: Ctrl+D, Ctrl+E, Ctrl+J, Ctrl+K, Ctrl+T, Ctrl+U, F4–F6, F
 **Fitxers amb paràgrafs tallats a mà:** dues línies de text seguides que no formen un bloc unit són un sol paràgraf en Markdown. En carregar s'ajunten amb un espai. El significat del document no canvia, però el fitxer desat ja no tindrà els talls.
 
 **Línies buides al buffer:** si es prem Enter dues vegades, queda una línia buida. Es desa com una línia en blanc addicional i es torna a carregar igual. Funciona en tots dos sentits: el fitxer amb dues línies en blanc torna a tenir una línia buida al buffer.
+
+**Detalls afegits en implementar-ho:**
+- **Blocs units separats per una línia en blanc** (dues taules, dues llistes): la línia en blanc es conserva com a línia buida, perquè no s'ajuntin en desar.
+- **Llistes niades** amb 4 espais o més: continuen sent llistes, no codi sagnat. Un paràgraf sagnat dins d'un element de llista hi va unit.
+- **Línies buides del final del document:** no es desen, ja que en carregar també es descarten.
+- **Text enganxat des del terminal:** segueix les mateixes regles que en carregar un fitxer, de manera que una línia en blanc entre paràgrafs és una separació, no una línia buida. No ajunta línies, i dins de blocs de codi ho conserva tot.
+- **Normalització coneguda:** un paràgraf seguit directament d'una llista (sense línia en blanc) rep una línia en blanc entre tots dos. Per a la resta de casos provats (taules, codi, metadades, cites, llistes niades, salts durs, HTML), el fitxer queda idèntic byte a byte.
 
 **Estimació de pàgines:** cada separació compta mitja línia.
 
@@ -334,7 +341,7 @@ src/
   util.c        ✅ assignació de memòria i errors fatals
   utf8.c        ✅ descodificació UTF-8, amplada de caràcters, diacrítics combinats
   buffer.c      ✅ vector de línies; inserir/esborrar/extreure; càrrega i desat atòmic
-  md.c          ✅ prefixos de bloc Markdown (llistes, cites, tasques)
+  md.c          ✅ prefixos de bloc Markdown i tipus de bloc de cada línia (model de paràgrafs)
   wrap.c        ✅ wordwrap suau amb sagnat penjant i cache per línia
   editor.c      ✅ estat de l'editor, cursor, moviment, edició, selecció i porta-retalls
   command.c     ✅ registre d'ordres amb nom i taula de dreceres
@@ -373,7 +380,7 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 - [x] **F0** — Decisions d'arquitectura: llenguatge, buffer, wordwrap, dreceres
 - [x] **F1** — Esquelet: obrir, mostrar, desplaçar-se, desar un fitxer UTF-8 (inclou el wordwrap suau, necessari per mostrar els paràgrafs)
 - [x] **F2** — Edició bàsica, sagnat penjant de llistes i cites, columna centrada
-- [ ] **F2b** — Separació visual de paràgrafs (vegeu «Model de paràgrafs»; regles pendents de confirmar)
+- [x] **F2b** — Separació visual de paràgrafs (vegeu «Model de paràgrafs»)
 - [ ] **F3** — Desfer/refer, cerca i substitució, **autodesat**
 - [ ] **F4** — Colors mínims de Markdown (capçaleres, èmfasi)
 - [ ] **F5** — Navegador de fitxers
@@ -442,3 +449,9 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **Peticions:**
     - separació de paràgrafs estrictament visual a la pantalla, amb separació normal al fitxer Markdown: model proposat a «Model de paràgrafs», pendent de confirmar;
     - autodesat configurable sobre el mateix document: planificat a la F3.
+- **2026-10-25** — ✅ Model de paràgrafs confirmat. **F2b completada.**
+  - **Pantalla:** una fila buida visual després de cada paràgraf; el cursor no s'hi pot posar.
+  - **Fitxer:** la separació normal de Markdown (una línia en blanc).
+  - **Classificació:** cada línia té un tipus de bloc que es manté al dia amb un escaneig incremental. S'atura quan l'estat de bloc de codi i de metadades torna a coincidir.
+  - **Prova amb el mateix SEGUIMENT.md:** en desar-lo, només afegeix les dues línies en blanc de la normalització paràgraf → llista.
+  - **Proves:** 1.439 comprovacions unitàries, també amb sanititzadors, i proves interactives de pantalla, moviment, desplaçament en el document gran, Retrocés entre paràgrafs i enganxat.

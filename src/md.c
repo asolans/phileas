@@ -104,3 +104,119 @@ size_t md_continue(const char *s, size_t len, char *out, size_t outsz)
     out[k] = '\0';
     return k;
 }
+
+static int all_chars(const char *s, size_t len, size_t i, char c)
+{
+    size_t n = 0;
+
+    for (; i < len && s[i] == c; i++)
+        n++;
+    while (i < len && is_blank(s[i]))
+        i++;
+    return i == len ? (int)n : 0;
+}
+
+/* Longitud de la tanca ``` o ~~~ que comença a s[i] (0 si no n'és). */
+static size_t fence_run(const char *s, size_t len, size_t i, char c)
+{
+    size_t n = 0;
+
+    while (i + n < len && s[i + n] == c)
+        n++;
+    return n >= 3 ? n : 0;
+}
+
+int md_kind(const char *s, size_t len, MdState *st)
+{
+    int first = !st->started;
+    size_t i = 0, n;
+    int col = 0, k, hard;
+    Prefix p;
+
+    st->started = 1;
+    while (i < len && i < 3 && s[i] == ' ')
+        i++;
+
+    if (st->fence_ch) {
+        n = fence_run(s, len, i, (char)st->fence_ch);
+        if (n >= st->fence_len && all_chars(s, len, i, (char)st->fence_ch)) {
+            st->fence_ch = 0;
+            return MD_FENCE_CLOSE;
+        }
+        return MD_CODE;
+    }
+    if (st->meta) {
+        if ((len == 3 && !memcmp(s, "---", 3)) || (len == 3 && !memcmp(s, "...", 3)))
+            st->meta = 0;
+        return MD_META;
+    }
+    if (first && len == 3 && !memcmp(s, "---", 3)) {
+        st->meta = 1;
+        return MD_META;
+    }
+
+    for (size_t j = 0; j < len && is_blank(s[j]); j++)
+        col += s[j] == '\t' ? 4 - col % 4 : 1;
+    if (skip_blanks(s, len, 0) == len)
+        return MD_EMPTY;
+    hard = (len >= 2 && s[len - 1] == ' ' && s[len - 2] == ' ') || s[len - 1] == '\\';
+    parse(s, len, &p);
+    /* Un marcador de llista o de cita mana sobre el sagnat (llistes niades) */
+    if (p.end > p.indent_end) {
+        k = p.quote_end > p.indent_end ? MD_QUOTE : MD_LIST;
+        return hard ? k | MD_HARDBREAK : k;
+    }
+    if (col >= 4)
+        return MD_INDENT;
+
+    if ((s[i] == '`' || s[i] == '~') && (n = fence_run(s, len, i, s[i]))) {
+        st->fence_ch = (unsigned char)s[i];
+        st->fence_len = (unsigned char)(n > 255 ? 255 : n);
+        return MD_FENCE_OPEN;
+    }
+
+    if (s[i] == '#') {
+        for (n = 0; i + n < len && s[i + n] == '#'; n++)
+            ;
+        if (n <= 6 && (i + n == len || is_blank(s[i + n])))
+            return MD_HEADING;
+    }
+    if (s[i] == '|')
+        return MD_TABLE;
+    else if (s[i] == '<')
+        return MD_HTML;
+    else if (all_chars(s, len, i, '=') || all_chars(s, len, i, '-') >= 2)
+        return MD_UNDERLINE;
+    else
+        k = MD_TEXT;
+    return hard ? k | MD_HARDBREAK : k;
+}
+
+int md_tight(int k1, int k2)
+{
+    int b1 = MD_BASE(k1), b2 = MD_BASE(k2);
+
+    if (b2 == MD_EMPTY)
+        return 0;
+    if (b1 == MD_FENCE_OPEN || b1 == MD_CODE)
+        return 1;
+    if (b1 == MD_META && b2 == MD_META)
+        return 1;
+    if (k1 & MD_HARDBREAK)
+        return 1;
+    if (b1 == b2 && (b1 == MD_LIST || b1 == MD_QUOTE || b1 == MD_TABLE ||
+                     b1 == MD_HTML || b1 == MD_INDENT))
+        return 1;
+    /* Paràgraf sagnat dins d'un element de llista */
+    if ((b1 == MD_LIST && b2 == MD_INDENT) || (b1 == MD_INDENT && b2 == MD_LIST))
+        return 1;
+    return b1 == MD_TEXT && b2 == MD_UNDERLINE;
+}
+
+int md_joinable(int k1, int k2)
+{
+    int b1 = MD_BASE(k1);
+
+    return MD_BASE(k2) == MD_TEXT && !(k1 & MD_HARDBREAK) &&
+           (b1 == MD_TEXT || b1 == MD_LIST || b1 == MD_QUOTE);
+}

@@ -93,8 +93,13 @@ int main(int argc, char **argv)
         if (key == KEY_PASTE) {
             size_t n;
             const char *text = key_paste_text(&n);
-            if (n > 0)
-                ed_insert(&e, text, n);
+            char *conv;
+
+            if (n > 0) {
+                conv = buf_paste_text(&e.buf, e.cy, text, n, &n);
+                ed_insert(&e, conv, n);
+                free(conv);
+            }
         } else if ((c = cmd_for_key(key))) {
             c->fn(&e);
         } else if (!(key & (KEY_FLAG_FN | KEY_FLAG_ALT)) && utf8_printable((wchar_t)key)) {

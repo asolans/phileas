@@ -3,6 +3,7 @@
 #include "util.h"
 
 #include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +18,7 @@ static void line_init(Line *l, const char *s, size_t n)
     memcpy(l->text, s, n);
     l->text[n] = '\0';
     l->len = n;
+    l->kind = -1;
 }
 
 static void push_line(Buffer *b, const char *s, size_t n)
@@ -33,6 +35,7 @@ void buf_init(Buffer *b)
     memset(b, 0, sizeof *b);
     b->final_newline = 1;
     push_line(b, "", 0);
+    buf_rescan_all(b);
 }
 
 void buf_free(Buffer *b)
@@ -49,11 +52,26 @@ void buf_free(Buffer *b)
  * Tota modificació del text passa per buf_insert i buf_delete: és el punt
  * on el desfer/refer (F3) enregistrarà les operacions. */
 
+static void mark_changed(Buffer *b, size_t from, size_t to)
+{
+    if (b->scan_from == SIZE_MAX) {
+        b->scan_from = from;
+        b->scan_to = to;
+        return;
+    }
+    if (from < b->scan_from)
+        b->scan_from = from;
+    if (to > b->scan_to)
+        b->scan_to = to;
+}
+
 static void line_changed(Buffer *b, Line *l)
 {
     l->wrap_w = 0;
     l->print_lines = 0;
+    l->kind = -1;
     b->modified = 1;
+    mark_changed(b, (size_t)(l - b->lines), (size_t)(l - b->lines));
 }
 
 static void line_reserve(Line *l, size_t len)
@@ -112,6 +130,9 @@ Pos buf_insert(Buffer *b, Pos at, const char *s, size_t n)
     line_changed(b, l);
 
     open_lines(b, at.line + 1, k);
+    if (b->scan_to > at.line)
+        b->scan_to += k;
+    mark_changed(b, at.line, at.line + k);
     s = nl + 1;
     n -= seg + 1;
     for (size_t j = 1; j <= k; j++) {
@@ -151,6 +172,117 @@ void buf_delete(Buffer *b, Pos a, Pos z)
     memmove(b->lines + a.line + 1, b->lines + z.line + 1,
             (b->nlines - z.line - 1) * sizeof *b->lines);
     b->nlines -= z.line - a.line;
+    if (b->scan_to > z.line)
+        b->scan_to -= z.line - a.line;
+    else if (b->scan_to > a.line)
+        b->scan_to = a.line;
+}
+
+void buf_rescan_all(Buffer *b)
+{
+    for (size_t i = 0; i < b->nlines; i++)
+        b->lines[i].kind = -1;
+    b->scan_from = 0;
+    b->scan_to = b->nlines - 1;
+}
+
+/* Classifica les línies a partir de la primera modificada. S'atura quan ja
+ * ha passat l'última modificada i l'estat torna a coincidir amb l'anterior:
+ * la resta del document no pot haver canviat. */
+void buf_scan(Buffer *b)
+{
+    MdState st;
+    size_t i = b->scan_from;
+
+    if (i == SIZE_MAX)
+        return;
+    if (i >= b->nlines) {
+        b->scan_from = SIZE_MAX;
+        return;
+    }
+    if (i > 0)
+        st = b->lines[i - 1].st;
+    else
+        memset(&st, 0, sizeof st);
+    for (; i < b->nlines; i++) {
+        Line *l = &b->lines[i];
+        int was_valid = l->kind >= 0;
+        MdState old = l->st;
+
+        l->kind = md_kind(l->text, l->len, &st);
+        l->st = st;
+        if (i >= b->scan_to && was_valid && !memcmp(&old, &st, sizeof st))
+            break;
+    }
+    b->scan_from = SIZE_MAX;
+}
+
+char *buf_paste_text(Buffer *b, size_t line, const char *s, size_t n, size_t *out_n)
+{
+    char *out = xmalloc(n + 1);
+    size_t k = 0, blanks = 0, i = 0, last_end = 0, trail = 0;
+    int any = 0;
+    MdState st;
+
+    buf_scan(b);
+    if (line > 0)
+        st = b->lines[line - 1].st;
+    else
+        memset(&st, 0, sizeof st);
+    /* Sense saber on comença el document, no es poden detectar metadades */
+    st.started = 1;
+
+    for (;;) {
+        const char *nl = memchr(s + i, '\n', n - i);
+        size_t len = nl ? (size_t)(nl - (s + i)) : n - i;
+
+        if (md_kind(s + i, len, &st) == MD_EMPTY) {
+            blanks++;
+        } else {
+            /* Entre blocs: les línies en blanc menys una (la separació) */
+            if (any) {
+                size_t nls = blanks > 1 ? blanks : 1;
+                while (nls--)
+                    out[k++] = '\n';
+            } else {
+                while (blanks--)
+                    out[k++] = '\n';
+            }
+            blanks = 0;
+            memcpy(out + k, s + i, len);
+            k += len;
+            last_end = i + len;
+            any = 1;
+        }
+        if (!nl)
+            break;
+        i += len + 1;
+    }
+    /* Salts del final: el primer després d'una línia en blanc és la
+     * separació; si no hi ha text, es conserven tots */
+    for (i = last_end; i < n; i++)
+        trail += s[i] == '\n';
+    if (any && trail >= 2)
+        trail--;
+    while (trail--)
+        out[k++] = '\n';
+    out[k] = '\0';
+    *out_n = k;
+    return out;
+}
+
+/* Hi ha separació després d'un bloc si el bloc següent amb text no hi va
+ * unit. Les línies buides del mig són línies en blanc addicionals. */
+int buf_gap_after(Buffer *b, size_t i)
+{
+    size_t j = i + 1;
+
+    buf_scan(b);
+    if (MD_BASE(b->lines[i].kind) == MD_EMPTY)
+        return 0;
+    while (j < b->nlines && MD_BASE(b->lines[j].kind) == MD_EMPTY)
+        j++;
+    return j < b->nlines && !md_tight(b->lines[i].kind, b->lines[j].kind);
 }
 
 char *buf_extract(const Buffer *b, Pos a, Pos z, size_t *n)
@@ -216,10 +348,48 @@ fail:
     return NULL;
 }
 
+/* Afegeix una línia del fitxer al buffer que s'està carregant. blanks
+ * compta les línies en blanc acumulades just abans. */
+static void load_line(Buffer *b, MdState *st, size_t *blanks, const char *s, size_t n)
+{
+    int k = md_kind(s, n, st);
+    Line *prev;
+
+    if (k == MD_EMPTY) {
+        ++*blanks;
+        return;
+    }
+    if (b->nlines == 0) {
+        /* Les línies en blanc del principi es conserven com a línies buides */
+        for (; *blanks > 0; --*blanks)
+            push_line(b, "", 0);
+    } else if (*blanks > 0) {
+        /* La primera línia en blanc és la separació; les altres, línies
+         * buides. Entre blocs que van units, totes són línies buides. */
+        if (!md_tight(b->lines[b->nlines - 1].kind, k))
+            --*blanks;
+        for (; *blanks > 0; --*blanks)
+            push_line(b, "", 0);
+    } else if (md_joinable((prev = &b->lines[b->nlines - 1])->kind, k)) {
+        /* Paràgraf tallat a mà: s'ajunta amb la línia anterior */
+        size_t skip = 0;
+
+        while (skip < n && (s[skip] == ' ' || s[skip] == '\t'))
+            skip++;
+        line_splice(prev, prev->len, 0, " ", 1);
+        line_splice(prev, prev->len, 0, s + skip, n - skip);
+        prev->kind = MD_BASE(prev->kind) | (k & MD_HARDBREAK);
+        return;
+    }
+    push_line(b, s, n);
+    b->lines[b->nlines - 1].kind = k;
+}
+
 int buf_load(Buffer *b, const char *path)
 {
     Buffer nb;
-    size_t n, start = 0, ls, nl = 0, crlf = 0;
+    MdState st;
+    size_t n, start = 0, ls, nl = 0, crlf = 0, blanks = 0;
     char *data = read_file(path, &n);
 
     if (!data)
@@ -240,16 +410,21 @@ int buf_load(Buffer *b, const char *path)
     nb.crlf = nl > 0 && crlf == nl;
     nb.final_newline = n > start && data[n - 1] == '\n';
 
+    memset(&st, 0, sizeof st);
     ls = start;
     for (size_t i = start; i < n; i++) {
         if (data[i] == '\n') {
-            push_line(&nb, data + ls, i - ls - (size_t)nb.crlf);
+            load_line(&nb, &st, &blanks, data + ls, i - ls - (size_t)nb.crlf);
             ls = i + 1;
         }
     }
-    if (ls < n || nb.nlines == 0)
-        push_line(&nb, data + ls, n - ls);
+    if (ls < n)
+        load_line(&nb, &st, &blanks, data + ls, n - ls);
+    /* Les línies en blanc del final es descarten */
+    if (nb.nlines == 0)
+        push_line(&nb, "", 0);
     free(data);
+    buf_rescan_all(&nb);
 
     buf_free(b);
     *b = nb;
@@ -270,6 +445,7 @@ int buf_save(Buffer *b, const char *path)
     struct stat st;
     mode_t mode, mask;
     FILE *f = NULL;
+    size_t end = b->nlines;
     int fd, err;
 
     if (stat(target, &st) == 0) {
@@ -292,9 +468,15 @@ int buf_save(Buffer *b, const char *path)
 
     if (b->bom)
         fputs("\xEF\xBB\xBF", f);
-    for (size_t i = 0; i < b->nlines; i++) {
+    /* Les línies buides del final no es desen (en carregar es descarten) */
+    buf_scan(b);
+    while (end > 1 && MD_BASE(b->lines[end - 1].kind) == MD_EMPTY)
+        end--;
+    for (size_t i = 0; i < end; i++) {
         fwrite(b->lines[i].text, 1, b->lines[i].len, f);
-        if (i + 1 < b->nlines || b->final_newline)
+        if (i + 1 < end || b->final_newline)
+            fputs(eol, f);
+        if (i + 1 < end && buf_gap_after(b, i))
             fputs(eol, f);
     }
     if (fflush(f) != 0 || ferror(f) || fsync(fd) != 0)
@@ -330,9 +512,9 @@ fail:
 /* A4 amb marges de 2,5 cm (16 x 24,7 cm útils) i una font convencional de
  * 12 punts amb interlineat senzill: unes 80 lletres per línia i 46 línies
  * per pàgina (~600 paraules). Es compta en mitges línies: cada paràgraf
- * ocupa les línies que necessita, una línia en blanc equival a l'espai entre
- * paràgrafs (mitja línia) i una capçalera suma una línia per l'espai que
- * l'envolta. */
+ * ocupa les línies que necessita, cada separació de paràgraf i cada línia
+ * buida equivalen a mitja línia, i una capçalera suma una línia per l'espai
+ * que l'envolta. */
 #define PRINT_CHARS_PER_LINE 80
 #define PRINT_LINES_PER_PAGE 46
 
@@ -358,7 +540,7 @@ size_t buf_pages(Buffer *b)
     size_t half = 0, per_page = 2 * PRINT_LINES_PER_PAGE;
 
     for (size_t i = 0; i < b->nlines; i++)
-        half += print_half_lines(&b->lines[i]);
+        half += print_half_lines(&b->lines[i]) + (size_t)buf_gap_after(b, i);
     /* Les línies en blanc del final no omplen cap pàgina */
     for (size_t i = b->nlines; i > 0 && b->lines[i - 1].len == 0; i--)
         half--;
