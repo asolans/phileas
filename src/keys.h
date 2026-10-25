@@ -26,6 +26,10 @@ enum { KB_UP, KB_DOWN, KB_RIGHT, KB_LEFT, KB_HOME, KB_END, KB_PGUP, KB_PGDN,
  * n'ha interpretat la seqüència directament. */
 #define KEY_MODIFIED(nav, mod) (KEY_FLAG_FN | 0x100000 | ((nav) << 4) | (mod))
 
+/* Nom llegible d'una tecla per a l'ajuda: "Ctrl+S", "Alt+<", "Maj+F7",
+ * "Ctrl+Maj+←", "RePàg"... */
+void key_describe(int key, char *out, size_t size);
+
 /* Retornat per key_read quan el terminal ha enganxat un text */
 #define KEY_PASTE    (KEY_FLAG_FN | 0xFFFFFF)
 

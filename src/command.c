@@ -1,6 +1,7 @@
 #include "command.h"
 #include "config.h"
 #include "filebrowser.h"
+#include "help.h"
 #include "keys.h"
 #include "render.h"
 #include "search.h"
@@ -448,6 +449,11 @@ static void c_reload_config(Editor *e)
         ed_msg(e, "Configuració recarregada (%s)", path);
 }
 
+static void c_help(Editor *e)
+{
+    help_show(e);
+}
+
 static void c_colors(Editor *e)
 {
     e->colors = !e->colors;
@@ -768,6 +774,7 @@ static const Command commands[] = {
     { "sortir",            c_quit,       "Surt de Phileas", ACT_NONE },
     { "redibuixar",        c_redraw,     "Torna a dibuixar la pantalla", ACT_NONE },
     { "paleta",            c_palette,    "Executa una ordre pel nom", ACT_NONE },
+    { "ajuda",             c_help,       "Mostra aquesta ajuda", ACT_NONE },
 
     { "desfer",            c_undo,       "Desfà l'últim canvi", ACT_NONE },
     { "refer",             c_redo,       "Refà el que s'ha desfet", ACT_NONE },
@@ -823,7 +830,7 @@ static const char *const default_bindings[][2] = {
     { "ctrl-s", "desar" },            { "alt-s", "desar-com" },
     { "ctrl-q", "sortir" },
     { "ctrl-l", "redibuixar" },
-    { "ctrl-p", "paleta" },
+    { "ctrl-p", "paleta" },           { "f1", "ajuda" },
 
     { "ctrl-z", "desfer" },           { "ctrl-y", "refer" },
     { "ctrl-f", "cercar" },
@@ -848,6 +855,26 @@ const Command *cmd_find(const char *name)
         if (!strcmp(commands[i].name, name))
             return &commands[i];
     return NULL;
+}
+
+size_t cmd_count(void)
+{
+    return sizeof commands / sizeof commands[0];
+}
+
+const Command *cmd_at(size_t i)
+{
+    return &commands[i];
+}
+
+int cmd_keys(const Command *c, int *keys, int max)
+{
+    int n = 0;
+
+    for (size_t i = 0; i < nbindings; i++)
+        if (bindings[i].cmd == c && n < max)
+            keys[n++] = bindings[i].key;
+    return n;
 }
 
 const Command *cmd_for_key(int key)

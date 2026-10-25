@@ -311,3 +311,74 @@ int key_read(void)
     }
     return (int)wc;
 }
+
+static const char *const nav_labels[] = {
+    [KB_UP] = "↑", [KB_DOWN] = "↓", [KB_RIGHT] = "→", [KB_LEFT] = "←",
+    [KB_HOME] = "Inici", [KB_END] = "Fi", [KB_PGUP] = "RePàg", [KB_PGDN] = "AvPàg",
+    [KB_DELETE] = "Supr", [KB_INSERT] = "Insert",
+};
+
+void key_describe(int key, char *out, size_t size)
+{
+    if (key & KEY_FLAG_ALT) {
+        int c = key & ~KEY_FLAG_ALT;
+        char s[4];
+        size_t n;
+
+        if (c == '\n') {
+            snprintf(out, size, "Alt+Enter");
+            return;
+        }
+        if (c >= 'a' && c <= 'z')
+            c -= 'a' - 'A';
+        n = utf8_encode((wchar_t)c, s);
+        snprintf(out, size, "Alt+%.*s", (int)n, s);
+        return;
+    }
+    if (key & KEY_FLAG_FN) {
+        int code = key & ~KEY_FLAG_FN;
+
+        if ((code & ~0xFF) == 0x100000 && (code >> 4 & 0xF) < NNAV) {   /* KEY_MODIFIED */
+            static const char *const mods[] = {
+                [2] = "Maj+", [3] = "Alt+", [4] = "Maj+Alt+", [5] = "Ctrl+",
+                [6] = "Ctrl+Maj+", [7] = "Ctrl+Alt+", [8] = "Ctrl+Alt+Maj+",
+            };
+            int mod = code & 0xF;
+
+            snprintf(out, size, "%s%s", mod >= 2 && mod <= 8 ? mods[mod] : "?+",
+                     nav_labels[(code >> 4) & 0xF]);
+            return;
+        }
+        for (int i = 0; i < NNAV; i++) {
+            if (nav_keys[i].code == code) {
+                snprintf(out, size, "%s", nav_labels[i]);
+                return;
+            }
+        }
+        if (code == KEY_BACKSPACE)
+            snprintf(out, size, "Retrocés");
+        else if (code >= KEY_F(1) && code <= KEY_F(12))
+            snprintf(out, size, "F%d", code - KEY_F0);
+        else if (code >= KEY_F(13) && code <= KEY_F(24))
+            snprintf(out, size, "Maj+F%d", code - KEY_F0 - 12);
+        else
+            snprintf(out, size, "tecla %d", code);
+        return;
+    }
+    if (key == 0)
+        snprintf(out, size, "Ctrl+Espai");
+    else if (key == '\n')
+        snprintf(out, size, "Enter");
+    else if (key == '\t')
+        snprintf(out, size, "Tab");
+    else if (key == 27)
+        snprintf(out, size, "Esc");
+    else if (key >= 1 && key <= 26)
+        snprintf(out, size, "Ctrl+%c", 'A' + key - 1);
+    else {
+        char s[4];
+        size_t n = utf8_encode((wchar_t)key, s);
+
+        snprintf(out, size, "%.*s", (int)n, s);
+    }
+}

@@ -14,6 +14,12 @@ typedef struct {
 } Command;
 
 const Command *cmd_find(const char *name);
+
+/* Per a l'ajuda: totes les ordres, i les tecles assignades a cadascuna
+ * (com a molt max; retorna quantes n'hi ha). */
+size_t cmd_count(void);
+const Command *cmd_at(size_t i);
+int  cmd_keys(const Command *c, int *keys, int max);
 const Command *cmd_for_key(int key);
 
 /* Assigna una tecla a una ordre. Retorna -1 si la tecla no existeix en

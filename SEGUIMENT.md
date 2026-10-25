@@ -4,7 +4,7 @@ Editor de text per a consola (Linux), orientat a escriure prosa en Markdown.
 
 ## Estat
 
-- **Fase actual:** 6b — Ajuda amb F1 (F7 completada)
+- **Fase actual:** 8 — Integració al projecte BYOK (F0–F7 completades)
 - **Última actualització:** 2026-10-25
 
 ## Requeriments (versió inicial)
@@ -265,7 +265,7 @@ Interoperabilitat amb fitxers tallats a mà (fases posteriors):
 | Alt+C | `centrar` (activar o desactivar la columna centrada) |
 | Ctrl+L | `redibuixar` (útil per SSH) |
 | F2 | mostrar/amagar la barra d'ajuda inferior (estil nano) |
-| F1 | `ajuda` |
+| F1 | `ajuda` (✅ ordres per temes, amb les tecles actuals; escriure filtra) |
 | **Ctrl+P** | **`paleta`**: escriure el nom de qualsevol ordre (amb autocompleció) |
 | Esc | cancel·lar el diàleg o la selecció |
 
@@ -489,6 +489,7 @@ src/
   spell.c       ✅ ortografia amb hunspell (carregat amb dlopen), cache de paraules, diccionari personal
   dirlist.c     ✅ lectura i ordenació de directoris, filtre, camins i mides (sense ncurses)
   filebrowser.c ✅ navegador de fitxers a pantalla completa
+  help.c        ✅ ajuda (F1): ordres per temes amb les tecles assignades, filtrable
   config.c      ✅ configuració: phileasrc del sistema i de l'usuari, línia d'ordres, plantilla (sense ncurses)
 tests/
   test.c        ✅ proves de utf8, wrap, buffer, edició, md, estils i dirlist (sense ncurses)
@@ -522,7 +523,7 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 - [x] **F4** — Colors mínims de Markdown (capçaleres, èmfasi)
 - [x] **F5** — Navegador de fitxers
 - [x] **F6** — Correcció ortogràfica amb hunspell
-- [ ] **F6b** — Ajuda: F1 obre una finestra amb una guia de totes les dreceres de teclat
+- [x] **F6b** — Ajuda: F1 obre una finestra amb una guia de totes les dreceres de teclat
 - [x] **F6c** — Mode màquina d'escriure («typewriter»): la línia on s'escriu es manté a una altura fixa de la pantalla i el text no arriba mai a baix de tot (pensat per a una pantalla en vertical)
 - [x] **F7** — Configuració i proves en Raspberry Pi
 - [ ] **F8** — Integració al projecte BYOK (`~/byok-build`), quan el processador estigui avançat:
@@ -844,3 +845,15 @@ make clean && make debug   # amb AddressSanitizer i UBSan
     - 1.628 comprovacions unitàries, també amb sanititzadors: valors correctes i incorrectes, comentaris, errors amb número de línia, prioritat sistema < usuari < línia d'ordres, tornada als valors interns, plantilla sense errors, text pla (anada i tornada exacta, i el mateix fitxer com a Markdown, que s'ajuntaria);
     - proves interactives: columnes, `-c`, F9 i Ctrl+T configurades, errors, `idiomes = es ca`, diccionari personal a `PHILEAS_CONFIG`, i el `phileasrc` editat amb el mateix Phileas i recarregat;
     - a la Pi: 1.626 comprovacions. El guió `/tmp/phileas/ph` fa servir `PHILEAS_CONFIG=/tmp/phileas/config`, amb una plantilla.
+- **2026-10-25** — **F6b completada: ajuda amb F1.**
+  - **Pantalla completa** amb totes les ordres agrupades per temes: fitxer, moviment, selecció i porta-retalls, edició, cerca, ortografia, vista, i configuració i ajuda. Cada ordre mostra les tecles, la descripció i el nom (per a la paleta i el `phileasrc`).
+  - **Generada del registre:**
+    - les tecles són les assignades en aquell moment, incloses les del `phileasrc`;
+    - una ordre sense tecla es marca amb «—»;
+    - una ordre nova que no tingui secció surt a «Altres».
+  - **Noms de tecla llegibles** (`key_describe`): `Ctrl+S`, `Alt+B`, `Maj+F7`, `Ctrl+Maj+←`, `RePàg`, `Supr`…
+  - **Ús:** escriure filtra per tecla, nom o descripció (sense distingir majúscules); ↑ ↓, RePàg/AvPàg i Inici/Fi per desplaçar-se; Esc buida el filtre o tanca, i F1 també tanca.
+  - **A sobre**, quatre línies sobre la paleta, el `phileasrc`, el navegador i els suggeriments.
+  - **Pensada per a 75 columnes** (la consola vertical de la Pi): el nom d'ordre només es mostra si hi cap sencer.
+  - **Proves:** interactives a 80 i a 75 columnes (filtre, tecles del `phileasrc`, Esc), i a la Pi amb TERM=linux. Unitàries: 1.628 (1.626 a la Pi).
+- **2026-10-25** — Fases F0–F7 completades. Pla de l'usuari: començar la integració al projecte BYOK (F8) l'endemà.
