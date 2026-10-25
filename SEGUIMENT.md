@@ -258,7 +258,9 @@ Interoperabilitat amb fitxers tallats a mà (fases posteriors):
 
 | Drecera | Ordre |
 |---------|-------|
-| F7 | `revisar-ortografia` (salta d'error en error) |
+| F7 | `ortografia` (activa o desactiva la correcció; la barra d'estat mostra `ca` o `es`) |
+| F8 | `alternar-idioma` (rotació de diccionaris: català ↔ castellà) |
+| Maj+F7 | `revisar-ortografia` (salta d'error en error) |
 | Alt+Enter | `suggeriments` (per a la paraula sota el cursor) |
 | Alt+C | `centrar` (activar o desactivar la columna centrada) |
 | Ctrl+L | `redibuixar` (útil per SSH) |
@@ -267,7 +269,7 @@ Interoperabilitat amb fitxers tallats a mà (fases posteriors):
 | **Ctrl+P** | **`paleta`**: escriure el nom de qualsevol ordre (amb autocompleció) |
 | Esc | cancel·lar el diàleg o la selecció |
 
-Lliures per al futur: Ctrl+D, Ctrl+E, Ctrl+J, Ctrl+K, Ctrl+T, Ctrl+U, F4–F6, F8–F12 i la majoria d'Alt+lletra.
+Lliures per al futur: Ctrl+D, Ctrl+E, Ctrl+J, Ctrl+K, Ctrl+T, Ctrl+U, F4–F6, F9–F12 i la majoria d'Alt+lletra.
 
 **Paleta d'ordres:** és la conseqüència directa del registre d'ordres. Qualsevol ordre és accessible pel nom encara que no tingui drecera. Així el joc de tecles es pot mantenir petit.
 
@@ -401,6 +403,7 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 - [x] **F5** — Navegador de fitxers
 - [x] **F6** — Correcció ortogràfica amb hunspell
 - [ ] **F6b** — Ajuda: F1 obre una finestra amb una guia de totes les dreceres de teclat
+- [ ] **F6c** — Mode màquina d'escriure («typewriter»): la línia on s'escriu es manté a una altura fixa de la pantalla i el text no arriba mai a baix de tot (pensat per a una pantalla en vertical)
 - [ ] **F7** — Configuració i proves en Raspberry Pi
 
 ## Registre
@@ -601,3 +604,15 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 
   - **Observació:** el servidor SSH de la Pi (dropbear) no obre terminals (`ssh -tt` es tanca). Per a les proves s'ha fet servir un petit programa auxiliar (`ptyrun`, amb `forkpty`), que no forma part de Phileas.
   - **Pendent:** l'ortografia a la Pi. Cal hunspell compilat per a ARM i el diccionari català.
+- **2026-10-25** — Petició de l'usuari sobre el plantejament de l'ortografia: el diccionari ha de ser fàcil de commutar entre català i castellà.
+  - **F7** activa o desactiva la correcció (abans saltava a l'error següent). La primera vegada carrega el diccionari.
+  - **F8** alterna el diccionari: català ↔ castellà.
+    - Si la correcció està activa, el canvi es veu de seguida.
+    - Si no ho està, només es tria l'idioma, i el diccionari no es carrega fins que es prem F7.
+    - Cada canvi torna a carregar el diccionari: només n'hi ha un en memòria.
+  - **Barra d'estat:** amb la correcció activa, hi consta `ca` o `es` abans de la línia i la columna.
+  - **Maj+F7** salta a l'error següent (també l'ordre `revisar-ortografia` de la paleta).
+  - **Diccionari personal per idioma:** `diccionari-ca.txt`, `diccionari-es.txt`… Una paraula afegida en castellà no s'accepta en català.
+  - **Noms de diccionari:** `-d es` i l'ordre `idioma` accepten només l'idioma: `es` troba `es_ES`. Una tria com `ca_ES-valencia` es manté fins que es prem F8.
+  - **Proves:** 1.552 comprovacions unitàries (codis d'idioma, `es` → `es_ES`) i proves interactives de F7, F8, la barra d'estat, Maj+F7 i el diccionari personal per idioma.
+- **2026-10-25** — Petició afegida al full de ruta (F6c): mode màquina d'escriure. La línia on s'escriu es manté a una altura fixa i el text no arriba a baix de la pantalla (l'usuari escriu amb la pantalla en vertical).

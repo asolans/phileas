@@ -432,16 +432,30 @@ static void c_colors(Editor *e)
  * Raspberry Pi petita pot trigar uns segons i ocupa memòria. */
 static int need_dict(Editor *e)
 {
-    if (spell_lang())
+    if (spell_lang() && !strcmp(e->dict_loaded, e->dict))
         return 1;
-    ed_msg(e, "Carregant el diccionari…");
+    ed_msg(e, "Carregant el diccionari %s…", e->dict);
     render(e);
     refresh();
     if (spell_open(e->dict) == 0) {
+        snprintf(e->dict_loaded, sizeof e->dict_loaded, "%s", e->dict);
         e->msg[0] = '\0';
         return 1;
     }
     ed_msg(e, "No s'ha pogut carregar el diccionari: %s", spell_error());
+    return 0;
+}
+
+/* Canvia el diccionari triat; si no es pot carregar, torna a l'anterior. */
+static int set_dict(Editor *e, const char *name)
+{
+    char old[sizeof e->dict];
+
+    snprintf(old, sizeof old, "%s", e->dict);
+    snprintf(e->dict, sizeof e->dict, "%s", name);
+    if (!e->spell || need_dict(e))
+        return 1;
+    snprintf(e->dict, sizeof e->dict, "%s", old);
     return 0;
 }
 
@@ -501,7 +515,7 @@ static void c_spell_next(Editor *e)
     ed_select(e, a, z);
     l = &e->buf.lines[a.line];
     snprintf(e->msg + strlen(e->msg), sizeof e->msg - strlen(e->msg),
-             "«%.*s»: Alt+Enter suggeriments · F7 següent", (int)(z.col - a.col), l->text + a.col);
+             "«%.*s»: Alt+Enter suggeriments · Maj+F7 següent", (int)(z.col - a.col), l->text + a.col);
 }
 
 /* Paraula seleccionada (dins d'una línia) o sota el cursor. */
@@ -596,28 +610,53 @@ static void c_suggest(Editor *e)
 
 static void c_spell_toggle(Editor *e)
 {
-    if (!e->spell && !need_dict(e))
+    char code[16];
+
+    if (e->spell) {
+        e->spell = 0;
+        ed_msg(e, "Ortografia desactivada");
         return;
-    e->spell = !e->spell;
-    ed_msg(e, e->spell ? "Ortografia activada (%s)" : "Ortografia desactivada", spell_lang());
+    }
+    if (!need_dict(e))
+        return;
+    e->spell = 1;
+    spell_code(spell_lang(), code, sizeof code);
+    ed_msg(e, "Ortografia activada: %s (F8 canvia l'idioma · Maj+F7 error següent)", code);
+}
+
+/* Rotació d'idiomes amb F8 */
+static const char *const rotation[] = { "ca", "es" };
+
+static void c_rotate_lang(Editor *e)
+{
+    char code[16];
+    size_t n = sizeof rotation / sizeof *rotation, i;
+
+    spell_code(e->dict, code, sizeof code);
+    for (i = 0; i < n && strcmp(code, rotation[i]); i++)
+        ;
+    if (!set_dict(e, rotation[(i + 1) % n]))
+        return;
+    if (e->spell)
+        ed_msg(e, "Idioma de l'ortografia: %s", rotation[(i + 1) % n]);
+    else
+        ed_msg(e, "Idioma de l'ortografia: %s (l'ortografia està desactivada: F7)",
+               rotation[(i + 1) % n]);
 }
 
 static void c_language(Editor *e)
 {
     char name[64];
 
-    snprintf(name, sizeof name, "%s", spell_lang() ? spell_lang() : "");
-    if (!prompt(e, "Diccionari (ca, ca_ES-valencia, es_ES, en_US...): ", name, sizeof name, NULL) ||
+    snprintf(name, sizeof name, "%s", e->dict);
+    if (!prompt(e, "Diccionari (ca, es, ca_ES-valencia, en_US...): ", name, sizeof name, NULL) ||
         !name[0])
         return;
-    ed_msg(e, "Carregant el diccionari %s…", name);
-    render(e);
-    refresh();
-    if (spell_open(name) < 0) {
-        ed_msg(e, "No s'ha pogut carregar: %s", spell_error());
+    e->spell = 1;
+    if (!set_dict(e, name)) {
+        e->spell = spell_lang() != NULL;
         return;
     }
-    e->spell = 1;
     ed_msg(e, "Diccionari: %s", spell_lang());
 }
 
@@ -698,7 +737,8 @@ static const Command commands[] = {
     { "revisar-ortografia", c_spell_next, "Selecciona l'error ortogràfic següent", ACT_NONE },
     { "suggeriments",      c_suggest,    "Suggeriments per a la paraula del cursor", ACT_NONE },
     { "ortografia",        c_spell_toggle, "Marca o no els errors ortogràfics", ACT_NONE },
-    { "idioma",            c_language,   "Canvia el diccionari de l'ortografia", ACT_NONE },
+    { "idioma",            c_language,   "Tria un diccionari pel nom", ACT_NONE },
+    { "alternar-idioma",   c_rotate_lang, "Alterna el diccionari entre català i castellà", ACT_NONE },
 };
 
 static const char *const default_bindings[][2] = {
@@ -744,7 +784,8 @@ static const char *const default_bindings[][2] = {
     { "ctrl-g", "cercar-seguent" },   { "f3", "cercar-seguent" },
     { "alt-g", "cercar-anterior" },   { "shift-f3", "cercar-anterior" },
     { "ctrl-r", "substituir" },
-    { "f7", "revisar-ortografia" },  { "alt-enter", "suggeriments" },
+    { "f7", "ortografia" },          { "shift-f7", "revisar-ortografia" },
+    { "f8", "alternar-idioma" },     { "alt-enter", "suggeriments" },
 };
 
 #define MAX_BINDINGS 256

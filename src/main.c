@@ -27,9 +27,9 @@ static void usage(FILE *f)
           "  -c N   amplada del text en columnes (per defecte 72)\n"
           "  -a N   desa sol després de N segons sense escriure (per defecte 30;\n"
           "         0 el desactiva). Desa sobre el mateix fitxer.\n"
-          "  -d ID  activa l'ortografia amb aquest diccionari: ca, es_ES, en_US...\n"
-          "         Sense -d, està desactivada fins que es prem F7 (o l'ordre\n"
-          "         «ortografia»), i fa servir el de la configuració regional.\n"
+          "  -d ID  activa l'ortografia amb aquest diccionari: ca, es, en_US...\n"
+          "         Sense -d, està desactivada fins que es prem F7 i fa servir\n"
+          "         l'idioma de la configuració regional. F8 alterna ca i es.\n"
           "  -h     mostra aquesta ajuda\n"
           "  -v     mostra la versió\n", f);
 }
@@ -99,6 +99,10 @@ int main(int argc, char **argv)
      * amb F7 o l'ordre «ortografia»). El diccionari triga una mica a
      * carregar-se (segons, en una Raspberry Pi petita): primer es mostra el
      * document. */
+    if (dict)
+        snprintf(e.dict, sizeof e.dict, "%s", dict);
+    else
+        spell_code(NULL, e.dict, sizeof e.dict);
     if (dict && strcmp(dict, "no")) {
         char msg[sizeof e.msg];
 
@@ -106,8 +110,9 @@ int main(int argc, char **argv)
         ed_msg(&e, "Carregant el diccionari…");
         render(&e);
         refresh();
-        e.dict = dict;
         e.spell = spell_open(dict) == 0;
+        if (e.spell)
+            snprintf(e.dict_loaded, sizeof e.dict_loaded, "%s", dict);
         if (e.spell)
             snprintf(e.msg, sizeof e.msg, "%s", msg);
         else

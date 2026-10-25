@@ -803,6 +803,21 @@ static void test_spell(void)
     WORDS("final. Següent", "final|Següent");
 #undef WORDS
 
+    {
+        char code[16];
+
+        spell_code("ca_ES-valencia", code, sizeof code);
+        CHECK(!strcmp(code, "ca"));
+        spell_code("es_ES.UTF-8", code, sizeof code);
+        CHECK(!strcmp(code, "es"));
+        spell_code("en", code, sizeof code);
+        CHECK(!strcmp(code, "en"));
+    }
+    if (spell_open("es") == 0) {   /* "es" troba es_ES */
+        CHECK(!strcmp(spell_lang(), "es_ES"));
+        CHECK(spell_check("niño", 5));
+        spell_close();
+    }
     if (spell_open("ca") < 0) {
         fprintf(stderr, "(sense diccionari català: %s; es salten les proves de hunspell)\n",
                 spell_error());

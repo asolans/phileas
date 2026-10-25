@@ -35,7 +35,8 @@ typedef struct {
     int     center;            /* columna de text centrada a la pantalla */
     int     colors;            /* colors de Markdown */
     int     spell;             /* marcar els errors ortogràfics */
-    const char *dict;          /* diccionari demanat amb -d; NULL = el de la configuració regional */
+    char    dict[64];          /* diccionari triat: "ca", "es" (F8), o el de -d o «idioma» */
+    char    dict_loaded[64];   /* el que hi ha carregat; "" = cap */
     int     width, height;     /* àrea de text real */
     int     margin;            /* columna de pantalla on comença el text */
 

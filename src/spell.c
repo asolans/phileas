@@ -3,6 +3,7 @@
 #include "utf8.h"
 #include "util.h"
 
+#include <ctype.h>
 #include <dlfcn.h>
 #include <errno.h>
 #include <iconv.h>
@@ -175,14 +176,33 @@ static int find_dict(const char *name, char *aff, char *dic, size_t size)
     return 0;
 }
 
+void spell_code(const char *name, char *out, size_t size)
+{
+    const char *env = name;
+
+    if (!env) {
+        env = getenv("LC_ALL");
+        if (!env || !*env)
+            env = getenv("LC_MESSAGES");
+        if (!env || !*env)
+            env = getenv("LANG");
+        if (!env || !*env || !strcmp(env, "C") || !strcmp(env, "POSIX") || !strncmp(env, "C.", 2))
+            env = "ca";
+    }
+    snprintf(out, size, "%.*s", (int)strcspn(env, "_-.@"), env);
+}
+
+/* Un diccionari personal per idioma: diccionari-ca.txt, diccionari-es.txt... */
 static void personal_path(char *out, size_t size)
 {
     const char *xdg = getenv("XDG_CONFIG_HOME"), *home = getenv("HOME");
+    char code[32];
 
+    spell_code(lang, code, sizeof code);
     if (xdg && *xdg)
-        snprintf(out, size, "%s/phileas/diccionari.txt", xdg);
+        snprintf(out, size, "%s/phileas/diccionari-%s.txt", xdg, code);
     else
-        snprintf(out, size, "%s/.config/phileas/diccionari.txt", home ? home : ".");
+        snprintf(out, size, "%s/.config/phileas/diccionari-%s.txt", home ? home : ".", code);
 }
 
 /* Converteix entre UTF-8 i la codificació del diccionari. Retorna una còpia
@@ -258,8 +278,18 @@ int spell_open(const char *name)
     if (load_lib() < 0)
         return -1;
     if (name) {
+        char full[64];
+
         if (open_one(name) == 0)
             return 0;
+        /* Només l'idioma: "es" -> "es_ES", "fr" -> "fr_FR" */
+        if (!strpbrk(name, "_-") && strlen(name) < 8) {
+            snprintf(full, sizeof full, "%s_%s", name, name);
+            for (char *p = full + strlen(name) + 1; *p; p++)
+                *p = (char)toupper((unsigned char)*p);
+            if (open_one(full) == 0)
+                return 0;
+        }
         snprintf(error, sizeof error, "no hi ha cap diccionari «%s»", name);
         return -1;
     }

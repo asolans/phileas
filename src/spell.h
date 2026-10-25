@@ -7,11 +7,17 @@
  * d'execució (dlopen): si no hi és, Phileas funciona igual, sense ortografia. */
 
 /* Carrega el diccionari lang ("ca", "es_ES"...), o el de la configuració
- * regional si és NULL (ca_ES, després ca, i si no, "ca"). Retorna 0, o -1
- * amb el motiu a spell_error(). El diccionari anterior es manté si falla. */
+ * regional si és NULL (ca_ES, després ca, i si no, "ca"). Si lang és només
+ * un idioma ("es"), també es prova "es_ES". Retorna 0, o -1 amb el motiu a
+ * spell_error(). El diccionari anterior es manté si falla. */
 int  spell_open(const char *lang);
 void spell_close(void);
 const char *spell_lang(void);      /* NULL si no hi ha diccionari */
+
+/* Codi d'idioma d'un nom de diccionari o de configuració regional
+ * ("ca_ES-valencia" -> "ca", "es_ES.UTF-8" -> "es"). Amb NULL, el de la
+ * configuració regional, o "ca" si no n'hi ha. */
+void spell_code(const char *name, char *out, size_t size);
 const char *spell_error(void);
 
 /* 1 si la paraula s[0..n) és correcta (o no hi ha diccionari). */
@@ -22,8 +28,9 @@ int  spell_check(const char *s, size_t n);
 int  spell_suggest(const char *s, size_t n, char ***list);
 void spell_free_list(char **list, int n);
 
-/* Afegeix la paraula al diccionari personal (es desa a
- * ~/.config/phileas/diccionari.txt) o la ignora fins que es tanqui Phileas.
+/* Afegeix la paraula al diccionari personal de l'idioma actual (es desa a
+ * ~/.config/phileas/diccionari-ca.txt, -es.txt...) o la ignora fins que es
+ * tanqui Phileas.
  * spell_add retorna -1 amb errno si no s'ha pogut desar. */
 int  spell_add(const char *s, size_t n);
 void spell_ignore(const char *s, size_t n);
