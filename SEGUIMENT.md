@@ -53,6 +53,40 @@ Alternativa raonable: **Lua amb nucli en C** (C per a pantalla i buffer, Lua per
 
 **Estat de la decisió:** ⏳ pendent de confirmar.
 
+### Anàlisi: C sol vs. C + Lua per a la configuració
+
+**C sol.** Fitxer de configuració declaratiu (`clau = valor`, estil `nanorc`) llegit per un analitzador propi d'unes 150–300 línies. Cobreix columnes, colors, diccionari i dreceres. No permet lògica, condicions ni ordres noves sense recompilar.
+
+**C + Lua.** El fitxer de configuració és un programa Lua (`~/.config/phileas/init.lua`). A més d'opcions, permet definir ordres pròpies, dreceres que criden funcions i *hooks* (en obrir, en desar…).
+
+Hi ha tres nivells d'integració:
+
+| Nivell | Què fa Lua | Exemples |
+|--------|-----------|----------|
+| A | Només llegeix la configuració | — |
+| B | Configuració + ordres d'usuari + hooks | neovim, micro |
+| C | La major part de l'editor és en Lua; C és el nucli | textadept, wordgrinder |
+
+| Aspecte | C sol | C + Lua (nivell B) |
+|---------|-------|--------------------|
+| Mida del binari | ~100–200 KB | +~250 KB (Lua 5.4 estàtic) |
+| RAM addicional | 0 | ~20–100 KB (estat Lua + configuració) |
+| Temps d'arrencada | Instantani | Imperceptible (<5 ms) |
+| Dependències | ncursesw, hunspell | + liblua5.4, o les fonts incloses al repositori (MIT, ~30 fitxers .c) |
+| Codi propi per a la configuració | Analitzador + validació | API C↔Lua (pila de Lua) + gestió d'errors (`pcall`) |
+| Extensibilitat de l'usuari | Cap | Alta |
+| Errors de configuració | Missatge de l'analitzador | Error Lua a la barra d'estat; l'editor ha de continuar funcionant |
+| Proves i manteniment | Un llenguatge | Dos llenguatges i una API pública que cal mantenir estable |
+| Seguretat | El fitxer és només dades | La configuració executa codi (com a vim o emacs; acceptable en ús personal) |
+
+Punts clau:
+
+- **El cost real de Lua no són els recursos** (a la RPi són negligibles), sinó el disseny i manteniment de l'API que s'exposa (`phileas.buffer`, `phileas.bind`, `phileas.on`…).
+- **El text de Lua no entén UTF-8:** `string.sub` treballa amb bytes. Cal exposar des de C funcions UTF-8 (paraula sota el cursor, longitud en caràcters, etc.) perquè les extensions no trenquin els accents.
+- **El factor decisiu és arquitectònic:** si el nucli es dissenya des del principi amb un **registre d'ordres amb nom** (`save`, `search`, `wrap-toggle`…) i les dreceres apunten a noms d'ordre, afegir Lua més endavant és barat: Lua només registra ordres noves i crida les existents. Sense aquest registre, afegir-lo a posteriori obliga a refactoritzar.
+
+**Recomanació:** començar amb **C sol + fitxer declaratiu**, però amb el registre d'ordres des de la F1. Decidir si s'afegeix Lua (nivell B) quan apareguin necessitats concretes (macros, plantilles, exportació amb pandoc, recompte de paraules personalitzat…). Si ja se sap que es volen extensions, val la pena decidir-ho ara per dissenyar l'API amb temps.
+
 ## Arquitectura preliminar (si es confirma C)
 
 ```
@@ -97,3 +131,4 @@ Decisions de disseny pendents:
 ## Registre
 
 - **2026-10-25** — Inici del projecte. Repositori git creat. Anàlisi de llenguatges; proposta: C + ncursesw + hunspell.
+- **2026-10-25** — Anàlisi C sol vs. C + Lua per a la configuració. Recomanació: C sol amb registre d'ordres, deixant Lua com a ampliació opcional.
