@@ -391,6 +391,80 @@ static void test_md(void)
 #undef CONT
 }
 
+/* Estils de s com a text: un caràcter per byte. '.' normal, 'm' marcador,
+ * 'b' negreta, 'i' cursiva, 'B' negreta i cursiva, 'c' codi, 'l' enllaç,
+ * 'q' cita, '1'-'3' capçalera; 'x' qualsevol altra combinació. */
+static const char *styled(const char *s, int setext)
+{
+    static char out[256];
+    unsigned char st[256];
+    MdState ms = {0};
+    size_t n = strlen(s);
+    int k = md_kind(s, n, &ms);
+
+    md_style(s, n, k, setext, st);
+    for (size_t i = 0; i < n; i++) {
+        unsigned char v = st[i], h = MS_HLEVEL(v);
+
+        if (v & MS_MARK)
+            out[i] = 'm';
+        else if (h && !(v & ~MS_H(3)))
+            out[i] = (char)('0' + h);
+        else if (v == 0)
+            out[i] = '.';
+        else if (v == MS_BOLD)
+            out[i] = 'b';
+        else if (v == MS_ITALIC)
+            out[i] = 'i';
+        else if (v == (MS_BOLD | MS_ITALIC))
+            out[i] = 'B';
+        else if (v == MS_CODE)
+            out[i] = 'c';
+        else if (v == MS_LINK)
+            out[i] = 'l';
+        else if (v == MS_QUOTE)
+            out[i] = 'q';
+        else
+            out[i] = 'x';
+    }
+    out[n] = '\0';
+    return out;
+}
+
+static void test_style(void)
+{
+#define STYLE(s, expect) CHECK(strcmp(styled(s, 0), expect) == 0)
+    STYLE("text", "....");
+    STYLE("# Títol", "mm111111");
+    STYLE("## Dos ##", "mmm2222mm");
+    STYLE("#### Quatre", "mmmmm333333");
+    STYLE("a **b** c", "..mmbmm..");
+    STYLE("a *b* _c_", "..mim.mim");
+    STYLE("***x***", "mmmBmmm");
+    STYLE("**a *b* c**", "mmbbmBmbbmm");
+    STYLE("2 * 3 * 4", ".........");      /* asteriscs envoltats d'espais */
+    STYLE("snake_case_x", "............");  /* '_' dins d'una paraula */
+    STYLE("**obert", ".......");
+    STYLE("`a*b*` c", "mccccm..");
+    STYLE("``a`b``", "mmcccmm");
+    STYLE("`obert", "......");
+    STYLE("\\*no\\*", "m...m.");
+    STYLE("[t](u)", "mlmmmm");
+    STYLE("![i](u)", "mmlmmmm");
+    STYLE("[t] sol", ".......");
+    STYLE("a <http://b>", "..mllllllllm");
+    STYLE("<b>", "mmm");                   /* HTML */
+    STYLE("- *a*", "m.mim");
+    STYLE("> cita *a*", "m.qqqqqmxm");
+    STYLE("- [ ] tasca", "m.m.m......");
+    STYLE("| a | `b` |", "m...m.mcm.m");
+    STYLE("---", "mmm");
+    STYLE("```c", "mmmm");
+    CHECK(strcmp(styled("Títol", 1), "111111") == 0);
+    CHECK(strcmp(styled("Sub *x*", 2), "2222mxm") == 0);
+#undef STYLE
+}
+
 static void set_text(Buffer *b, size_t n, const char *fill, size_t chars)
 {
     Line *l;
@@ -639,6 +713,7 @@ int main(void)
     test_pages();
     test_edit();
     test_md();
+    test_style();
     test_blocks();
     test_paste();
     test_undo();

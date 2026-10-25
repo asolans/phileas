@@ -4,7 +4,7 @@ Editor de text per a consola (Linux), orientat a escriure prosa en Markdown.
 
 ## Estat
 
-- **Fase actual:** 4 — Colors mínims de Markdown (F3 completada)
+- **Fase actual:** 5 — Navegador de fitxers (F4 completada)
 - **Última actualització:** 2026-10-25
 
 ## Requeriments (versió inicial)
@@ -317,7 +317,7 @@ Lliures per al futur: Ctrl+D, Ctrl+E, Ctrl+J, Ctrl+K, Ctrl+T, Ctrl+U, F4–F6, F
 - **Implementació:** la lectura de tecles espera amb un temps límit (`timeout()` de ncurses) en lloc de bloquejar-se. No cal cap fil ni consum en repòs.
 - **Per què a la F3:** com que l'autodesat sobreescriu l'original, ha d'anar amb el desfer. Si es desa sol un canvi no volgut, s'ha de poder recuperar amb Ctrl+Z.
 
-## Colors mínims de Markdown (planificat a la F4)
+## Colors mínims de Markdown (✅ implementat a la F4)
 
 Només atributs del terminal, que funcionen també a la consola de Linux i en terminals de 8 colors:
 
@@ -333,6 +333,18 @@ Només atributs del terminal, que funcionen també a la consola de Linux i en te
 
 L'estat de bloc (dins de codi, de metadades…) es calcula una sola vegada per línia i es guarda a la cache. És el mateix que necessita el model de paràgrafs per saber quins blocs van units.
 
+Colors triats (provisionals, configurables a la F7):
+
+| Element | xterm i similars | Consola de Linux |
+|---------|------------------|------------------|
+| Capçalera nivell 1 / 2 / 3–6 | Negreta magenta / cian / verd | Igual |
+| Marcadors | Atenuats | Atenuats, sense color |
+| `*cursiva*` | Cursiva | Subratllat |
+| Codi | Groc | Groc |
+| Cites | Verd | Verd (el text en cursiva o atenuat, sense color) |
+
+La consola de Linux no combina el subratllat ni l'atenuat amb colors (capacitat `ncv` del terminfo); en aquests casos es manté l'atribut i es treu el color. L'ordre `colors` de la paleta els activa o els desactiva.
+
 ## Arquitectura
 
 ```
@@ -341,12 +353,12 @@ src/
   util.c        ✅ assignació de memòria i errors fatals
   utf8.c        ✅ descodificació UTF-8, amplada de caràcters, diacrítics combinats
   buffer.c      ✅ vector de línies; inserir/esborrar/extreure; càrrega i desat atòmic
-  md.c          ✅ prefixos de bloc Markdown i tipus de bloc de cada línia (model de paràgrafs)
+  md.c          ✅ prefixos de bloc Markdown, tipus de bloc de cada línia i estils per als colors
   wrap.c        ✅ wordwrap suau amb sagnat penjant i cache per línia
   editor.c      ✅ estat de l'editor, cursor, moviment, edició, selecció i porta-retalls
   command.c     ✅ registre d'ordres amb nom i taula de dreceres
   keys.c        ✅ lectura de tecles, noms de tecla ("ctrl-s", "alt-<"...) i enganxat delimitat
-  render.c      ✅ dibuix amb ncursesw, barra d'estat i diàlegs a la línia inferior
+  render.c      ✅ dibuix amb ncursesw, colors, barra d'estat i diàlegs a la línia inferior
   search.c      ✅ cerca (sense distingir majúscules si el patró no en té), endavant i enrere
   undo.c        ✅ historial desfer/refer per grups, amb límit de memòria (8 MB)
   autosave.c    ✅ autodesat per inactivitat i interval màxim
@@ -383,7 +395,7 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 - [x] **F2** — Edició bàsica, sagnat penjant de llistes i cites, columna centrada
 - [x] **F2b** — Separació visual de paràgrafs (vegeu «Model de paràgrafs»)
 - [x] **F3** — Desfer/refer, cerca i substitució, autodesat
-- [ ] **F4** — Colors mínims de Markdown (capçaleres, èmfasi)
+- [x] **F4** — Colors mínims de Markdown (capçaleres, èmfasi)
 - [ ] **F5** — Navegador de fitxers
 - [ ] **F6** — Correcció ortogràfica amb hunspell
 - [ ] **F7** — Configuració i proves en Raspberry Pi
@@ -483,3 +495,21 @@ make clean && make debug   # amb AddressSanitizer i UBSan
     - l'espera es fa amb el temps límit de ncurses: no consumeix CPU en repòs.
   - **Proves:** 1.467 comprovacions unitàries, també amb sanititzadors, i proves interactives de totes les funcions.
 - **2026-10-25** — Prova de l'usuari de la F3: tot correcte. La barra d'estat mostra les pàgines sense el signe ≈ (`N pàg.`).
+- **2026-10-25** — **F4 completada.**
+  - **Capçaleres:**
+    - `#` a `######`, amb un color per nivell (els nivells 3 a 6 comparteixen el tercer);
+    - les capçaleres subratllades amb `===` o `---` també;
+    - els `#` (també els de tancament opcionals) queden atenuats.
+  - **Èmfasi:**
+    - `**negreta**`, `*cursiva*`, `_cursiva_`, `***totes dues***` i èmfasis niats;
+    - no s'activa amb asteriscs envoltats d'espais (`2 * 3`), ni amb `_` dins d'una paraula (`nom_de_fitxer`), ni si no es tanca.
+  - **Altres:**
+    - codi entre accents oberts i blocs de codi en groc, sense interpretar-ne el contingut;
+    - enllaços i imatges amb el text subratllat i la resta atenuada; adreces `<http://...>`;
+    - cites en verd; marcadors de llista, de tasca i separadors de taula atenuats;
+    - metadades, HTML i separadors atenuats;
+    - els escapaments (`\*`) es respecten.
+  - **Terminals:** sense cursiva, es fa servir el subratllat; sense colors, només negreta, subratllat i atenuat. A la consola de Linux, vegeu la taula de «Colors mínims de Markdown».
+  - **Rendiment:** els estils es calculen només per a les línies visibles, una vegada per línia i dibuix. Document d'11 MB: ~10 ms més de CPU en tota la sessió de prova.
+  - **Ordre nova:** `colors` (paleta) activa o desactiva els colors.
+  - **Proves:** 1.495 comprovacions unitàries, també amb sanititzadors, i proves interactives amb TERM=xterm-256color, linux i vt100.

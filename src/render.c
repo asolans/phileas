@@ -1,12 +1,112 @@
 #include "render.h"
 #include "keys.h"
+#include "md.h"
 #include "tui.h"
 #include "utf8.h"
 #include "wrap.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <wctype.h>
+
+/* Parelles de colors (fons per defecte del terminal) */
+enum { PAIR_H1 = 1, PAIR_H2, PAIR_H3, PAIR_CODE, PAIR_QUOTE, PAIR_MARK };
+
+static attr_t italic_attr = A_UNDERLINE;  /* si el terminal no té cursiva */
+static attr_t mark_attr;
+static attr_t no_color;   /* atributs que el terminal no combina amb colors (ncv) */
+static int    have_colors;
+
+/* Estils de la línia que s'està dibuixant */
+static unsigned char *styles;
+static size_t styles_cap;
+
+static void colors_init(void)
+{
+    attr_t ta = term_attrs();
+
+    if (ta & A_ITALIC)
+        italic_attr = A_ITALIC;
+    if (has_colors() && start_color() == OK) {
+        short bg = use_default_colors() == OK ? -1 : COLOR_BLACK;
+
+        int ncv = tigetnum("ncv");
+
+        have_colors = 1;
+        if (ncv > 0)
+            no_color = (ncv & 2 ? A_UNDERLINE : 0) | (ncv & 16 ? A_DIM : 0) |
+                       (ncv & 0x8000 ? A_ITALIC : 0);
+        init_pair(PAIR_H1, COLOR_MAGENTA, bg);
+        init_pair(PAIR_H2, COLOR_CYAN, bg);
+        init_pair(PAIR_H3, COLOR_GREEN, bg);
+        init_pair(PAIR_CODE, COLOR_YELLOW, bg);
+        init_pair(PAIR_QUOTE, COLOR_GREEN, bg);
+        init_pair(PAIR_MARK, COLOR_BLUE, bg);
+    }
+    /* Marcadors atenuats; si el terminal no en sap, en blau */
+    if (ta & A_DIM)
+        mark_attr = A_DIM;
+    else if (have_colors)
+        mark_attr = COLOR_PAIR(PAIR_MARK);
+}
+
+static attr_t style_attr(unsigned char st)
+{
+    static const short heading_pair[] = { 0, PAIR_H1, PAIR_H2, PAIR_H3 };
+    attr_t a = 0;
+    short pair = 0;
+
+    if (MS_HLEVEL(st)) {
+        a |= A_BOLD;
+        pair = heading_pair[MS_HLEVEL(st)];
+    }
+    if (st & MS_QUOTE)
+        pair = PAIR_QUOTE;
+    if (st & MS_BOLD)
+        a |= A_BOLD;
+    if (st & MS_ITALIC)
+        a |= italic_attr;
+    if (st & MS_LINK)
+        a |= A_UNDERLINE;
+    if (st & MS_CODE)
+        pair = PAIR_CODE;
+    if (st & MS_MARK) {
+        a &= ~A_BOLD;   /* negreta i atenuat es contradiuen */
+        if (mark_attr & A_DIM)
+            a |= A_DIM;
+        else
+            pair = PAIR_MARK;
+    }
+    /* A la consola de Linux, el subratllat i l'atenuat no van amb color:
+     * mana l'atribut */
+    return have_colors && pair && !(a & no_color) ? a | COLOR_PAIR(pair) : a;
+}
+
+/* Calcula els estils de la línia y (0 si els colors estan desactivats). */
+static void line_styles(Editor *e, size_t y)
+{
+    Line *l = ed_line(e, y);
+    int setext = 0;
+
+    if (l->len + 1 > styles_cap) {
+        styles_cap = l->len + 64;
+        free(styles);
+        styles = malloc(styles_cap);
+        if (!styles) {
+            styles_cap = 0;
+            return;
+        }
+    }
+    if (!e->colors) {
+        memset(styles, 0, l->len);
+        return;
+    }
+    if (MD_BASE(l->kind) == MD_TEXT && y + 1 < e->buf.nlines &&
+        MD_BASE(e->buf.lines[y + 1].kind) == MD_UNDERLINE)
+        setext = strchr(e->buf.lines[y + 1].text, '=') ? 1 : 2;
+    md_style(l->text, l->len, l->kind, setext, styles);
+}
 
 void ui_init(void)
 {
@@ -16,6 +116,7 @@ void ui_init(void)
     keypad(stdscr, TRUE);
     set_escdelay(25);
     key_init();
+    colors_init();
 }
 
 void ui_end(void)
@@ -42,23 +143,22 @@ static void draw_row(Editor *e, Line *l, size_t r, int y, size_t s0, size_t s1)
 
         if (col + w > e->width - indent)
             break;
+        attrset(styles_cap ? style_attr(styles[i]) : 0);
         if (sel)
             attron(A_REVERSE);
         if (wc == L'\t') {
             for (int k = 0; k < w; k++)
                 addch(' ');
         } else if (!utf8_printable(wc)) {
-            attron(A_REVERSE);
+            attrset(A_REVERSE);
             addch('?');
-            attroff(A_REVERSE);
         } else {
             addnwstr(&wc, 1);
         }
-        if (sel)
-            attroff(A_REVERSE);
         col += w;
         i += n;
     }
+    attrset(A_NORMAL);
     /* El salt de línia seleccionat es mostra com un espai al final */
     if (end == l->len && s1 > l->len && col < e->width - indent) {
         attron(A_REVERSE);
@@ -102,11 +202,12 @@ static void draw_status(Editor *e)
 
 void render(Editor *e)
 {
-    size_t tl, tr, crow;
+    size_t tl, tr, crow, styled = (size_t)-1;
     int cur_y = -1, cur_x = 0, has_sel;
     Pos sa, sz;
 
     ed_layout(e, COLS, LINES);
+    buf_scan(&e->buf);   /* els colors depenen del tipus de bloc */
     erase();
 
     tl = e->top_line;
@@ -120,8 +221,11 @@ void render(Editor *e)
             s0 = tl == sa.line ? sa.col : 0;
             s1 = tl == sz.line ? sz.col : (size_t)-1;
         }
-        if (tr < ed_line(e, tl)->nrows)   /* si no, és la fila de separació */
+        if (tr < ed_line(e, tl)->nrows) {  /* si no, és la fila de separació */
+            if (styled != tl)
+                line_styles(e, styled = tl);
             draw_row(e, ed_line(e, tl), tr, y, s0, s1);
+        }
         if (tl == e->cy && tr == crow) {
             cur_y = y;
             cur_x = e->margin + ed_cursor_x(e);

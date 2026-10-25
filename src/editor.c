@@ -19,6 +19,7 @@ void ed_init(Editor *e, int columns)
     e->height = 1;
     e->want_x = -1;
     e->autosave_max = 300;
+    e->colors = 1;
 }
 
 void ed_free(Editor *e)

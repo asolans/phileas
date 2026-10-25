@@ -59,4 +59,21 @@ int md_tight(int k1, int k2);
  * blanc és la continuació del mateix paràgraf (text tallat a mà). */
 int md_joinable(int k1, int k2);
 
+/* ---- Estils per als colors ----
+ * Cada byte d'una línia rep una combinació d'aquests bits, que render.c
+ * converteix en atributs del terminal. */
+#define MS_MARK    0x01   /* marcador de sintaxi (#, **, -, >...): atenuat */
+#define MS_BOLD    0x02
+#define MS_ITALIC  0x04
+#define MS_CODE    0x08
+#define MS_LINK    0x10   /* text d'un enllaç */
+#define MS_QUOTE   0x20
+#define MS_H(n)    ((n) << 6)          /* capçalera de nivell 1-3 (4-6 = 3) */
+#define MS_HLEVEL(st) ((st) >> 6)
+
+/* Omple out[0..len) amb l'estil de cada byte de la línia s, de tipus kind.
+ * setext és el nivell (1 o 2) si la línia és el text d'una capçalera
+ * subratllada amb === o ---, i 0 si no. */
+void md_style(const char *s, size_t len, int kind, int setext, unsigned char *out);
+
 #endif

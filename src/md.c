@@ -220,3 +220,231 @@ int md_joinable(int k1, int k2)
     return MD_BASE(k2) == MD_TEXT && !(k1 & MD_HARDBREAK) &&
            (b1 == MD_TEXT || b1 == MD_LIST || b1 == MD_QUOTE);
 }
+
+/* ---- Estils ---- */
+
+#define NONE ((size_t)-1)
+
+static int is_word(unsigned char c)
+{
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+           c >= 0x80;
+}
+
+static int is_punct(unsigned char c)
+{
+    return c > ' ' && c < 0x7F && !is_word(c);
+}
+
+static size_t run(const char *s, size_t b, size_t i)
+{
+    size_t j = i;
+
+    while (j < b && s[j] == s[i])
+        j++;
+    return j - i;
+}
+
+static void fill(unsigned char *out, size_t a, size_t b, unsigned char v)
+{
+    memset(out + a, v, b - a);
+}
+
+/* Inici de la tanca d'un fragment de codi de n accents oberts que comença
+ * a from: una tira d'exactament n. NONE si no n'hi ha. */
+static size_t code_close(const char *s, size_t b, size_t from, size_t n)
+{
+    for (size_t j = from; j < b;) {
+        size_t r;
+
+        if (s[j] != '`') {
+            j++;
+            continue;
+        }
+        r = run(s, b, j);
+        if (r == n)
+            return j;
+        j += r;
+    }
+    return NONE;
+}
+
+/* Tanca d'un èmfasi de n caràcters c: una tira d'exactament n que no
+ * segueix un espai (ni va davant d'una lletra, si és '_'). Se salten els
+ * escapaments i els fragments de codi. */
+static size_t emph_close(const char *s, size_t b, size_t from, char c, size_t n)
+{
+    for (size_t j = from; j < b;) {
+        size_t r, k;
+
+        if (s[j] == '\\') {
+            j += 2;
+        } else if (s[j] == '`') {
+            r = run(s, b, j);
+            k = code_close(s, b, j + r, r);
+            j = k == NONE ? j + r : k + r;
+        } else if (s[j] == c) {
+            r = run(s, b, j);
+            if (r == n && j > from && !is_blank(s[j - 1]) &&
+                (c != '_' || j + r >= b || !is_word((unsigned char)s[j + r])))
+                return j;
+            j += r;
+        } else {
+            j++;
+        }
+    }
+    return NONE;
+}
+
+/* Final (']') del text d'un enllaç que comença a from, i ')' de l'adreça.
+ * Retorna 0 si no és un enllaç complet. */
+static int link_end(const char *s, size_t b, size_t from, size_t *text_end, size_t *url_end)
+{
+    size_t j = from;
+
+    while (j < b && s[j] != ']') {
+        if (s[j] == '\\')
+            j++;
+        j++;
+    }
+    if (j + 1 >= b || s[j + 1] != '(')
+        return 0;
+    *text_end = j;
+    for (j += 2; j < b && s[j] != ')'; j++)
+        ;
+    if (j >= b)
+        return 0;
+    *url_end = j;
+    return 1;
+}
+
+/* Adreça automàtica <http://...>: retorna la posició de '>' o NONE. */
+static size_t autolink_end(const char *s, size_t b, size_t i)
+{
+    static const char *schemes[] = { "http://", "https://", "mailto:" };
+    size_t j;
+
+    for (size_t k = 0; k < sizeof schemes / sizeof *schemes; k++) {
+        size_t n = strlen(schemes[k]);
+
+        if (i + 1 + n > b || memcmp(s + i + 1, schemes[k], n))
+            continue;
+        for (j = i + 1 + n; j < b && s[j] != '>' && !is_blank(s[j]); j++)
+            ;
+        return j < b && s[j] == '>' ? j : NONE;
+    }
+    return NONE;
+}
+
+/* Estils de línia: codi, èmfasi, enllaços i escapaments a [a, b). */
+static void inline_style(const char *s, size_t a, size_t b, unsigned char st,
+                         unsigned char *out)
+{
+    size_t i = a, n, k, te, ue;
+
+    while (i < b) {
+        char c = s[i];
+
+        if (c == '\\' && i + 1 < b && is_punct((unsigned char)s[i + 1])) {
+            out[i] = st | MS_MARK;
+            out[i + 1] = st;
+            i += 2;
+        } else if (c == '`') {
+            n = run(s, b, i);
+            k = code_close(s, b, i + n, n);
+            if (k == NONE) {
+                fill(out, i, i + n, st);
+            } else {
+                fill(out, i, i + n, st | MS_MARK);
+                fill(out, i + n, k, st | MS_CODE);
+                fill(out, k, k + n, st | MS_MARK);
+                n = k + n - i;
+            }
+            i += n;
+        } else if (c == '*' || c == '_') {
+            n = run(s, b, i);
+            k = NONE;
+            if (n <= 3 && i + n < b && !is_blank(s[i + n]) &&
+                (c == '*' || i == 0 || !is_word((unsigned char)s[i - 1])))
+                k = emph_close(s, b, i + n, c, n);
+            if (k == NONE) {
+                fill(out, i, i + n, st);
+            } else {
+                unsigned char add = (n != 2 ? MS_ITALIC : 0) | (n >= 2 ? MS_BOLD : 0);
+
+                fill(out, i, i + n, st | MS_MARK);
+                inline_style(s, i + n, k, st | add, out);
+                fill(out, k, k + n, st | MS_MARK);
+                n = k + n - i;
+            }
+            i += n;
+        } else if ((c == '[' || (c == '!' && i + 1 < b && s[i + 1] == '[')) &&
+                   link_end(s, b, i + (c == '!') + 1, &te, &ue)) {
+            fill(out, i, i + (c == '!') + 1, st | MS_MARK);
+            inline_style(s, i + (c == '!') + 1, te, st | MS_LINK, out);
+            fill(out, te, ue + 1, st | MS_MARK);
+            i = ue + 1;
+        } else if (c == '<' && (k = autolink_end(s, b, i)) != NONE) {
+            out[i] = out[k] = st | MS_MARK;
+            fill(out, i + 1, k, st | MS_LINK);
+            i = k + 1;
+        } else {
+            out[i++] = st;
+        }
+    }
+}
+
+void md_style(const char *s, size_t len, int kind, int setext, unsigned char *out)
+{
+    size_t i, p, e;
+    unsigned char st = 0;
+
+    memset(out, 0, len);
+    switch (MD_BASE(kind)) {
+    case MD_EMPTY:
+        return;
+    case MD_CODE:
+        fill(out, 0, len, MS_CODE);
+        return;
+    case MD_FENCE_OPEN:
+    case MD_FENCE_CLOSE:
+    case MD_META:
+    case MD_HTML:
+    case MD_UNDERLINE:
+        fill(out, 0, len, MS_MARK);
+        return;
+    case MD_HEADING:
+        i = skip_blanks(s, len, 0);
+        p = i + run(s, len, i);
+        st = MS_H(p - i > 3 ? 3 : p - i);
+        p = skip_blanks(s, len, p);
+        fill(out, 0, p, st | MS_MARK);
+        /* Tanca opcional: "## Títol ##" */
+        for (e = len; e > p && is_blank(s[e - 1]); e--)
+            ;
+        i = e;
+        while (i > p && s[i - 1] == '#')
+            i--;
+        if (i < e && (i == p || is_blank(s[i - 1]))) {
+            fill(out, i, len, st | MS_MARK);
+            len = i;
+        }
+        inline_style(s, p, len, st, out);
+        return;
+    }
+
+    p = md_prefix(s, len);
+    for (i = 0; i < p; i++)
+        out[i] = is_blank(s[i]) ? 0 : MS_MARK;
+    if (MD_BASE(kind) == MD_QUOTE)
+        st = MS_QUOTE;
+    else if (setext)
+        st = MS_H(setext);
+    if ((kind & MD_HARDBREAK) && s[len - 1] == '\\')
+        out[--len] = st | MS_MARK;
+    inline_style(s, p, len, st, out);
+    if (MD_BASE(kind) == MD_TABLE)
+        for (i = p; i < len; i++)
+            if (s[i] == '|' && !(out[i] & (MS_CODE | MS_MARK)) && (i == 0 || s[i - 1] != '\\'))
+                out[i] |= MS_MARK;
+}

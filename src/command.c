@@ -350,6 +350,12 @@ static void c_replace(Editor *e)
     ed_msg(e, count == 1 ? "1 substitució" : "%zu substitucions", count);
 }
 
+static void c_colors(Editor *e)
+{
+    e->colors = !e->colors;
+    ed_msg(e, e->colors ? "Colors de Markdown activats" : "Colors de Markdown desactivats");
+}
+
 static void c_autosave(Editor *e)
 {
     if (e->autosave) {
@@ -408,6 +414,7 @@ static const Command commands[] = {
     { "enganxar",                  c_paste,          "Enganxa el porta-retalls", ACT_NONE },
 
     { "centrar",           c_center,     "Centra o no la columna de text", ACT_NONE },
+    { "colors",            c_colors,     "Activa o desactiva els colors de Markdown", ACT_NONE },
     { "desar",             c_save,       "Desa el document", ACT_NONE },
     { "desar-com",         c_save_as,    "Desa el document amb un altre nom", ACT_NONE },
     { "sortir",            c_quit,       "Surt de Phileas", ACT_NONE },
