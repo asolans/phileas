@@ -128,6 +128,10 @@ void key_set_timeout(int ms)
 
 void key_init(void)
 {
+    /* Els terminfo «linux» i «screen» declaren Ctrl+Z com a tecla de
+     * suspendre (kspd=^Z), i ncurses la convertiria en KEY_SUSPEND: ha
+     * d'arribar com a Ctrl+Z (desfer) */
+    keyok(KEY_SUSPEND, FALSE);
     ntranslations = 0;
     for (int i = 0; i < NNAV; i++) {
         for (int mod = 2; mod <= 8; mod++) {

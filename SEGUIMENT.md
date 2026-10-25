@@ -861,3 +861,7 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **Secció pròpia, al principi:** «Ordres de la paleta», amb les ordres que no tenen cap tecla assignada. A la primera columna hi ha el nom que cal escriure després de Ctrl+P.
   - **Es genera sola:** si al `phileasrc` s'assigna una tecla a una d'aquestes ordres, deixa de sortir en aquesta secció.
   - **A les seccions per temes**, les ordres sense tecla es marquen amb «paleta».
+- **2026-10-25** — **Error corregit (informat per l'usuari a la Pi):** Ctrl+Z (desfer) no feia res.
+  - **Causa:** els terminfo `linux` (la consola) i `screen` declaren Ctrl+Z com a tecla de suspendre (`kspd=^Z`). ncurses el convertia en el codi `KEY_SUSPEND`, que no té cap ordre. No era el mapa de teclat (Ctrl+Z hi envia 0x1A) ni els senyals (el terminal té `-isig`). A xterm funcionava perquè `xterm-256color` no té `kspd`.
+  - **Solució:** `keyok(KEY_SUSPEND, FALSE)` a `key_init()`, perquè ncurses no tradueixi aquesta tecla. És l'única tecla d'un sol caràcter de control en aquesta situació: `kbs`, el Retrocés, ja es tractava.
+  - **Proves:** desfer després d'escriure i d'esborrar amb Supr, i refer, amb TERM=linux, screen i xterm-256color al PC, i a la Pi amb TERM=linux.
