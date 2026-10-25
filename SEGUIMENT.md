@@ -179,7 +179,101 @@ Interoperabilitat amb fitxers tallats a mà (fases posteriors):
 - Ordre `desfer-salts`: ajunta les línies de cada paràgraf d'un fitxer amb salts durs, respectant l'estructura Markdown.
 - Ordre `reformatar` (opcional): genera una còpia amb salts durs a N columnes, per si cal enviar el text per correu o a un repositori amb aquesta convenció.
 
-**Estat de la decisió:** ⏳ pendent de confirmar (incloent-hi l'amplada per defecte, 72).
+**Estat de la decisió:** ✅ Confirmada (2026-10-25): **wordwrap suau a 72 columnes**, amb tots els detalls proposats.
+
+## Dreceres de teclat
+
+### Limitacions del terminal (condicionen tot el disseny)
+
+| Tecla | Problema | Solució |
+|-------|----------|---------|
+| Ctrl+S / Ctrl+Q | Control de flux XON/XOFF: congelen el terminal | Desactivar `IXON` en mode *raw* → queden lliures |
+| Ctrl+C / Ctrl+Z | Envien SIGINT / SIGTSTP | `raw()` de ncurses les captura com a tecles normals |
+| Ctrl+I, Ctrl+M, Ctrl+[ | Són idèntiques a Tab, Enter i Esc | **No es poden fer servir** |
+| Ctrl+H | És Retrocés en alguns terminals | Només com a extra (esborrar paraula), mai per a res essencial |
+| Ctrl+Maj+lletra | Indistingible de Ctrl+lletra | No es fa servir |
+| Ctrl/Maj + fletxes, Ctrl+Inici/Fi | Cada terminal envia una seqüència diferent. **A la consola de Linux** (RPi sense escriptori) normalment no arriben | Es poden fer servir, però sempre amb una alternativa |
+| Alt+lletra | Arriba com Esc + lletra | Funciona a tot arreu; `ESCDELAY` = 25 ms perquè Esc sol respongui ràpid |
+| F1–F12 | Funcionen a tot arreu | Bones per a funcions secundàries |
+
+**Norma de disseny:** tota ordre essencial ha de tenir una drecera amb **Ctrl+lletra, Alt+lletra o tecla F**. Les combinacions amb fletxes són sempre una comoditat addicional.
+
+### Estils considerats
+
+- **nano** (Ctrl+O desar, Ctrl+W cercar, Ctrl+K tallar): conegut a Linux, però poc intuïtiu per a qui ve dels processadors de text.
+- **CUA** (Ctrl+S/Z/X/C/V/F, com als editors gràfics): el que coneix tothom que escriu. Encaixa amb el públic de Phileas.
+- **emacs / vim modal:** pensats per programar; corba d'aprenentatge alta. Descartats.
+
+### Proposta: **estil CUA** adaptat al terminal + paleta d'ordres
+
+**Fitxer**
+
+| Drecera | Ordre |
+|---------|-------|
+| Ctrl+S | `desar` |
+| Alt+S | `desar-com` |
+| Ctrl+O | `obrir` (navegador de fitxers) |
+| Ctrl+N | `nou` |
+| Ctrl+Q | `sortir` (demana confirmació si hi ha canvis) |
+
+**Edició i selecció**
+
+| Drecera | Ordre |
+|---------|-------|
+| Ctrl+Z / Ctrl+Y | `desfer` / `refer` |
+| Ctrl+X / Ctrl+C / Ctrl+V | `tallar` / `copiar` / `enganxar` |
+| Ctrl+A | `seleccionar-tot` |
+| Ctrl+Espai | `marca` (comença/acaba la selecció; alternativa universal) |
+| Maj+fletxes | ampliar selecció (on el terminal ho permeti) |
+| Ctrl+W (i Ctrl+Retrocés on arribi) | `esborrar-paraula-anterior` |
+| Alt+D | `esborrar-paraula-seguent` |
+
+**Cerca**
+
+| Drecera | Ordre |
+|---------|-------|
+| Ctrl+F | `cercar` |
+| Ctrl+G / F3 | `cercar-seguent` |
+| Alt+G / Maj+F3 | `cercar-anterior` |
+| Ctrl+R | `substituir` (Ctrl+H no és fiable) |
+
+**Navegació** (fletxes, Inici/Fi i RePàg/AvPàg per línies visuals)
+
+| Drecera | Alternativa universal | Ordre |
+|---------|----------------------|-------|
+| Ctrl+← / → | Alt+B / Alt+F | `paraula-anterior` / `paraula-seguent` |
+| Ctrl+↑ / ↓ | Alt+P / Alt+N | `paragraf-anterior` / `paragraf-seguent` |
+| Ctrl+Inici / Fi | Alt+< / Alt+> | `inici-document` / `fi-document` |
+| — | Alt+L | `anar-a-linia` |
+
+**Markdown**
+
+| Drecera | Ordre |
+|---------|-------|
+| Ctrl+B | `negreta` (envolta la selecció o la paraula amb `**`) |
+| Alt+I | `cursiva` (`*`; Ctrl+I no és possible) |
+| Alt+1 … Alt+6 | `capcalera-1` … `capcalera-6` (Alt+0 la treu) |
+
+**Ortografia, vista i ajuda**
+
+| Drecera | Ordre |
+|---------|-------|
+| F7 | `revisar-ortografia` (salta d'error en error) |
+| Alt+Enter | `suggeriments` (per a la paraula sota el cursor) |
+| Alt+C | `centrar` (activar o desactivar la columna centrada) |
+| Ctrl+L | `redibuixar` (útil per SSH) |
+| F2 | mostrar/amagar la barra d'ajuda inferior (estil nano) |
+| F1 | `ajuda` |
+| **Ctrl+P** | **`paleta`**: escriure el nom de qualsevol ordre (amb autocompleció) |
+| Esc | cancel·lar el diàleg o la selecció |
+
+Lliures per al futur: Ctrl+D, Ctrl+E, Ctrl+J, Ctrl+K, Ctrl+T, Ctrl+U, F4–F6, F8–F12 i la majoria d'Alt+lletra.
+
+**Paleta d'ordres:** és la conseqüència directa del registre d'ordres. Qualsevol ordre és accessible pel nom encara que no tingui drecera. Així el joc de tecles es pot mantenir petit.
+
+**Personalització:** totes les dreceres es poden reassignar al fitxer de configuració (`tecla.ctrl-k = tallar`). Més endavant es podria oferir un perfil `nano` predefinit.
+
+**Estat de la decisió:** ⏳ pendent de confirmar.
 
 ## Arquitectura preliminar
 
@@ -202,7 +296,6 @@ src/
 Decisions de disseny pendents:
 
 - Format del fitxer de configuració.
-- Joc de dreceres de teclat (estil nano? propi?).
 
 ## Entorn de desenvolupament
 
@@ -227,3 +320,4 @@ Decisions de disseny pendents:
 - **2026-10-25** — Anàlisi C sol vs. C + Lua per a la configuració. Recomanació: C sol amb registre d'ordres, deixant Lua com a ampliació opcional.
 - **2026-10-25** — ✅ Confirmat: C sol + configuració declarativa + registre d'ordres. Anàlisi de l'estructura del buffer; proposta: vector de línies (línia = paràgraf).
 - **2026-10-25** — ✅ Confirmat: vector de línies. Anàlisi del wordwrap; proposta: suau a 72 columnes, amb moviment per línies visuals i sagnat penjant.
+- **2026-10-25** — ✅ Confirmat: wordwrap suau a 72 columnes. Proposta de dreceres: estil CUA adaptat al terminal, amb alternatives Alt per a la consola de Linux i una paleta d'ordres (Ctrl+P).
