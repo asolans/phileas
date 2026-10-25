@@ -20,7 +20,13 @@ const Command *cmd_for_key(int key);
  * aquest terminal o l'ordre és desconeguda. */
 int  cmd_bind(const char *keyname, const char *cmdname);
 
-/* Dreceres per defecte (cal que ncurses estigui inicialitzat). */
+/* Treu la drecera d'una tecla. Retorna -1 si el nom de tecla no existeix. */
+int  cmd_unbind(const char *keyname);
+
+/* Deixa només les dreceres per defecte. */
 void cmd_bind_defaults(void);
+
+/* Per a la configuració: "tecla.NOM = ordre", o buit per treure-la. */
+int  cmd_config_bind(const char *keyname, const char *cmdname);
 
 #endif

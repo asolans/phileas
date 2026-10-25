@@ -44,3 +44,16 @@ char *xstrdup(const char *s)
 
     return memcpy(xmalloc(n), s, n);
 }
+
+void config_dir(char *out, size_t size)
+{
+    const char *dir = getenv("PHILEAS_CONFIG"), *xdg = getenv("XDG_CONFIG_HOME");
+    const char *home = getenv("HOME");
+
+    if (dir && *dir)
+        snprintf(out, size, "%s", dir);
+    else if (xdg && *xdg)
+        snprintf(out, size, "%s/phileas", xdg);
+    else
+        snprintf(out, size, "%s/.config/phileas", home && *home ? home : ".");
+}

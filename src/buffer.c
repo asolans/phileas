@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -328,6 +329,12 @@ char *buf_paste_text(Buffer *b, size_t line, const char *s, size_t n, size_t *ou
     int any = 0;
     MdState st;
 
+    if (b->plain) {   /* tal qual */
+        memcpy(out, s, n);
+        out[n] = '\0';
+        *out_n = n;
+        return out;
+    }
     buf_scan(b);
     if (line > 0)
         st = b->lines[line - 1].st;
@@ -381,6 +388,8 @@ int buf_gap_after(Buffer *b, size_t i)
 {
     size_t j = i + 1;
 
+    if (b->plain)
+        return 0;
     buf_scan(b);
     if (MD_BASE(b->lines[i].kind) == MD_EMPTY)
         return 0;
@@ -463,6 +472,10 @@ static void load_line(Buffer *b, MdState *st, size_t *blanks, const char *s, siz
     int k = md_kind(s, n, st);
     Line *prev;
 
+    if (b->plain) {
+        push_line(b, s, n);
+        return;
+    }
     if (k == MD_EMPTY) {
         ++*blanks;
         return;
@@ -493,6 +506,20 @@ static void load_line(Buffer *b, MdState *st, size_t *blanks, const char *s, siz
     b->lines[b->nlines - 1].kind = k;
 }
 
+int buf_is_markdown_path(const char *path)
+{
+    static const char *exts[] = { ".md", ".markdown", ".mdown", ".mkd", ".txt" };
+    const char *base = strrchr(path, '/'), *dot;
+
+    base = base ? base + 1 : path;
+    if (!(dot = strrchr(base, '.')) || dot == base)
+        return 0;
+    for (size_t i = 0; i < sizeof exts / sizeof *exts; i++)
+        if (!strcasecmp(dot, exts[i]))
+            return 1;
+    return 0;
+}
+
 int buf_load(Buffer *b, const char *path)
 {
     Buffer nb;
@@ -503,6 +530,7 @@ int buf_load(Buffer *b, const char *path)
     if (!data)
         return -1;
     memset(&nb, 0, sizeof nb);
+    nb.plain = b->plain;
     if (n >= 3 && memcmp(data, "\xEF\xBB\xBF", 3) == 0) {
         nb.bom = 1;
         start = 3;
@@ -576,9 +604,10 @@ int buf_save(Buffer *b, const char *path)
 
     if (b->bom)
         fputs("\xEF\xBB\xBF", f);
-    /* Les línies buides del final no es desen (en carregar es descarten) */
+    /* Les línies buides del final no es desen (en carregar es descarten);
+     * en text pla, sí */
     buf_scan(b);
-    while (end > 1 && MD_BASE(b->lines[end - 1].kind) == MD_EMPTY)
+    while (!b->plain && end > 1 && MD_BASE(b->lines[end - 1].kind) == MD_EMPTY)
         end--;
     for (size_t i = 0; i < end; i++) {
         fwrite(b->lines[i].text, 1, b->lines[i].len, f);

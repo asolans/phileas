@@ -4,7 +4,7 @@ Editor de text per a consola (Linux), orientat a escriure prosa en Markdown.
 
 ## Estat
 
-- **Fase actual:** 6b — Ajuda amb F1 (F6 i F6c completades)
+- **Fase actual:** 6b — Ajuda amb F1 (F7 completada)
 - **Última actualització:** 2026-10-25
 
 ## Requeriments (versió inicial)
@@ -396,7 +396,7 @@ Amb aquests dos valors surten els tres modes:
 
 **Estat de la decisió:** ✅ Confirmada (2026-10-25).
 
-## Configuració (F7, proposta pendent de confirmar)
+## Configuració (✅ confirmada i implementada a la F7)
 
 Ja decidit a la F0: C sol, amb un fitxer declaratiu (`clau = valor`) i les dreceres apuntant a ordres amb nom.
 
@@ -467,7 +467,7 @@ En carregar un fitxer, Phileas ajunta les línies seguides d'un paràgraf (text 
 
 Així el fitxer de configuració (i qualsevol altre) es pot editar amb el mateix Phileas sense fer-lo malbé. És una mica més de feina, però avui obrir un fitxer qualsevol el pot alterar en desar-lo.
 
-**Estat de la decisió:** pendent de confirmar.
+**Estat de la decisió:** ✅ Confirmada (2026-10-25).
 
 ## Arquitectura
 
@@ -489,14 +489,11 @@ src/
   spell.c       ✅ ortografia amb hunspell (carregat amb dlopen), cache de paraules, diccionari personal
   dirlist.c     ✅ lectura i ordenació de directoris, filtre, camins i mides (sense ncurses)
   filebrowser.c ✅ navegador de fitxers a pantalla completa
-  config.c      configuració (~/.config/phileas/)
+  config.c      ✅ configuració: phileasrc del sistema i de l'usuari, línia d'ordres, plantilla (sense ncurses)
 tests/
   test.c        ✅ proves de utf8, wrap, buffer, edició, md, estils i dirlist (sense ncurses)
 ```
 
-Decisions de disseny pendents:
-
-- Format del fitxer de configuració.
 
 ## Compilació i ús
 
@@ -506,6 +503,7 @@ make test       # proves unitàries
 make clean && make debug   # amb AddressSanitizer i UBSan
 ./phileas [-c COLUMNES] [-a SEGONS] [-d IDIOMA] [fitxer.md]
                      # -a 0 desactiva l'autodesat; -d activa l'ortografia en arrencar
+./phileas --config > ~/.config/phileas/phileasrc   # configuració de mostra
 ```
 
 ## Entorn de desenvolupament
@@ -526,12 +524,13 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 - [x] **F6** — Correcció ortogràfica amb hunspell
 - [ ] **F6b** — Ajuda: F1 obre una finestra amb una guia de totes les dreceres de teclat
 - [x] **F6c** — Mode màquina d'escriure («typewriter»): la línia on s'escriu es manté a una altura fixa de la pantalla i el text no arriba mai a baix de tot (pensat per a una pantalla en vertical)
-- [ ] **F7** — Configuració i proves en Raspberry Pi
+- [x] **F7** — Configuració i proves en Raspberry Pi
 - [ ] **F8** — Integració al projecte BYOK (`~/byok-build`), quan el processador estigui avançat:
   - afegir Phileas a la imatge com a paquet de buildroot;
   - afegir-hi la biblioteca `libhunspell-1.7.so.0` (compilada com a la prova del 2026-10-25) a `/usr/lib`;
   - posar els diccionaris `ca` i `es_ES` (`.aff` i `.dic`) a `/usr/share/hunspell`, on Phileas els troba sense variables d'entorn;
-  - tenir en compte el mapa de teclat de la imatge (`/usr/share/byok/teclat.map`), que Phileas ja interpreta.
+  - tenir en compte el mapa de teclat de la imatge (`/usr/share/byok/teclat.map`), que Phileas ja interpreta;
+  - exportar `PHILEAS_CONFIG=/data/phileas` al perfil (l'arrel és de només lectura), i posar els valors per defecte de la imatge a `/etc/phileas/phileasrc`.
 
 ## Registre
 
@@ -822,3 +821,26 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **A la pantalla vertical de la Pi** (58 files de text): en passar la fila 46, el cursor torna a la 29.
   - **Proves:** 1.588 comprovacions unitàries (1.586 a la Pi).
 - **2026-10-25** — Prova de l'usuari del salt 80 % → 50 %: va bé. Proposta de la configuració (F7): fitxer `phileasrc` declaratiu, amb prioritats (línia d'ordres > usuari > `/etc/phileas` > valors interns) i `PHILEAS_CONFIG` per a la Pi, on només `/data` és escrivible. Detectat un problema previ: els fitxers que no són Markdown es poden alterar en desar-los (s'ajunten línies); proposta de mode text pla. Pendent de confirmar.
+- **2026-10-25** — ✅ Proposta de configuració confirmada. **F7 completada.**
+  - **Mode text pla:**
+    - els fitxers que no acaben en `.md`, `.markdown`, `.mdown`, `.mkd` o `.txt` es carreguen línia a línia, sense ajuntar paràgrafs ni separacions;
+    - no hi ha colors de Markdown ni continuació de llistes, i l'enganxat s'insereix tal qual;
+    - es desen exactament igual, també les línies en blanc del final;
+    - la barra d'estat diu `(text)`.
+
+    El mode es tria en obrir el fitxer i es manté si es desa amb un altre nom.
+  - **Fitxer `phileasrc`:**
+    - es llegeixen `/etc/phileas/phileasrc` i després el de l'usuari: `$PHILEAS_CONFIG`, `$XDG_CONFIG_HOME/phileas` o `~/.config/phileas`;
+    - les opcions `-c`, `-a` i `-d` manen sobre tots dos, i es validen igual: un valor incorrecte atura l'arrencada amb un missatge;
+    - opcions: `columnes`, `centrar`, `colors`, `maquina-escriure` (i `-limit`, `-ancoratge`), `autodesat`, `autodesat-maxim`, `ortografia`, `idiomes`, `diccionari`, `color-capcalera-1/2/3`, `color-codi`, `color-cita`, `color-error` i `tecla.NOM`;
+    - `tecla.NOM =` (buit) treu una drecera.
+  - **Errors:** la línia s'ignora i la barra d'estat avisa de la primera (fitxer, línia i motiu) i del nombre de les altres.
+  - **Ordres:**
+    - `recarregar-configuracio` (paleta) torna als valors interns, rellegeix els fitxers i torna a aplicar la línia d'ordres;
+    - `phileas --config` escriu una plantilla completa i comentada.
+  - **Idiomes:** l'opció `idiomes` defineix la rotació de F8 (fins a 4). Sense configuració, és `ca es`, o `es ca` si la configuració regional és castellana.
+  - **Diccionari personal:** ara va al directori de configuració (`$PHILEAS_CONFIG`), i per tant a la Pi pot anar a `/data`.
+  - **Proves:**
+    - 1.628 comprovacions unitàries, també amb sanititzadors: valors correctes i incorrectes, comentaris, errors amb número de línia, prioritat sistema < usuari < línia d'ordres, tornada als valors interns, plantilla sense errors, text pla (anada i tornada exacta, i el mateix fitxer com a Markdown, que s'ajuntaria);
+    - proves interactives: columnes, `-c`, F9 i Ctrl+T configurades, errors, `idiomes = es ca`, diccionari personal a `PHILEAS_CONFIG`, i el `phileasrc` editat amb el mateix Phileas i recarregat;
+    - a la Pi: 1.626 comprovacions. El guió `/tmp/phileas/ph` fa servir `PHILEAS_CONFIG=/tmp/phileas/config`, amb una plantilla.

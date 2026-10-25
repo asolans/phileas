@@ -1,4 +1,5 @@
 #include "command.h"
+#include "config.h"
 #include "filebrowser.h"
 #include "keys.h"
 #include "render.h"
@@ -432,6 +433,21 @@ static void c_typewriter(Editor *e)
         ed_msg(e, "Desplaçament clàssic (fins a baix de tot)");
 }
 
+static void c_reload_config(Editor *e)
+{
+    char msg[256], path[1100];
+    int n;
+
+    cmd_bind_defaults();
+    n = config_load(e, CONFIG_SYSTEM, NULL, msg, sizeof msg);
+    render_colors(e);
+    config_user_path(path, sizeof path);
+    if (n)
+        ed_msg(e, "Configuració: %s", msg);
+    else
+        ed_msg(e, "Configuració recarregada (%s)", path);
+}
+
 static void c_colors(Editor *e)
 {
     e->colors = !e->colors;
@@ -481,7 +497,10 @@ static unsigned char *styles_of(Editor *e, size_t y)
     unsigned char *st = xmalloc(l->len + 1);
 
     buf_scan(&e->buf);
-    md_style(l->text, l->len, l->kind, 0, st);
+    if (e->buf.plain)
+        memset(st, 0, l->len);
+    else
+        md_style(l->text, l->len, l->kind, 0, st);
     return st;
 }
 
@@ -638,24 +657,31 @@ static void c_spell_toggle(Editor *e)
     ed_msg(e, "Ortografia activada: %s (F8 canvia l'idioma · Maj+F7 error següent)", code);
 }
 
-/* Rotació d'idiomes amb F8 */
-static const char *const rotation[] = { "ca", "es" };
-
+/* Rotació d'idiomes amb F8 (opció «idiomes» de la configuració) */
 static void c_rotate_lang(Editor *e)
 {
-    char code[16];
-    size_t n = sizeof rotation / sizeof *rotation, i;
+    char code[16], next[16];
+    int i;
 
     spell_code(e->dict, code, sizeof code);
-    for (i = 0; i < n && strcmp(code, rotation[i]); i++)
-        ;
-    if (!set_dict(e, rotation[(i + 1) % n]))
+    for (i = 0; i < e->nlangs; i++) {
+        char c[16];
+
+        spell_code(e->langs[i], c, sizeof c);
+        if (!strcmp(code, c))
+            break;
+    }
+    snprintf(next, sizeof next, "%s", e->langs[(i + 1) % e->nlangs]);
+    if (e->nlangs == 1 && !strcmp(code, next)) {
+        ed_msg(e, "Només hi ha un idioma configurat (%s): opció «idiomes»", next);
+        return;
+    }
+    if (!set_dict(e, next))
         return;
     if (e->spell)
-        ed_msg(e, "Idioma de l'ortografia: %s", rotation[(i + 1) % n]);
+        ed_msg(e, "Idioma de l'ortografia: %s", next);
     else
-        ed_msg(e, "Idioma de l'ortografia: %s (l'ortografia està desactivada: F7)",
-               rotation[(i + 1) % n]);
+        ed_msg(e, "Idioma de l'ortografia: %s (l'ortografia està desactivada: F7)", next);
 }
 
 static void c_language(Editor *e)
@@ -733,6 +759,7 @@ static const Command commands[] = {
 
     { "centrar",           c_center,     "Centra o no la columna de text", ACT_NONE },
     { "maquina-escriure",  c_typewriter, "Desplaçament: salt, línia fixa o clàssic", ACT_NONE },
+    { "recarregar-configuracio", c_reload_config, "Torna a llegir el fitxer phileasrc", ACT_NONE },
     { "colors",            c_colors,     "Activa o desactiva els colors de Markdown", ACT_NONE },
     { "obrir",             c_open,       "Obre un document amb el navegador de fitxers", ACT_NONE },
     { "nou",               c_new,        "Comença un document nou sense nom", ACT_NONE },
@@ -851,8 +878,29 @@ int cmd_bind(const char *keyname, const char *cmdname)
     return 0;
 }
 
+int cmd_unbind(const char *keyname)
+{
+    int key = key_parse(keyname);
+
+    if (key < 0)
+        return -1;
+    for (size_t i = 0; i < nbindings; i++) {
+        if (bindings[i].key == key) {
+            bindings[i] = bindings[--nbindings];
+            break;
+        }
+    }
+    return 0;
+}
+
+int cmd_config_bind(const char *keyname, const char *cmdname)
+{
+    return *cmdname ? cmd_bind(keyname, cmdname) : cmd_unbind(keyname);
+}
+
 void cmd_bind_defaults(void)
 {
+    nbindings = 0;
     for (size_t i = 0; i < sizeof default_bindings / sizeof default_bindings[0]; i++) {
         if (!cmd_find(default_bindings[i][1]))
             die("drecera per defecte amb una ordre inexistent: %s", default_bindings[i][1]);

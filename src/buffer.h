@@ -37,6 +37,10 @@ typedef struct {
 
     int     modified;
 
+    /* Text pla (fitxers que no són Markdown): cada línia del fitxer és una
+     * línia del buffer, sense ajuntar paràgrafs ni separacions */
+    int     plain;
+
     /* Interval de línies modificades des de l'últim buf_scan() */
     size_t  scan_from, scan_to;
 
@@ -86,7 +90,12 @@ void buf_rescan_all(Buffer *b);
  * buffer. */
 int  buf_gap_after(Buffer *b, size_t i);
 
+/* 1 si el nom de fitxer és de Markdown (.md, .markdown, .mdown, .mkd,
+ * .txt): els altres s'obren com a text pla. */
+int  buf_is_markdown_path(const char *path);
+
 /* Retornen 0 si va bé, o -1 amb errno. Si buf_load falla, b no canvia.
+ * El mode (b->plain) s'ha de triar abans de carregar.
  * En carregar, cada línia en blanc entre blocs es converteix en una
  * separació de paràgraf, i les línies d'un paràgraf tallat a mà s'ajunten.
  * En desar, cada separació torna a ser una línia en blanc. */

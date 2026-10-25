@@ -24,6 +24,12 @@ enum {
     SEL_MARK,   /* Ctrl+Espai: els moviments l'amplien fins que es cancel·la */
 };
 
+/* Elements amb color configurable */
+enum { PAL_H1, PAL_H2, PAL_H3, PAL_CODE, PAL_QUOTE, PAL_ERROR, PAL_N };
+#define PAL_DEFAULT (-1)   /* el color normal del terminal */
+
+#define MAX_LANGS 4
+
 typedef struct {
     Buffer  buf;
     char   *filename;          /* NULL si el document encara no té nom */
@@ -46,9 +52,13 @@ typedef struct {
     int     tw_limit;          /* % de l'alçada que el cursor no passa en baixar (salt) */
     int     tw_anchor;         /* % de l'alçada on queda el cursor després d'un salt */
     int     colors;            /* colors de Markdown */
+    short   palette[PAL_N];    /* COLOR_* de ncurses (0-7) o PAL_DEFAULT */
     int     spell;             /* marcar els errors ortogràfics */
     char    dict[64];          /* diccionari triat: "ca", "es" (F8), o el de -d o «idioma» */
     char    dict_loaded[64];   /* el que hi ha carregat; "" = cap */
+    char    langs[MAX_LANGS][16]; /* rotació de F8 */
+    int     nlangs;
+    int     spell_start;       /* activar l'ortografia en arrencar */
     int     width, height;     /* àrea de text real */
     int     margin;            /* columna de pantalla on comença el text */
 

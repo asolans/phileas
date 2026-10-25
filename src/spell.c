@@ -214,17 +214,15 @@ void spell_code(const char *name, char *out, size_t size)
     snprintf(out, size, "%.*s", (int)strcspn(env, "_-.@"), env);
 }
 
-/* Un diccionari personal per idioma: diccionari-ca.txt, diccionari-es.txt... */
+/* Un diccionari personal per idioma, al directori de configuració:
+ * diccionari-ca.txt, diccionari-es.txt... */
 static void personal_path(char *out, size_t size)
 {
-    const char *xdg = getenv("XDG_CONFIG_HOME"), *home = getenv("HOME");
-    char code[32];
+    char dir[900], code[32];
 
+    config_dir(dir, sizeof dir);
     spell_code(cur ? cur->lang : NULL, code, sizeof code);
-    if (xdg && *xdg)
-        snprintf(out, size, "%s/phileas/diccionari-%s.txt", xdg, code);
-    else
-        snprintf(out, size, "%s/.config/phileas/diccionari-%s.txt", home ? home : ".", code);
+    snprintf(out, size, "%s/diccionari-%s.txt", dir, code);
 }
 
 /* Converteix entre UTF-8 i la codificació del diccionari. Retorna una còpia

@@ -18,6 +18,7 @@ static attr_t italic_attr = A_UNDERLINE;  /* si el terminal no té cursiva */
 static attr_t mark_attr;
 static attr_t no_color;   /* atributs que el terminal no combina amb colors (ncv) */
 static int    have_colors;
+static short  default_bg = -1;
 
 /* Estils de la línia que s'està dibuixant */
 static unsigned char *styles, *errors;
@@ -38,13 +39,8 @@ static void colors_init(void)
         if (ncv > 0)
             no_color = (ncv & 2 ? A_UNDERLINE : 0) | (ncv & 16 ? A_DIM : 0) |
                        (ncv & 0x8000 ? A_ITALIC : 0);
-        init_pair(PAIR_H1, COLOR_MAGENTA, bg);
-        init_pair(PAIR_H2, COLOR_CYAN, bg);
-        init_pair(PAIR_H3, COLOR_GREEN, bg);
-        init_pair(PAIR_CODE, COLOR_YELLOW, bg);
-        init_pair(PAIR_QUOTE, COLOR_GREEN, bg);
+        default_bg = bg;
         init_pair(PAIR_MARK, COLOR_BLUE, bg);
-        init_pair(PAIR_ERROR, COLOR_RED, bg);
     }
     /* Marcadors atenuats; si el terminal no en sap, en blau */
     if (ta & A_DIM)
@@ -85,6 +81,25 @@ static attr_t style_attr(unsigned char st)
     return have_colors && pair && !(a & no_color) ? a | COLOR_PAIR(pair) : a;
 }
 
+void render_colors(Editor *e)
+{
+    static const short pairs[PAL_N] = {
+        [PAL_H1] = PAIR_H1, [PAL_H2] = PAIR_H2, [PAL_H3] = PAIR_H3,
+        [PAL_CODE] = PAIR_CODE, [PAL_QUOTE] = PAIR_QUOTE, [PAL_ERROR] = PAIR_ERROR,
+    };
+
+    if (!have_colors)
+        return;
+    for (int i = 0; i < PAL_N; i++) {
+        short fg = e->palette[i];
+
+        /* «cap»: el color normal, si el terminal en té (si no, blanc) */
+        if (fg == PAL_DEFAULT && default_bg != -1)
+            fg = COLOR_WHITE;
+        init_pair(pairs[i], fg, default_bg);
+    }
+}
+
 /* Error ortogràfic: vermell i subratllat (a la consola de Linux, només
  * vermell; sense colors, només subratllat) */
 static attr_t error_attr(attr_t a)
@@ -119,7 +134,10 @@ static void line_styles(Editor *e, size_t y)
     if (MD_BASE(l->kind) == MD_TEXT && y + 1 < e->buf.nlines &&
         MD_BASE(e->buf.lines[y + 1].kind) == MD_UNDERLINE)
         setext = strchr(e->buf.lines[y + 1].text, '=') ? 1 : 2;
-    md_style(l->text, l->len, l->kind, setext, styles);
+    if (e->buf.plain)
+        memset(styles, 0, l->len);
+    else
+        md_style(l->text, l->len, l->kind, setext, styles);
 
     memset(errors, 0, l->len);
     while (e->spell && spell_next_error(l->text, l->len, styles, from, &a, &b)) {
@@ -209,9 +227,9 @@ static void draw_status(Editor *e)
     Line *l = &e->buf.lines[e->cy];
     int rlen;
 
-    snprintf(left, sizeof left, " %s%s",
+    snprintf(left, sizeof left, " %s%s%s",
              e->filename ? e->filename : "[sense nom]",
-             e->buf.modified ? " [+]" : "");
+             e->buf.modified ? " [+]" : "", e->buf.plain ? "  (text)" : "");
     if (e->spell && spell_lang()) {
         spell_code(spell_lang(), code, sizeof code - 2);
         strcat(code, "  ");

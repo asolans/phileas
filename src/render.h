@@ -4,6 +4,9 @@
 #include "editor.h"
 
 void ui_init(void);
+
+/* Aplica els colors de e->palette (en arrencar i en recarregar la configuració). */
+void render_colors(Editor *e);
 void ui_end(void);
 
 /* Recalcula la disposició i dibuixa la pantalla (sense refresh()). */

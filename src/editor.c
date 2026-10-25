@@ -1,5 +1,6 @@
 #include "editor.h"
 #include "md.h"
+#include "spell.h"
 #include "utf8.h"
 #include "util.h"
 #include "wrap.h"
@@ -13,18 +14,34 @@
 
 void ed_init(Editor *e, int columns)
 {
+    char code[16];
+
     memset(e, 0, sizeof *e);
     buf_init(&e->buf);
     e->columns = columns;
     e->width = columns;
     e->height = 1;
     e->want_x = -1;
+    e->autosave = e->autosave_last = 30;
     e->autosave_max = 300;
     e->recenter = 1;
     e->colors = 1;
     e->tw_mode = TW_SALT;
     e->tw_limit = 80;
     e->tw_anchor = 50;
+    /* magenta, cian, verd, groc, verd, vermell (els números de COLOR_* de ncurses) */
+    e->palette[PAL_H1] = 5;
+    e->palette[PAL_H2] = 6;
+    e->palette[PAL_H3] = 2;
+    e->palette[PAL_CODE] = 3;
+    e->palette[PAL_QUOTE] = 2;
+    e->palette[PAL_ERROR] = 1;
+    /* Rotació de F8: català i castellà, començant pel de la configuració
+     * regional si és un d'aquests dos */
+    spell_code(NULL, code, sizeof code);
+    snprintf(e->langs[0], sizeof e->langs[0], "%s", strcmp(code, "es") ? "ca" : "es");
+    snprintf(e->langs[1], sizeof e->langs[1], "%s", strcmp(code, "es") ? "es" : "ca");
+    e->nlangs = 2;
 }
 
 void ed_free(Editor *e)
@@ -36,11 +53,17 @@ void ed_free(Editor *e)
 
 int ed_open(Editor *e, const char *path)
 {
+    int plain = path && !buf_is_markdown_path(path), old = e->buf.plain;
+
+    e->buf.plain = plain;
     if (!path || buf_load(&e->buf, path) < 0) {
-        if (path && errno != ENOENT)
+        if (path && errno != ENOENT) {
+            e->buf.plain = old;
             return -1;
+        }
         buf_free(&e->buf);
         buf_init(&e->buf);
+        e->buf.plain = plain;
         if (path)
             ed_msg(e, "Fitxer nou: %s", path);
     }
@@ -554,6 +577,10 @@ void ed_newline(Editor *e)
     char prefix[256];
 
     delete_selection(e);
+    if (e->buf.plain) {
+        ed_insert(e, "\n", 1);
+        return;
+    }
     l = &e->buf.lines[e->cy];
     p = md_prefix(l->text, l->len);
 

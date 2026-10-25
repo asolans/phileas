@@ -1,5 +1,6 @@
 /* Proves dels mòduls que no depenen de ncurses: make test */
 #include "buffer.h"
+#include "config.h"
 #include "dirlist.h"
 #include "editor.h"
 #include "md.h"
@@ -943,6 +944,120 @@ static void test_typewriter(void)
     ed_free(&e);
 }
 
+static char last_bind[64];
+
+static int fake_bind(const char *key, const char *cmd)
+{
+    if (!strcmp(key, "tecla-dolenta") || !strcmp(cmd, "ordre-dolenta"))
+        return -1;
+    snprintf(last_bind, sizeof last_bind, "%s=%s", key, cmd);
+    return 0;
+}
+
+static void test_config(void)
+{
+    Editor e;
+    char err[256], msg[256], sys[512], user[512];
+    FILE *f;
+
+    ed_init(&e, 72);
+#define SET(k, v) config_set(&e, k, v, err, sizeof err)
+    CHECK(SET("columnes", "60") == 0 && e.columns == 60);
+    CHECK(SET("columnes", "5") < 0 && e.columns == 60);
+    CHECK(SET("columnes", "6x") < 0);
+    CHECK(SET("centrar", "sí") == 0 && e.center == 1);
+    CHECK(SET("centrar", "no") == 0 && e.center == 0);
+    CHECK(SET("centrar", "potser") < 0);
+    CHECK(SET("maquina-escriure", "fixa") == 0 && e.tw_mode == TW_FIXA);
+    CHECK(SET("maquina-escriure", "clàssic") == 0 && e.tw_mode == TW_CLASSIC);
+    CHECK(SET("maquina-escriure", "lenta") < 0);
+    CHECK(SET("autodesat", "0") == 0 && e.autosave == 0 && e.autosave_last == 30);
+    CHECK(SET("color-codi", "blau") == 0 && e.palette[PAL_CODE] == 4);
+    CHECK(SET("color-cita", "cap") == 0 && e.palette[PAL_QUOTE] == PAL_DEFAULT);
+    CHECK(SET("color-cita", "rosa") < 0);
+    CHECK(SET("idiomes", "es ca en_US") == 0 && e.nlangs == 3 && !strcmp(e.langs[2], "en_US"));
+    CHECK(SET("idiomes", "") < 0 && e.nlangs == 3);
+    CHECK(SET("idiomes", "a b c d e") < 0);
+    CHECK(SET("diccionari", "../x") < 0);
+    CHECK(SET("colums", "60") < 0 && strstr(err, "desconeguda"));
+    config_bind_hook = fake_bind;
+    CHECK(SET("tecla.ctrl-t", "maquina-escriure") == 0 && !strcmp(last_bind, "ctrl-t=maquina-escriure"));
+    CHECK(SET("tecla.ctrl-h", "") == 0 && !strcmp(last_bind, "ctrl-h="));
+    CHECK(SET("tecla.tecla-dolenta", "desar") < 0);
+    CHECK(SET("tecla.", "desar") < 0);
+#undef SET
+    ed_free(&e);
+
+    /* Fitxers: el del sistema i després el de l'usuari, amb comentaris i errors */
+    snprintf(sys, sizeof sys, "%s/sistema", tmpdir);
+    snprintf(user, sizeof user, "%s/usuari", tmpdir);
+    f = fopen(sys, "w");
+    fputs("columnes = 50\ncolors = no\nmaquina-escriure = fixa\n", f);
+    fclose(f);
+    f = fopen(user, "w");
+    fputs("# comentari\n\n  columnes=64   # de l'usuari\nopcio-rara = 1\nsense igual\n"
+          "tecla.f9 = colors\nautodesat = 10\n", f);
+    fclose(f);
+    ed_init(&e, 72);
+    CHECK(config_load(&e, sys, user, msg, sizeof msg) == 2);
+    CHECK(strstr(msg, "usuari, línia 4") && strstr(msg, "i 1 error més"));
+    CHECK(e.columns == 64 && e.colors == 0 && e.tw_mode == TW_FIXA && e.autosave == 10);
+    CHECK(!strcmp(last_bind, "f9=colors"));
+    CHECK(!strcmp(e.dict, e.langs[0]));
+    /* Sense fitxers: es torna als valors interns */
+    CHECK(config_load(&e, "/no/existeix", "/no/existeix", msg, sizeof msg) == 0);
+    CHECK(e.columns == 72 && e.colors == 1 && e.tw_mode == TW_SALT && e.autosave == 30);
+    /* La línia d'ordres mana */
+    config_override("columnes", "40");
+    CHECK(config_load(&e, sys, "/no/existeix", msg, sizeof msg) == 0 && e.columns == 40 &&
+          e.colors == 0);
+    ed_free(&e);
+
+    /* La plantilla és un fitxer correcte amb els valors per defecte */
+    f = fopen(user, "w");
+    config_template(f);
+    fclose(f);
+    ed_init(&e, 72);
+    e.columns = 99;
+    CHECK(config_load(&e, NULL, user, msg, sizeof msg) == 0);
+    CHECK(e.columns == 40 && e.tw_limit == 80 && e.tw_anchor == 50 && e.palette[PAL_H1] == 5);
+    ed_free(&e);
+    unlink(sys);
+    unlink(user);
+    config_bind_hook = NULL;
+}
+
+static void test_plain(void)
+{
+    static const char data[] = "columnes = 72\ncentrar = no\n\n\n- llista\n    sagnat\n\n";
+    char path[512], *out;
+    Buffer b;
+    size_t n;
+
+    CHECK(buf_is_markdown_path("a.md") && buf_is_markdown_path("dir/Nota.MARKDOWN") &&
+          buf_is_markdown_path("x.txt"));
+    CHECK(!buf_is_markdown_path("phileasrc") && !buf_is_markdown_path("a.c") &&
+          !buf_is_markdown_path(".md") && !buf_is_markdown_path("dir.md/fitxer"));
+
+    snprintf(path, sizeof path, "%s/phileasrc", tmpdir);
+    write_file(path, data, sizeof data - 1);
+    buf_init(&b);
+    b.plain = 1;
+    CHECK(buf_load(&b, path) == 0 && b.plain && b.nlines == 7);
+    CHECK(!strcmp(b.lines[1].text, "centrar = no") && b.lines[2].len == 0);
+    CHECK(!buf_gap_after(&b, 0));
+    CHECK(buf_save(&b, path) == 0 && file_equals(path, data, sizeof data - 1));
+    out = buf_paste_text(&b, 0, "a\n\n\nb", 6, &n);
+    CHECK(n == 6 && !memcmp(out, "a\n\n\nb", 6));
+    free(out);
+    buf_free(&b);
+    /* El mateix fitxer com a Markdown s'ajunta (per això cal el text pla) */
+    buf_init(&b);
+    CHECK(buf_load(&b, path) == 0 && !strcmp(b.lines[0].text, "columnes = 72 centrar = no"));
+    buf_free(&b);
+    unlink(path);
+}
+
 int main(void)
 {
     /* Qualsevol configuració UTF-8 (una Raspberry amb buildroot pot no tenir C.UTF-8) */
@@ -969,6 +1084,8 @@ int main(void)
     test_dirlist();
     test_spell();
     test_typewriter();
+    test_plain();
+    test_config();
     rmdir(tmpdir);
 
     printf("%d comprovacions, %d errors\n", checks, failures);

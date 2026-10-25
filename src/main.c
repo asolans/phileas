@@ -1,5 +1,6 @@
 #include "autosave.h"
 #include "command.h"
+#include "config.h"
 #include "editor.h"
 #include "keys.h"
 #include "render.h"
@@ -18,48 +19,70 @@
 
 #define PHILEAS_VERSION  "0.1.0"
 #define DEFAULT_COLUMNS  72
-#define DEFAULT_AUTOSAVE 30     /* segons sense escriure abans de desar sol */
 
 static void usage(FILE *f)
 {
     fputs("Ús: phileas [-c COLUMNES] [-a SEGONS] [-d IDIOMA] [FITXER]\n"
+          "     phileas --config > ~/.config/phileas/phileasrc\n"
           "\n"
-          "  -c N   amplada del text en columnes (per defecte 72)\n"
-          "  -a N   desa sol després de N segons sense escriure (per defecte 30;\n"
-          "         0 el desactiva). Desa sobre el mateix fitxer.\n"
-          "  -d ID  activa l'ortografia amb aquest diccionari: ca, es, en_US...\n"
-          "         Sense -d, està desactivada fins que es prem F7 i fa servir\n"
-          "         l'idioma de la configuració regional. F8 alterna ca i es.\n"
-          "  -h     mostra aquesta ajuda\n"
-          "  -v     mostra la versió\n", f);
+          "  -c N      amplada del text en columnes (per defecte 72)\n"
+          "  -a N      desa sol després de N segons sense escriure (per defecte 30;\n"
+          "            0 el desactiva). Desa sobre el mateix fitxer.\n"
+          "  -d ID     activa l'ortografia amb aquest diccionari: ca, es, en_US...\n"
+          "            (-d no la desactiva). Sense -d, F7 l'activa i F8 alterna ca i es.\n"
+          "  --config  escriu un fitxer de configuració amb els valors per defecte\n"
+          "  -h        mostra aquesta ajuda\n"
+          "  -v        mostra la versió\n"
+          "\n"
+          "Configuració: /etc/phileas/phileasrc i després $PHILEAS_CONFIG/phileasrc\n"
+          "(o ~/.config/phileas/phileasrc). Les opcions -c, -a i -d manen sobre tots dos.\n",
+          f);
+}
+
+/* Una opció de la línia d'ordres: es comprova ara (si és incorrecta, no
+ * s'arrenca) i s'aplica després dels fitxers de configuració. */
+static void cli_option(const char *key, const char *value)
+{
+    Editor scratch;
+    char err[256];
+    int bad;
+
+    ed_init(&scratch, DEFAULT_COLUMNS);
+    bad = config_set(&scratch, key, value, err, sizeof err) < 0;
+    ed_free(&scratch);
+    if (bad) {
+        fprintf(stderr, "phileas: %s: %s\n", key, err);
+        exit(2);
+    }
+    config_override(key, value);
 }
 
 int main(int argc, char **argv)
 {
     Editor e;
-    int columns = DEFAULT_COLUMNS, autosave = DEFAULT_AUTOSAVE;
-    const char *dict = NULL;
-    int opt;
+    char cfg_msg[256];
+    int opt, cfg_errors;
 
     setlocale(LC_ALL, "");
+    if (argc > 1 && !strcmp(argv[1], "--config")) {
+        config_template(stdout);
+        return 0;
+    }
     while ((opt = getopt(argc, argv, "a:c:d:hv")) != -1) {
         switch (opt) {
         case 'c':
-            columns = atoi(optarg);
-            if (columns < 10 || columns > 1000) {
-                fputs("phileas: les columnes han d'estar entre 10 i 1000\n", stderr);
-                return 2;
-            }
+            cli_option("columnes", optarg);
             break;
         case 'a':
-            autosave = atoi(optarg);
-            if (autosave < 0 || autosave > 86400) {
-                fputs("phileas: l'autodesat ha d'estar entre 0 i 86400 segons\n", stderr);
-                return 2;
-            }
+            cli_option("autodesat", optarg);
             break;
         case 'd':
-            dict = optarg;
+            if (!strcmp(optarg, "no")) {
+                cli_option("ortografia", "no");
+            } else {
+                cli_option("diccionari", optarg);
+                cli_option("ortografia", "si");
+            }
             break;
         case 'h':
             usage(stdout);
@@ -77,8 +100,11 @@ int main(int argc, char **argv)
         return 2;
     }
 
-    ed_init(&e, columns);
-    e.autosave = autosave;
+    ed_init(&e, DEFAULT_COLUMNS);
+    cmd_bind_defaults();
+    config_bind_hook = cmd_config_bind;
+    cfg_errors = config_load(&e, CONFIG_SYSTEM, NULL, cfg_msg, sizeof cfg_msg);
+
     if (optind < argc) {
         const char *path = argv[optind];
 
@@ -90,33 +116,31 @@ int main(int argc, char **argv)
     }
     if (strcmp(nl_langinfo(CODESET), "UTF-8") != 0)
         ed_msg(&e, "Avís: la configuració regional no és UTF-8; els accents no es veuran bé");
+    if (cfg_errors)
+        ed_msg(&e, "Configuració: %s", cfg_msg);
 
     ui_init();
     die_hook = ui_end;
-    cmd_bind_defaults();
+    render_colors(&e);
 
-    /* L'ortografia només s'activa en arrencar si es demana amb -d (si no,
-     * amb F7 o l'ordre «ortografia»). El diccionari triga una mica a
+    /* L'ortografia només s'activa en arrencar si es demana (-d o l'opció
+     * «ortografia»; si no, amb F7). El diccionari triga una mica a
      * carregar-se (segons, en una Raspberry Pi petita): primer es mostra el
      * document. */
-    if (dict)
-        snprintf(e.dict, sizeof e.dict, "%s", dict);
-    else
-        spell_code(NULL, e.dict, sizeof e.dict);
-    if (dict && strcmp(dict, "no")) {
+    if (e.spell_start) {
         char msg[sizeof e.msg];
 
         snprintf(msg, sizeof msg, "%s", e.msg);
         ed_msg(&e, "Carregant el diccionari…");
         render(&e);
         refresh();
-        e.spell = spell_open(dict) == 0;
-        if (e.spell)
-            snprintf(e.dict_loaded, sizeof e.dict_loaded, "%s", dict);
-        if (e.spell)
+        e.spell = spell_open(e.dict) == 0;
+        if (e.spell) {
+            snprintf(e.dict_loaded, sizeof e.dict_loaded, "%s", e.dict);
             snprintf(e.msg, sizeof e.msg, "%s", msg);
-        else
+        } else {
             ed_msg(&e, "Ortografia desactivada: %s", spell_error());
+        }
     }
 
     e.last_input = now_seconds();
