@@ -99,7 +99,12 @@ static void c_paste(Editor *e)
 static void c_center(Editor *e)
 {
     e->center = !e->center;
-    ed_msg(e, e->center ? "Columna centrada" : "Columna a l'esquerra");
+    if (!e->center)
+        ed_msg(e, "Columna a l'esquerra");
+    else if (COLS > e->columns)
+        ed_msg(e, "Columna centrada");
+    else
+        ed_msg(e, "No hi ha marge per centrar (terminal %d < text %d)", COLS, e->columns);
 }
 
 static void c_goto_line(Editor *e)

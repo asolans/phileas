@@ -275,6 +275,57 @@ Lliures per al futur: Ctrl+D, Ctrl+E, Ctrl+J, Ctrl+K, Ctrl+T, Ctrl+U, F4–F6, F
 
 **Estat de la decisió:** ✅ Confirmada (2026-10-25).
 
+## Model de paràgrafs (proposta, pendent de confirmar)
+
+**Petició:** un Enter separa paràgrafs. A la pantalla, la separació es veu com una fila en blanc que no existeix al buffer. Al fitxer Markdown hi ha la separació normal de paràgrafs: una línia en blanc real.
+
+**Model:** cada línia del buffer és un bloc (paràgraf, capçalera, element de llista…).
+- **Desar:** entre dos blocs s'escriu `\n\n` (separació de paràgraf). Entre dos blocs *units* s'escriu `\n`, sense línia en blanc.
+- **Carregar:** cada línia en blanc entre blocs es converteix en una separació i desapareix del buffer.
+- **Pantalla:** una fila buida visual després de cada bloc no unit.
+
+**Blocs units** (un sol `\n` al fitxer, sense fila visual entre ells):
+- elements consecutius d'una llista;
+- línies consecutives d'una cita (`>`);
+- files d'una taula (`|`);
+- línies dins d'un bloc de codi (` ``` `) i d'una capçalera de metadades YAML (`---` al principi);
+- una línia acabada en salt dur (dos espais o `\` al final).
+
+**Fitxers amb paràgrafs tallats a mà:** dues línies de text seguides que no formen un bloc unit són un sol paràgraf en Markdown. En carregar s'ajunten amb un espai. El significat del document no canvia, però el fitxer desat ja no tindrà els talls.
+
+**Línies buides al buffer:** si es prem Enter dues vegades, queda una línia buida. Es desa com una línia en blanc addicional i es torna a carregar igual. Funciona en tots dos sentits: el fitxer amb dues línies en blanc torna a tenir una línia buida al buffer.
+
+**Estimació de pàgines:** cada separació compta mitja línia.
+
+## Autodesat (planificat a la F3)
+
+- **Comportament:** desa sobre el mateix document, sense còpies de seguretat. Fa servir el mateix desat atòmic que Ctrl+S.
+- **Quan desa:** quan hi ha canvis sense desar i fa *N* segons que no es prem cap tecla. Si s'escriu sense parar, desa com a molt cada *M* segons, perquè no es perdi feina en una sessió llarga.
+- **Configuració:**
+  - opcions `autodesat = 30` (segons d'inactivitat; `0` = desactivat) i `autodesat-maxim = 300`;
+  - fins que hi hagi el fitxer de configuració (F7), l'opció de línia d'ordres `-a SEGONS`;
+  - ordre `autodesat` a la paleta, per activar-lo o desactivar-lo durant la sessió.
+- **Documents sense nom:** no es desen sols. La barra d'estat avisa que cal desar-los primer amb un nom.
+- **Avís:** la barra mostra breument «desat automàticament hh:mm».
+- **Implementació:** la lectura de tecles espera amb un temps límit (`timeout()` de ncurses) en lloc de bloquejar-se. No cal cap fil ni consum en repòs.
+- **Per què a la F3:** com que l'autodesat sobreescriu l'original, ha d'anar amb el desfer. Si es desa sol un canvi no volgut, s'ha de poder recuperar amb Ctrl+Z.
+
+## Colors mínims de Markdown (planificat a la F4)
+
+Només atributs del terminal, que funcionen també a la consola de Linux i en terminals de 8 colors:
+
+| Element | Aspecte |
+|---------|---------|
+| Capçaleres `#` | Negreta + color (un per nivell, com a molt 3 de diferents) |
+| `**negreta**` | Negreta |
+| `*cursiva*` | Cursiva si el terminal en té; si no, subratllat |
+| `` `codi` `` i blocs ` ``` ` | Color atenuat |
+| Marcadors (`#`, `**`, `-`, `>`) | Atenuats, per destacar el text |
+| Cites `>` | Color suau |
+| Enllaços `[text](url)` | Text subratllat, URL atenuada |
+
+L'estat de bloc (dins de codi, de metadades…) es calcula una sola vegada per línia i es guarda a la cache. És el mateix que necessita el model de paràgrafs per saber quins blocs van units.
+
 ## Arquitectura
 
 ```
@@ -322,7 +373,8 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 - [x] **F0** — Decisions d'arquitectura: llenguatge, buffer, wordwrap, dreceres
 - [x] **F1** — Esquelet: obrir, mostrar, desplaçar-se, desar un fitxer UTF-8 (inclou el wordwrap suau, necessari per mostrar els paràgrafs)
 - [x] **F2** — Edició bàsica, sagnat penjant de llistes i cites, columna centrada
-- [ ] **F3** — Desfer/refer, cerca i substitució
+- [ ] **F2b** — Separació visual de paràgrafs (vegeu «Model de paràgrafs»; regles pendents de confirmar)
+- [ ] **F3** — Desfer/refer, cerca i substitució, **autodesat**
 - [ ] **F4** — Colors mínims de Markdown (capçaleres, èmfasi)
 - [ ] **F5** — Navegador de fitxers
 - [ ] **F6** — Correcció ortogràfica amb hunspell
@@ -385,3 +437,8 @@ make clean && make debug   # amb AddressSanitizer i UBSan
     - 1.281 comprovacions unitàries, també amb sanititzadors;
     - proves interactives de totes les operacions;
     - escriure al mig d'un document de 2,7 MB: ~60 ms de CPU per a 210 pulsacions, càrrega inclosa.
+- **2026-10-25** — Prova de l'usuari de la F2: l'edició és correcta.
+  - **Centrat:** el terminal de l'aplicació fa 54 columnes, menys que la columna de text (72), i no hi ha marge per centrar. Ara el missatge ho explica en lloc de dir «Columna centrada».
+  - **Peticions:**
+    - separació de paràgrafs estrictament visual a la pantalla, amb separació normal al fitxer Markdown: model proposat a «Model de paràgrafs», pendent de confirmar;
+    - autodesat configurable sobre el mateix document: planificat a la F3.
