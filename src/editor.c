@@ -23,8 +23,8 @@ void ed_init(Editor *e, int columns)
     e->recenter = 1;
     e->colors = 1;
     e->tw_mode = TW_SALT;
-    e->tw_limit = 85;
-    e->tw_anchor = 55;
+    e->tw_limit = 80;
+    e->tw_anchor = 50;
 }
 
 void ed_free(Editor *e)

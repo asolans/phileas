@@ -367,15 +367,15 @@ La consola de Linux no combina el subratllat ni l'atenuat amb colors (capacitat 
 
 ### Proposta: **un sol mecanisme amb dos paràmetres, i el salt (A) per defecte**
 
-- **Límit** (per defecte, el 85 % de l'alçada): si el cursor el passa en baixar, el text es desplaça.
-- **Ancoratge** (per defecte, el 55 %, «una mica per sota de la meitat»): la fila on queda el cursor després del desplaçament.
+- **Límit** (per defecte, el 80 % de l'alçada; inicialment el 85 %): si el cursor el passa en baixar, el text es desplaça.
+- **Ancoratge** (per defecte, el 50 %; inicialment el 55 %): la fila on queda el cursor després del desplaçament.
 
 Amb aquests dos valors surten els tres modes:
 
 | Mode | Límit | Ancoratge |
 |------|-------|-----------|
-| `salt` (per defecte) | 85 % | 55 % |
-| `fixa` | 55 % | 55 % (el cursor no es mou de la fila) |
+| `salt` (per defecte) | 80 % | 50 % |
+| `fixa` | 50 % | 50 % (el cursor no es mou de la fila) |
 | `classic` | 100 % | 100 % (el comportament actual) |
 
 **Detalls:**
@@ -744,3 +744,7 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **Mode clàssic:** sense espai en blanc a dalt.
   - **Implementació:** `top_blank`, les files en blanc per sobre de l'inici del document, i `recenter`, que activen `ed_open` i `ed_init`.
   - **Proves:** 1.587 comprovacions unitàries (1.585 a la Pi) i proves interactives: sense fitxer, fitxer nou, document curt, Ctrl+N i Ctrl+O.
+- **2026-10-25** — Petició de l'usuari: la relació de salts, una mica més amunt que 55 %–85 %.
+  - **Nous valors per defecte:** límit 80 % i ancoratge 50 %. El salt manté la mida (un 30 % de l'alçada).
+  - **A la pantalla vertical de la Pi** (58 files de text): en passar la fila 46, el cursor torna a la 29.
+  - **Proves:** 1.588 comprovacions unitàries (1.586 a la Pi).
