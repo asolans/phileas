@@ -347,6 +347,55 @@ Colors triats (provisionals, configurables a la F7):
 
 La consola de Linux no combina el subratllat ni l'atenuat amb colors (capacitat `ncv` del terminfo); en aquests casos es manté l'atribut i es treu el color. L'ordre `colors` de la paleta els activa o els desactiva.
 
+## Mode màquina d'escriure (F6c, proposta pendent de confirmar)
+
+### Context
+
+- **La pantalla de l'usuari:** a la Pi, en vertical, fa 1920×1200 a 16 bits, amb una consola de 60 files × 75 columnes (lletra de 16×32), de les quals 58 són de text.
+- **Comportament actual:** el cursor pot baixar fins a l'última fila, i a partir d'aquí cada fila nova desplaça el text una línia. S'escriu sempre a baix de tot.
+- **Referent:** WordGrinder. S'escriu baixant per la pantalla. Quan el cursor arriba gairebé a baix, el text puja d'un salt i el cursor queda una mica per sota de la meitat.
+
+### Opcions
+
+| | A. Salt (WordGrinder) | B. Línia fixa (typewriter pur) | C. Clàssic (l'actual) |
+|---|---|---|---|
+| On s'escriu | Entre la meitat i el 85 % de l'alçada | Sempre a la mateixa fila | A baix de tot |
+| Moviment del text | Un salt cada ~17 files (amb 58 files) | Una línia a cada fila nova | Una línia a cada fila nova |
+| Context visible a sobre | Entre un 55 % i un 85 % de la pantalla | Fix, p. ex. un 55 % | Tota la pantalla |
+| Cost a la Pi | Un redibuix sencer de tant en tant | Redibuix sencer a cada fila: la consola girada no té acceleració | Igual que B |
+| Distracció | Mínima: el text es queda quiet mentre s'escriu | El text es mou contínuament | El text es mou i s'escriu al límit |
+
+### Proposta: **un sol mecanisme amb dos paràmetres, i el salt (A) per defecte**
+
+- **Límit** (per defecte, el 85 % de l'alçada): si el cursor el passa en baixar, el text es desplaça.
+- **Ancoratge** (per defecte, el 55 %, «una mica per sota de la meitat»): la fila on queda el cursor després del desplaçament.
+
+Amb aquests dos valors surten els tres modes:
+
+| Mode | Límit | Ancoratge |
+|------|-------|-----------|
+| `salt` (per defecte) | 85 % | 55 % |
+| `fixa` | 55 % | 55 % (el cursor no es mou de la fila) |
+| `classic` | 100 % | 100 % (el comportament actual) |
+
+**Detalls:**
+
+- **Final del document:** es pot desplaçar més enllà de l'última línia, de manera que en escriure al final el text no arriba mai a baix: per sota del cursor hi ha espai en blanc.
+- **Pujar amb el cursor:** quan surt per dalt, es col·loca a l'ancoratge, i així també es veu el context de sobre. A l'inici del document no hi ha espai en blanc per dalt: el cursor queda on toqui.
+- **Salts llargs** (obrir un document, Ctrl+Fi, cerca, anar a línia, desfer lluny): el cursor queda a l'ancoratge, i no a baix de tot com ara.
+- **RePàg/AvPàg:** el cursor manté la seva fila de pantalla.
+- **Canvi de mida o gir de pantalla:** els percentatges es tornen a aplicar a la nova alçada.
+- **Ordre `maquina-escriure`** a la paleta: passa per `salt` → `fixa` → `classic`. Els percentatges, i el mode per defecte, aniran al fitxer de configuració (F7).
+- **Implementació:** tot és a `ed_layout()`, que ja decideix la fila de dalt. Cal calcular la fila de pantalla del cursor (com a molt, recórrer l'alçada de la pantalla) i aplicar-hi les dues regles. No afecta el buffer, el wordwrap ni el model de paràgrafs.
+
+**Per què el salt per defecte:**
+
+- és el que demana l'usuari i el que fa WordGrinder;
+- el text es queda quiet mentre s'escriu;
+- a la Pi, amb la consola girada (sense acceleració), redibuixar la pantalla sencera a cada fila nova probablement es notaria. El salt només ho fa una vegada cada ~17 files. Aquest punt s'ha de mesurar a la consola real; si la línia fixa resultés fluida, també hi és com a mode.
+
+**Estat de la decisió:** pendent de confirmar.
+
 ## Arquitectura
 
 ```
@@ -674,3 +723,4 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **Proves:** 1.561 comprovacions unitàries, també amb sanititzadors (dos diccionaris, cache independent per idioma, paraules ignorades compartides, descart del menys usat).
   - **A la Pi, per provar-ho:** `/tmp/phileas/ph FITXER`, un guió que arrenca `phileas-nou` amb la biblioteca i els diccionaris de `/tmp/phileas`.
 - **2026-10-25** — Decisió de l'usuari: quan el processador estigui avançat, s'integrarà al projecte BYOK, i llavors s'hi afegiran `libhunspell` i els diccionaris a `/usr`. Anotat al full de ruta com a **F8**.
+- **2026-10-25** — Anàlisi del mode màquina d'escriure (F6c). Proposta: un sol mecanisme amb dos paràmetres (límit i ancoratge), amb el salt a l'estil WordGrinder per defecte (85 % → 55 %) i els modes `fixa` i `classic` com a alternatives. Pendent de confirmar.
