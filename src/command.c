@@ -3,6 +3,8 @@
 #include "keys.h"
 #include "render.h"
 #include "search.h"
+#include "spell.h"
+#include "utf8.h"
 #include "tui.h"
 #include "util.h"
 
@@ -424,6 +426,191 @@ static void c_colors(Editor *e)
     ed_msg(e, e->colors ? "Colors de Markdown activats" : "Colors de Markdown desactivats");
 }
 
+/* ---- Ortografia ---- */
+
+static int need_dict(Editor *e)
+{
+    if (spell_lang())
+        return 1;
+    ed_msg(e, "No hi ha diccionari: %s", spell_error());
+    return 0;
+}
+
+/* Estils de Markdown de la línia y, per no revisar el codi ni els marcadors
+ * (cal alliberar-los). */
+static unsigned char *styles_of(Editor *e, size_t y)
+{
+    Line *l = &e->buf.lines[y];
+    unsigned char *st = xmalloc(l->len + 1);
+
+    buf_scan(&e->buf);
+    md_style(l->text, l->len, l->kind, 0, st);
+    return st;
+}
+
+/* Error ortogràfic següent a partir de (y, x), fent la volta al document. */
+static int find_error(Editor *e, size_t y, size_t x, Pos *a, Pos *z)
+{
+    for (size_t k = 0; k <= e->buf.nlines; k++) {
+        size_t line = (y + k) % e->buf.nlines, from = k == 0 ? x : 0, s, t;
+        Line *l = &e->buf.lines[line];
+        unsigned char *st = styles_of(e, line);
+        int found = spell_next_error(l->text, l->len, st, from, &s, &t);
+
+        free(st);
+        /* A l'última volta, només fins on s'ha començat */
+        if (found && (k < e->buf.nlines || s < x)) {
+            a->line = z->line = line;
+            a->col = s;
+            z->col = t;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void c_spell_next(Editor *e)
+{
+    Pos a, z, from;
+    Line *l;
+
+    if (!need_dict(e))
+        return;
+    if (!ed_selection(e, &a, &from)) {
+        from.line = e->cy;
+        from.col = e->cx;
+    }
+    if (!find_error(e, from.line, from.col, &a, &z)) {
+        ed_msg(e, "Cap error ortogràfic");
+        return;
+    }
+    if (a.line < from.line || (a.line == from.line && a.col < from.col))
+        ed_msg(e, "(des del principi) ");
+    else
+        e->msg[0] = '\0';
+    ed_select(e, a, z);
+    l = &e->buf.lines[a.line];
+    snprintf(e->msg + strlen(e->msg), sizeof e->msg - strlen(e->msg),
+             "«%.*s»: Alt+Enter suggeriments · F7 següent", (int)(z.col - a.col), l->text + a.col);
+}
+
+/* Paraula seleccionada (dins d'una línia) o sota el cursor. */
+static int word_at_cursor(Editor *e, Pos *a, Pos *z)
+{
+    Line *l = &e->buf.lines[e->cy];
+    size_t from = 0, s, t;
+
+    if (ed_selection(e, a, z))
+        return a->line == z->line && z->col > a->col;
+    while (spell_next_word(l->text, l->len, from, &s, &t)) {
+        if (s <= e->cx && e->cx <= t) {
+            a->line = z->line = e->cy;
+            a->col = s;
+            z->col = t;
+            return 1;
+        }
+        from = t;
+    }
+    return 0;
+}
+
+static void c_suggest(Editor *e)
+{
+    Pos a, z;
+    char word[256], question[512], keys[16] = "";
+    char **list;
+    int n, shown = 0, c;
+    size_t len, nk = 0;
+
+    if (!need_dict(e))
+        return;
+    if (!word_at_cursor(e, &a, &z)) {
+        ed_msg(e, "No hi ha cap paraula al cursor");
+        return;
+    }
+    len = z.col - a.col;
+    if (len >= sizeof word)
+        len = sizeof word - 1;
+    memcpy(word, e->buf.lines[a.line].text + a.col, len);
+    word[len] = '\0';
+    if (spell_check(word, len)) {
+        ed_msg(e, "«%s» és correcta", word);
+        return;
+    }
+    ed_msg(e, "Buscant suggeriments…");
+    render(e);
+    refresh();
+    n = spell_suggest(word, len, &list);
+
+    /* Tants suggeriments com càpiguen a la línia (fins a 9) */
+    snprintf(question, sizeof question, "«%s»:", word);
+    for (int i = 0; i < n && i < 9; i++) {
+        char item[300];
+
+        snprintf(item, sizeof item, " %d %s ", i + 1, list[i]);
+        if ((int)utf8_count(question, strlen(question)) + (int)utf8_count(item, strlen(item)) +
+            34 > COLS)
+            break;
+        strcat(question, item);
+        keys[nk++] = (char)('1' + i);
+        shown++;
+    }
+    if (n == 0)
+        strcat(question, " (sense suggeriments)");
+    strcat(question, " · a afegir · i ignorar · Esc ");
+    keys[nk++] = 'a';
+    keys[nk++] = 'i';
+    keys[nk] = '\0';
+
+    c = prompt_choice(e, question, keys);
+    if (c >= '1' && c < '1' + shown) {
+        const char *rep = list[c - '1'];
+
+        ed_select(e, a, z);
+        ed_insert(e, rep, strlen(rep));
+        ed_msg(e, "«%s» → «%s»", word, rep);
+    } else if (c == 'a') {
+        if (spell_add(word, len) < 0)
+            ed_msg(e, "«%s» afegida, però no s'ha pogut desar el diccionari personal: %s",
+                   word, strerror(errno));
+        else
+            ed_msg(e, "«%s» afegida al diccionari personal", word);
+    } else if (c == 'i') {
+        spell_ignore(word, len);
+        ed_msg(e, "«%s» s'ignorarà fins que es tanqui Phileas", word);
+    } else {
+        e->msg[0] = '\0';
+    }
+    spell_free_list(list, n);
+}
+
+static void c_spell_toggle(Editor *e)
+{
+    if (!e->spell && !need_dict(e))
+        return;
+    e->spell = !e->spell;
+    ed_msg(e, e->spell ? "Ortografia activada (%s)" : "Ortografia desactivada", spell_lang());
+}
+
+static void c_language(Editor *e)
+{
+    char name[64];
+
+    snprintf(name, sizeof name, "%s", spell_lang() ? spell_lang() : "");
+    if (!prompt(e, "Diccionari (ca, ca_ES-valencia, es_ES, en_US...): ", name, sizeof name, NULL) ||
+        !name[0])
+        return;
+    ed_msg(e, "Carregant el diccionari %s…", name);
+    render(e);
+    refresh();
+    if (spell_open(name) < 0) {
+        ed_msg(e, "No s'ha pogut carregar: %s", spell_error());
+        return;
+    }
+    e->spell = 1;
+    ed_msg(e, "Diccionari: %s", spell_lang());
+}
+
 static void c_autosave(Editor *e)
 {
     if (e->autosave) {
@@ -498,6 +685,10 @@ static const Command commands[] = {
     { "cercar-anterior",   c_find_prev,  "Coincidència anterior", ACT_NONE },
     { "substituir",        c_replace,    "Substitueix un text, amb confirmació", ACT_NONE },
     { "autodesat",         c_autosave,   "Activa o desactiva l'autodesat", ACT_NONE },
+    { "revisar-ortografia", c_spell_next, "Selecciona l'error ortogràfic següent", ACT_NONE },
+    { "suggeriments",      c_suggest,    "Suggeriments per a la paraula del cursor", ACT_NONE },
+    { "ortografia",        c_spell_toggle, "Marca o no els errors ortogràfics", ACT_NONE },
+    { "idioma",            c_language,   "Canvia el diccionari de l'ortografia", ACT_NONE },
 };
 
 static const char *const default_bindings[][2] = {
@@ -543,6 +734,7 @@ static const char *const default_bindings[][2] = {
     { "ctrl-g", "cercar-seguent" },   { "f3", "cercar-seguent" },
     { "alt-g", "cercar-anterior" },   { "shift-f3", "cercar-anterior" },
     { "ctrl-r", "substituir" },
+    { "f7", "revisar-ortografia" },  { "alt-enter", "suggeriments" },
 };
 
 #define MAX_BINDINGS 256

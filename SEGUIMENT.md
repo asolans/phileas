@@ -4,7 +4,7 @@ Editor de text per a consola (Linux), orientat a escriure prosa en Markdown.
 
 ## Estat
 
-- **Fase actual:** 6 — Correcció ortogràfica amb hunspell (F5 completada)
+- **Fase actual:** 6b — Ajuda amb F1 (F6 completada)
 - **Última actualització:** 2026-10-25
 
 ## Requeriments (versió inicial)
@@ -362,7 +362,7 @@ src/
   search.c      ✅ cerca (sense distingir majúscules si el patró no en té), endavant i enrere
   undo.c        ✅ historial desfer/refer per grups, amb límit de memòria (8 MB)
   autosave.c    ✅ autodesat per inactivitat i interval màxim
-  spell.c       integració amb hunspell
+  spell.c       ✅ ortografia amb hunspell (carregat amb dlopen), cache de paraules, diccionari personal
   dirlist.c     ✅ lectura i ordenació de directoris, filtre, camins i mides (sense ncurses)
   filebrowser.c ✅ navegador de fitxers a pantalla completa
   config.c      configuració (~/.config/phileas/)
@@ -380,13 +380,14 @@ Decisions de disseny pendents:
 make            # compila ./phileas
 make test       # proves unitàries
 make clean && make debug   # amb AddressSanitizer i UBSan
-./phileas [-c COLUMNES] [-a SEGONS] [fitxer.md]   # -a 0 desactiva l'autodesat
+./phileas [-c COLUMNES] [-a SEGONS] [-d IDIOMA] [fitxer.md]
+                     # -a 0 desactiva l'autodesat; -d no desactiva l'ortografia
 ```
 
 ## Entorn de desenvolupament
 
 - gcc 14.2, ncurses 6.5 (`libncurses-dev` ✅ instal·lat)
-- hunspell 1.7.2: biblioteca ✅, **`libhunspell-dev` ❌ cal instal·lar-lo** (`sudo apt install libhunspell-dev`)
+- hunspell 1.7.2: biblioteca ✅. No cal `libhunspell-dev`: Phileas carrega `libhunspell-1.7.so.0` en temps d'execució (`dlopen`) i, si no hi és, funciona sense ortografia
 - Diccionaris disponibles a `/usr/share/hunspell/`: ca, ca_ES, ca_ES-valencia, es, en_US
 
 ## Full de ruta (provisional)
@@ -398,7 +399,8 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 - [x] **F3** — Desfer/refer, cerca i substitució, autodesat
 - [x] **F4** — Colors mínims de Markdown (capçaleres, èmfasi)
 - [x] **F5** — Navegador de fitxers
-- [ ] **F6** — Correcció ortogràfica amb hunspell
+- [x] **F6** — Correcció ortogràfica amb hunspell
+- [ ] **F6b** — Ajuda: F1 obre una finestra amb una guia de totes les dreceres de teclat
 - [ ] **F7** — Configuració i proves en Raspberry Pi
 
 ## Registre
@@ -539,3 +541,32 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **Proves:**
     - 1.520 comprovacions unitàries, també amb sanititzadors;
     - proves interactives amb un emulador de pantalla mínim (terminfo propi): filtre, directoris, pare, `~`, ocults, fitxer nou, binari, canvis sense desar, `/usr/bin` (3.100 entrades) i directori sense permís.
+- **2026-10-25** — Prova de l'usuari de la F5: tot correcte. Petició afegida al full de ruta (F6b): F1 obre una finestra amb una guia de totes les dreceres de teclat.
+- **2026-10-25** — **F6 completada.**
+  - **Decisió tècnica:** hunspell es carrega en temps d'execució (`dlopen`) en lloc d'enllaçar-lo en compilar.
+    - No cal el paquet `libhunspell-dev` per compilar.
+    - Si una màquina no té hunspell, Phileas funciona igual, sense ortografia, i la barra n'explica el motiu.
+    - La biblioteca té una API C estable: Phileas hi declara les set funcions que fa servir.
+  - **Diccionari:**
+    - per defecte, el de la configuració regional (`ca_ES.UTF-8` → `ca_ES` → `ca`), i si no n'hi ha, `ca`;
+    - `-d IDIOMA` a la línia d'ordres, o l'ordre `idioma` de la paleta per canviar-lo en marxa;
+    - `-d no` no carrega l'ortografia;
+    - es busca a `$DICPATH`, `~/.local/share/hunspell`, `/usr/share/hunspell` i `/usr/share/myspell`;
+    - els diccionaris que no són UTF-8 es converteixen amb `iconv`.
+  - **A la pantalla:**
+    - els errors surten en vermell i subratllats; a la consola de Linux, només en vermell, i sense colors, només subratllats;
+    - la paraula que s'està escrivint no es marca fins que s'acaba;
+    - no es revisen el codi, els marcadors, les adreces (`http://`, `www.`, correus), els noms de fitxer (`prova.md`) ni les paraules amb xifres (`2a`, `mp3`);
+    - les paraules inclouen l'apòstrof (`l'home`, `l’home`), la ela geminada (`col·lecció`) i els pronoms amb guionet (`fes-ho`).
+  - **Ordres:**
+    - F7 (`revisar-ortografia`) selecciona l'error següent, fent la volta al document;
+    - Alt+Enter (`suggeriments`) mostra fins a 9 suggeriments per a la paraula del cursor o la seleccionada: el número la substitueix (es pot desfer), `a` l'afegeix al diccionari personal, `i` la ignora fins que es tanqui Phileas;
+    - `ortografia` (paleta) marca o no els errors.
+  - **Diccionari personal:** `~/.config/phileas/diccionari.txt`, una paraula per línia. Es carrega amb el diccionari.
+  - **Rendiment:**
+    - els resultats es guarden en una cache de paraules, de manera que cada paraula només es consulta a hunspell una vegada;
+    - el diccionari català ocupa ~17 MB de memòria;
+    - el document es mostra abans de carregar el diccionari, perquè en una Raspberry Pi petita pot trigar uns segons (pendent de mesurar a la F7);
+    - F7 en el document d'11 MB: 0,19 s de CPU.
+  - **Proves:** 1.547 comprovacions unitàries, també amb sanititzadors (tokenització i, si hi ha el diccionari català, consultes, cache, suggeriments i paraules ignorades), i proves interactives de marcatge, F7, suggeriments, afegir, ignorar, `idioma` i `-d`.
+  - **Observació:** amb la normativa del 2017, el diccionari ja no accepta «dóna» (ara «dona»).

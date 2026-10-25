@@ -34,6 +34,7 @@ typedef struct {
     int     columns;           /* amplada de text configurada */
     int     center;            /* columna de text centrada a la pantalla */
     int     colors;            /* colors de Markdown */
+    int     spell;             /* marcar els errors ortogràfics */
     int     width, height;     /* àrea de text real */
     int     margin;            /* columna de pantalla on comença el text */
 

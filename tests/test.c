@@ -3,6 +3,7 @@
 #include "dirlist.h"
 #include "md.h"
 #include "search.h"
+#include "spell.h"
 #include "utf8.h"
 #include "wrap.h"
 
@@ -763,6 +764,80 @@ static void test_dirlist(void)
     CHECK(!strcmp(out, "3,0 MB"));
 }
 
+/* Paraules de s separades per '|' */
+static const char *words(const char *s)
+{
+    static char out[256];
+    size_t from = 0, a, b, k = 0, n = strlen(s);
+
+    out[0] = '\0';
+    while (spell_next_word(s, n, from, &a, &b)) {
+        if (k)
+            out[k++] = '|';
+        memcpy(out + k, s + a, b - a);
+        k += b - a;
+        from = b;
+    }
+    out[k] = '\0';
+    return out;
+}
+
+static void test_spell(void)
+{
+    char **list;
+    int n, found = 0;
+    size_t a, b;
+    unsigned char st[64];
+    const char *s;
+
+#define WORDS(str, expect) CHECK(strcmp(words(str), expect) == 0)
+    WORDS("Hola, món!", "Hola|món");
+    WORDS("l'home i l’aigua", "l'home|i|l’aigua");
+    WORDS("col·lecció", "col·lecció");
+    WORDS("dóna-li-ho", "dóna-li-ho");
+    WORDS("'cometes' i -guions-", "cometes|i|guions");
+    WORDS("2a edició, 10è, mp3, A4", "edició");
+    WORDS("vegeu http://x.cat/a o www.y.cat", "vegeu|o");
+    WORDS("escriu a nom@x.cat ara", "escriu|a|ara");
+    WORDS("el fitxer prova.md. Fi.", "el|fitxer|Fi");
+    WORDS("final. Següent", "final|Següent");
+#undef WORDS
+
+    if (spell_open("ca") < 0) {
+        fprintf(stderr, "(sense diccionari català: %s; es salten les proves de hunspell)\n",
+                spell_error());
+        return;
+    }
+    CHECK(!strcmp(spell_lang(), "ca"));
+#define OK(w) spell_check(w, strlen(w))
+    CHECK(OK("casa"));
+    CHECK(OK("l'home"));
+    CHECK(OK("l’home"));
+    CHECK(OK("col·lecció"));
+    CHECK(OK("fes-ho"));
+    CHECK(!OK("dóna-li"));   /* sense diacrític des del 2017 */
+    CHECK(OK("Barcelona"));
+    CHECK(!OK("cassa_"));
+    CHECK(!OK("paraulla"));
+    CHECK(!OK("paraulla"));   /* des de la cache */
+    n = spell_suggest("paraulla", 8, &list);
+    for (int i = 0; i < n; i++)
+        found |= !strcmp(list[i], "paraula");
+    CHECK(found);
+    spell_free_list(list, n);
+    spell_ignore("Phileas", 7);
+    CHECK(OK("Phileas"));
+
+    s = "Una `paraulla` i paraulla";
+    md_style(s, strlen(s), MD_TEXT, 0, st);
+    CHECK(spell_next_error(s, strlen(s), st, 0, &a, &b) && a == 17 && b == 25);
+    CHECK(!spell_next_error(s, strlen(s), st, 25, &a, &b));
+    CHECK(spell_open("no_existeix") == -1 && !strcmp(spell_lang(), "ca"));
+#undef OK
+    spell_close();
+    CHECK(spell_lang() == NULL && spell_check("xyzw", 4));
+}
+
 int main(void)
 {
     if (!setlocale(LC_ALL, "C.UTF-8")) {
@@ -785,6 +860,7 @@ int main(void)
     test_undo();
     test_search();
     test_dirlist();
+    test_spell();
     rmdir(tmpdir);
 
     printf("%d comprovacions, %d errors\n", checks, failures);

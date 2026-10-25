@@ -3,6 +3,7 @@
 #include "editor.h"
 #include "keys.h"
 #include "render.h"
+#include "spell.h"
 #include "tui.h"
 #include "utf8.h"
 #include "util.h"
@@ -21,11 +22,13 @@
 
 static void usage(FILE *f)
 {
-    fputs("Ús: phileas [-c COLUMNES] [-a SEGONS] [FITXER]\n"
+    fputs("Ús: phileas [-c COLUMNES] [-a SEGONS] [-d IDIOMA] [FITXER]\n"
           "\n"
           "  -c N   amplada del text en columnes (per defecte 72)\n"
           "  -a N   desa sol després de N segons sense escriure (per defecte 30;\n"
           "         0 el desactiva). Desa sobre el mateix fitxer.\n"
+          "  -d ID  diccionari de l'ortografia: ca, es_ES, en_US... (per defecte, el\n"
+          "         de la configuració regional); -d no desactiva l'ortografia\n"
           "  -h     mostra aquesta ajuda\n"
           "  -v     mostra la versió\n", f);
 }
@@ -34,10 +37,11 @@ int main(int argc, char **argv)
 {
     Editor e;
     int columns = DEFAULT_COLUMNS, autosave = DEFAULT_AUTOSAVE;
+    const char *dict = NULL;
     int opt;
 
     setlocale(LC_ALL, "");
-    while ((opt = getopt(argc, argv, "a:c:hv")) != -1) {
+    while ((opt = getopt(argc, argv, "a:c:d:hv")) != -1) {
         switch (opt) {
         case 'c':
             columns = atoi(optarg);
@@ -52,6 +56,9 @@ int main(int argc, char **argv)
                 fputs("phileas: l'autodesat ha d'estar entre 0 i 86400 segons\n", stderr);
                 return 2;
             }
+            break;
+        case 'd':
+            dict = optarg;
             break;
         case 'h':
             usage(stdout);
@@ -86,6 +93,22 @@ int main(int argc, char **argv)
     ui_init();
     die_hook = ui_end;
     cmd_bind_defaults();
+
+    /* El diccionari triga una mica a carregar-se (segons, en una Raspberry
+     * Pi petita): primer es mostra el document */
+    if (strcmp(dict ? dict : "", "no")) {
+        char msg[sizeof e.msg];
+
+        snprintf(msg, sizeof msg, "%s", e.msg);
+        ed_msg(&e, "Carregant el diccionari…");
+        render(&e);
+        refresh();
+        e.spell = spell_open(dict) == 0;
+        if (e.spell)
+            snprintf(e.msg, sizeof e.msg, "%s", msg);
+        else
+            ed_msg(&e, "Ortografia desactivada: %s", spell_error());
+    }
 
     e.last_input = now_seconds();
     while (!e.quit) {
@@ -131,6 +154,7 @@ int main(int argc, char **argv)
     }
 
     ui_end();
+    spell_close();
     ed_free(&e);
     return 0;
 }

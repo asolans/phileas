@@ -1,6 +1,7 @@
 #include "render.h"
 #include "keys.h"
 #include "md.h"
+#include "spell.h"
 #include "tui.h"
 #include "utf8.h"
 #include "wrap.h"
@@ -11,7 +12,7 @@
 #include <wctype.h>
 
 /* Parelles de colors (fons per defecte del terminal) */
-enum { PAIR_H1 = 1, PAIR_H2, PAIR_H3, PAIR_CODE, PAIR_QUOTE, PAIR_MARK };
+enum { PAIR_H1 = 1, PAIR_H2, PAIR_H3, PAIR_CODE, PAIR_QUOTE, PAIR_MARK, PAIR_ERROR };
 
 static attr_t italic_attr = A_UNDERLINE;  /* si el terminal no té cursiva */
 static attr_t mark_attr;
@@ -19,7 +20,7 @@ static attr_t no_color;   /* atributs que el terminal no combina amb colors (ncv
 static int    have_colors;
 
 /* Estils de la línia que s'està dibuixant */
-static unsigned char *styles;
+static unsigned char *styles, *errors;
 static size_t styles_cap;
 
 static void colors_init(void)
@@ -43,6 +44,7 @@ static void colors_init(void)
         init_pair(PAIR_CODE, COLOR_YELLOW, bg);
         init_pair(PAIR_QUOTE, COLOR_GREEN, bg);
         init_pair(PAIR_MARK, COLOR_BLUE, bg);
+        init_pair(PAIR_ERROR, COLOR_RED, bg);
     }
     /* Marcadors atenuats; si el terminal no en sap, en blau */
     if (ta & A_DIM)
@@ -83,29 +85,49 @@ static attr_t style_attr(unsigned char st)
     return have_colors && pair && !(a & no_color) ? a | COLOR_PAIR(pair) : a;
 }
 
-/* Calcula els estils de la línia y (0 si els colors estan desactivats). */
+/* Error ortogràfic: vermell i subratllat (a la consola de Linux, només
+ * vermell; sense colors, només subratllat) */
+static attr_t error_attr(attr_t a)
+{
+    if (!have_colors)
+        return a | A_UNDERLINE;
+    a = (a & ~(A_COLOR | no_color)) | COLOR_PAIR(PAIR_ERROR);
+    return no_color & A_UNDERLINE ? a : a | A_UNDERLINE;
+}
+
+/* Calcula els estils i els errors ortogràfics de la línia y. */
 static void line_styles(Editor *e, size_t y)
 {
     Line *l = ed_line(e, y);
     int setext = 0;
+    size_t from = 0, a, b;
 
     if (l->len + 1 > styles_cap) {
         styles_cap = l->len + 64;
         free(styles);
+        free(errors);
         styles = malloc(styles_cap);
-        if (!styles) {
+        errors = malloc(styles_cap);
+        if (!styles || !errors) {
+            free(styles);
+            free(errors);
+            styles = errors = NULL;
             styles_cap = 0;
             return;
         }
-    }
-    if (!e->colors) {
-        memset(styles, 0, l->len);
-        return;
     }
     if (MD_BASE(l->kind) == MD_TEXT && y + 1 < e->buf.nlines &&
         MD_BASE(e->buf.lines[y + 1].kind) == MD_UNDERLINE)
         setext = strchr(e->buf.lines[y + 1].text, '=') ? 1 : 2;
     md_style(l->text, l->len, l->kind, setext, styles);
+
+    memset(errors, 0, l->len);
+    while (e->spell && spell_next_error(l->text, l->len, styles, from, &a, &b)) {
+        /* La paraula que s'està escrivint no es marca fins que s'acaba */
+        if (!(y == e->cy && b == e->cx && e->last_act == ACT_TYPE))
+            memset(errors + a, 1, b - a);
+        from = b;
+    }
 }
 
 void ui_init(void)
@@ -143,7 +165,10 @@ static void draw_row(Editor *e, Line *l, size_t r, int y, size_t s0, size_t s1)
 
         if (col + w > e->width - indent)
             break;
-        attrset(styles_cap ? style_attr(styles[i]) : 0);
+        if (styles_cap) {
+            attr_t a = e->colors ? style_attr(styles[i]) : 0;
+            attrset(errors[i] ? error_attr(a) : a);
+        }
         if (sel)
             attron(A_REVERSE);
         if (wc == L'\t') {
