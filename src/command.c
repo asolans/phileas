@@ -1,4 +1,5 @@
 #include "command.h"
+#include "filebrowser.h"
 #include "keys.h"
 #include "render.h"
 #include "search.h"
@@ -163,6 +164,73 @@ static void c_save(Editor *e)
         save_to(e, e->filename);
     else
         c_save_as(e);
+}
+
+/* Abans de canviar de document: si hi ha canvis, pregunta si cal desar-los.
+ * Retorna 0 si l'usuari cancel·la o el desat falla. */
+static int confirm_discard(Editor *e)
+{
+    int c;
+
+    if (!e->buf.modified)
+        return 1;
+    c = prompt_choice(e, "Hi ha canvis sense desar. Els vols desar? (s/n, Esc cancel·la) ", "sn");
+    if (c == 0) {
+        ed_msg(e, "Cancel·lat");
+        return 0;
+    }
+    if (c == 'n')
+        return 1;
+    c_save(e);
+    return !e->buf.modified;
+}
+
+/* 1 si el fitxer sembla binari (té bytes nuls al principi). */
+static int looks_binary(const char *path)
+{
+    char data[8192];
+    FILE *f = fopen(path, "rb");
+    size_t n;
+
+    if (!f)
+        return 0;
+    n = fread(data, 1, sizeof data, f);
+    fclose(f);
+    return memchr(data, '\0', n) != NULL;
+}
+
+static void c_open(Editor *e)
+{
+    char path[PATH_MAX];
+
+    if (!file_browser(e, path, sizeof path))
+        return;
+    if (e->filename && !strcmp(path, e->filename)) {
+        ed_msg(e, "Ja és el document obert");
+        return;
+    }
+    if (looks_binary(path)) {
+        ed_msg(e, "%s sembla un fitxer binari: no s'obre", path);
+        return;
+    }
+    if (!confirm_discard(e))
+        return;
+    e->msg[0] = '\0';
+    if (ed_open(e, path) < 0) {
+        ed_msg(e, "No s'ha pogut obrir %s: %s", path, strerror(errno));
+        return;
+    }
+    if (!e->msg[0])
+        ed_msg(e, "Obert: %s (%zu %s)", path, e->buf.nlines,
+               e->buf.nlines == 1 ? "línia" : "línies");
+}
+
+static void c_new(Editor *e)
+{
+    if (!confirm_discard(e))
+        return;
+    ed_open(e, NULL);
+    ed_msg(e, "Document nou");
 }
 
 static void c_quit(Editor *e)
@@ -415,6 +483,8 @@ static const Command commands[] = {
 
     { "centrar",           c_center,     "Centra o no la columna de text", ACT_NONE },
     { "colors",            c_colors,     "Activa o desactiva els colors de Markdown", ACT_NONE },
+    { "obrir",             c_open,       "Obre un document amb el navegador de fitxers", ACT_NONE },
+    { "nou",               c_new,        "Comença un document nou sense nom", ACT_NONE },
     { "desar",             c_save,       "Desa el document", ACT_NONE },
     { "desar-com",         c_save_as,    "Desa el document amb un altre nom", ACT_NONE },
     { "sortir",            c_quit,       "Surt de Phileas", ACT_NONE },
@@ -462,6 +532,7 @@ static const char *const default_bindings[][2] = {
     { "ctrl-x", "tallar" },  { "ctrl-c", "copiar" },  { "ctrl-v", "enganxar" },
 
     { "alt-c", "centrar" },
+    { "ctrl-o", "obrir" },            { "ctrl-n", "nou" },
     { "ctrl-s", "desar" },            { "alt-s", "desar-com" },
     { "ctrl-q", "sortir" },
     { "ctrl-l", "redibuixar" },

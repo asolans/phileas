@@ -57,6 +57,11 @@ typedef struct {
 
 void  ed_init(Editor *e, int columns);
 void  ed_free(Editor *e);
+
+/* Substitueix el document per un de nou (path NULL: sense nom). Si path no
+ * existeix, comença un fitxer nou amb aquest nom. Retorna -1 amb errno si
+ * no es pot llegir, i el document actual no canvia. */
+int   ed_open(Editor *e, const char *path);
 void  ed_msg(Editor *e, const char *fmt, ...);
 
 /* Adapta l'àrea de text a la mida del terminal i fa visible el cursor. */

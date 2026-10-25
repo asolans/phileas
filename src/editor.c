@@ -4,6 +4,7 @@
 #include "util.h"
 #include "wrap.h"
 
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,6 +28,31 @@ void ed_free(Editor *e)
     buf_free(&e->buf);
     free(e->filename);
     free(e->clip);
+}
+
+int ed_open(Editor *e, const char *path)
+{
+    if (!path || buf_load(&e->buf, path) < 0) {
+        if (path && errno != ENOENT)
+            return -1;
+        buf_free(&e->buf);
+        buf_init(&e->buf);
+        if (path)
+            ed_msg(e, "Fitxer nou: %s", path);
+    }
+    free(e->filename);
+    e->filename = path ? xstrdup(path) : NULL;
+    e->cy = e->cx = 0;
+    e->top_line = e->top_row = 0;
+    e->want_x = -1;
+    e->sel_mode = SEL_NONE;
+    e->last_act = ACT_NONE;
+    e->dirty_since = 0;
+    e->autosave_warned = 0;
+    e->quit_confirm = 0;
+    /* Normalment s'obre un document per continuar-lo: cursor al final */
+    ed_doc_end(e);
+    return 0;
 }
 
 void ed_msg(Editor *e, const char *fmt, ...)

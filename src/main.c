@@ -74,17 +74,11 @@ int main(int argc, char **argv)
     if (optind < argc) {
         const char *path = argv[optind];
 
-        if (buf_load(&e.buf, path) < 0) {
-            if (errno != ENOENT) {
-                fprintf(stderr, "phileas: %s: %s\n", path, strerror(errno));
-                ed_free(&e);
-                return 1;
-            }
-            ed_msg(&e, "Fitxer nou: %s", path);
+        if (ed_open(&e, path) < 0) {
+            fprintf(stderr, "phileas: %s: %s\n", path, strerror(errno));
+            ed_free(&e);
+            return 1;
         }
-        /* Normalment s'obre un document per continuar-lo: cursor al final */
-        ed_doc_end(&e);
-        e.filename = xstrdup(path);
     }
     if (strcmp(nl_langinfo(CODESET), "UTF-8") != 0)
         ed_msg(&e, "Avís: la configuració regional no és UTF-8; els accents no es veuran bé");

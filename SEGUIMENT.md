@@ -4,7 +4,7 @@ Editor de text per a consola (Linux), orientat a escriure prosa en Markdown.
 
 ## Estat
 
-- **Fase actual:** 5 — Navegador de fitxers (F4 completada)
+- **Fase actual:** 6 — Correcció ortogràfica amb hunspell (F5 completada)
 - **Última actualització:** 2026-10-25
 
 ## Requeriments (versió inicial)
@@ -363,10 +363,11 @@ src/
   undo.c        ✅ historial desfer/refer per grups, amb límit de memòria (8 MB)
   autosave.c    ✅ autodesat per inactivitat i interval màxim
   spell.c       integració amb hunspell
-  filebrowser.c navegació pel disc i obertura de fitxers
+  dirlist.c     ✅ lectura i ordenació de directoris, filtre, camins i mides (sense ncurses)
+  filebrowser.c ✅ navegador de fitxers a pantalla completa
   config.c      configuració (~/.config/phileas/)
 tests/
-  test.c        ✅ proves de utf8, wrap, buffer, edició i md (sense ncurses)
+  test.c        ✅ proves de utf8, wrap, buffer, edició, md, estils i dirlist (sense ncurses)
 ```
 
 Decisions de disseny pendents:
@@ -396,7 +397,7 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 - [x] **F2b** — Separació visual de paràgrafs (vegeu «Model de paràgrafs»)
 - [x] **F3** — Desfer/refer, cerca i substitució, autodesat
 - [x] **F4** — Colors mínims de Markdown (capçaleres, èmfasi)
-- [ ] **F5** — Navegador de fitxers
+- [x] **F5** — Navegador de fitxers
 - [ ] **F6** — Correcció ortogràfica amb hunspell
 - [ ] **F7** — Configuració i proves en Raspberry Pi
 
@@ -513,3 +514,28 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **Rendiment:** els estils es calculen només per a les línies visibles, una vegada per línia i dibuix. Document d'11 MB: ~10 ms més de CPU en tota la sessió de prova.
   - **Ordre nova:** `colors` (paleta) activa o desactiva els colors.
   - **Proves:** 1.495 comprovacions unitàries, també amb sanititzadors, i proves interactives amb TERM=xterm-256color, linux i vt100.
+- **2026-10-25** — Prova de l'usuari de la F4: els colors estan bé.
+- **2026-10-25** — **F5 completada.**
+  - **Obrir** (Ctrl+O): navegador de fitxers a pantalla completa.
+    - Comença al directori del document actual, amb el document seleccionat. Si no té nom, a l'últim directori visitat o al de treball.
+    - Primer `../` i els directoris, després els fitxers, per ordre alfabètic. Cada fitxer mostra la mida i la data de modificació. En terminals estrets es treu la data, i després la mida.
+    - La capçalera mostra el camí amb `~` per al directori personal. Si és massa llarg, se'n retalla el principi.
+  - **Tecles del navegador:**
+    - ↑ ↓, RePàg/AvPàg, Inici/Fi per moure's;
+    - Enter obre el fitxer o entra al directori; → entra al directori;
+    - ← (o Retrocés sense filtre) puja al directori pare i hi selecciona el que es deixa;
+    - escriure filtra la llista (sense distingir majúscules, també amb accents); Retrocés esborra el filtre;
+    - un filtre que comença per `/` o `~` és un camí: Enter hi va directament;
+    - si el filtre no coincideix amb res, Enter crea un fitxer nou amb aquest nom al directori;
+    - Ctrl+A mostra o amaga els fitxers ocults;
+    - Esc buida el filtre i, si ja és buit, surt sense obrir res.
+  - **Document actual:**
+    - si té canvis sense desar, pregunta si cal desar-los (s/n, Esc cancel·la);
+    - no torna a obrir el document que ja està obert;
+    - els fitxers binaris (amb bytes nuls) no s'obren;
+    - el porta-retalls intern es conserva: es pot copiar d'un document a l'altre.
+  - **Document nou** (Ctrl+N): document buit sense nom, amb la mateixa pregunta si hi ha canvis.
+  - **Errors:** un directori sense permís mostra el motiu i el navegador es queda on era.
+  - **Proves:**
+    - 1.520 comprovacions unitàries, també amb sanititzadors;
+    - proves interactives amb un emulador de pantalla mínim (terminfo propi): filtre, directoris, pare, `~`, ocults, fitxer nou, binari, canvis sense desar, `/usr/bin` (3.100 entrades) i directori sense permís.

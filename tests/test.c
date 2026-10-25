@@ -1,5 +1,6 @@
 /* Proves dels mòduls que no depenen de ncurses: make test */
 #include "buffer.h"
+#include "dirlist.h"
 #include "md.h"
 #include "search.h"
 #include "utf8.h"
@@ -9,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 static int failures, checks;
@@ -697,6 +699,70 @@ static void test_search(void)
     buf_free(&b);
 }
 
+static void test_dirlist(void)
+{
+    DirList l = {0};
+    char path[512], out[64];
+
+    path_join(tmpdir, "b.md", path, sizeof path);
+    write_file(path, "x", 1);
+    path_join(tmpdir, "A.md", path, sizeof path);
+    write_file(path, "", 0);
+    path_join(tmpdir, ".ocult", path, sizeof path);
+    write_file(path, "", 0);
+    path_join(tmpdir, "zdir", path, sizeof path);
+    CHECK(mkdir(path, 0700) == 0);
+
+    CHECK(dirlist_read(&l, tmpdir, 0) == 0);
+    CHECK(l.n == 3);
+    CHECK(l.n == 3 && !strcmp(l.items[0].name, "zdir") && l.items[0].is_dir);  /* directoris primer */
+    CHECK(l.n == 3 && !strcmp(l.items[1].name, "A.md") && !strcmp(l.items[2].name, "b.md"));
+    CHECK(l.n == 3 && l.items[2].size == 1);
+    CHECK(dirlist_read(&l, tmpdir, 1) == 0 && l.n == 4);
+    dirlist_free(&l);
+    CHECK(l.n == 0 && l.items == NULL);
+    path_join(tmpdir, "no-existeix", path, sizeof path);
+    CHECK(dirlist_read(&l, path, 0) == -1 && l.n == 0);
+
+    path_join(tmpdir, "zdir", path, sizeof path);
+    rmdir(path);
+    path_join(tmpdir, "b.md", path, sizeof path);
+    unlink(path);
+    path_join(tmpdir, "A.md", path, sizeof path);
+    unlink(path);
+    path_join(tmpdir, ".ocult", path, sizeof path);
+    unlink(path);
+
+    CHECK(dirlist_match("Capítol.md", ""));
+    CHECK(dirlist_match("Capítol.md", "cap"));
+    CHECK(dirlist_match("Capítol.md", "ÍTOL"));
+    CHECK(dirlist_match("Capítol.md", ".md"));
+    CHECK(!dirlist_match("Capítol.md", "capitol"));
+    CHECK(!dirlist_match("a", "ab"));
+
+    path_parent("/home/u/doc", out, sizeof out);
+    CHECK(!strcmp(out, "/home/u"));
+    path_parent("/home", out, sizeof out);
+    CHECK(!strcmp(out, "/"));
+    path_parent("/", out, sizeof out);
+    CHECK(!strcmp(out, "/"));
+    path_join("/", "etc", out, sizeof out);
+    CHECK(!strcmp(out, "/etc"));
+    path_join("/home", "u", out, sizeof out);
+    CHECK(!strcmp(out, "/home/u"));
+
+    format_size(0, out, sizeof out);
+    CHECK(!strcmp(out, "0 B"));
+    format_size(1023, out, sizeof out);
+    CHECK(!strcmp(out, "1023 B"));
+    format_size(1536, out, sizeof out);
+    CHECK(!strcmp(out, "1,5 KB"));
+    format_size(20 * 1024, out, sizeof out);
+    CHECK(!strcmp(out, "20 KB"));
+    format_size((off_t)3 << 20, out, sizeof out);
+    CHECK(!strcmp(out, "3,0 MB"));
+}
+
 int main(void)
 {
     if (!setlocale(LC_ALL, "C.UTF-8")) {
@@ -718,6 +784,7 @@ int main(void)
     test_paste();
     test_undo();
     test_search();
+    test_dirlist();
     rmdir(tmpdir);
 
     printf("%d comprovacions, %d errors\n", checks, failures);
