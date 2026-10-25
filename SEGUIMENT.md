@@ -51,7 +51,7 @@ Riscos i mitigacions:
 
 Alternativa raonable: **Lua amb nucli en C** (C per a pantalla i buffer, Lua per a configuració i extensions). Es pot afegir més endavant sense reescriure res si el nucli es dissenya en C.
 
-**Estat de la decisió:** ⏳ pendent de confirmar.
+**Estat de la decisió:** ✅ Confirmada (2026-10-25): **C sol**, amb un fitxer de configuració declaratiu i un registre d'ordres amb nom des de la F1. Lua queda com a possible ampliació futura.
 
 ### Anàlisi: C sol vs. C + Lua per a la configuració
 
@@ -87,12 +87,70 @@ Punts clau:
 
 **Recomanació:** començar amb **C sol + fitxer declaratiu**, però amb el registre d'ordres des de la F1. Decidir si s'afegeix Lua (nivell B) quan apareguin necessitats concretes (macros, plantilles, exportació amb pandoc, recompte de paraules personalitzat…). Si ja se sap que es volen extensions, val la pena decidir-ho ara per dissenyar l'API amb temps.
 
-## Arquitectura preliminar (si es confirma C)
+## Decisió d'estructura del buffer
+
+### Context que condiciona la tria
+
+- **Prosa en Markdown:** cada paràgraf és una sola línia lògica, que pot fer de centenars a milers de bytes. El wordwrap és visual.
+- **Mida típica:** des d'un article (10–50 KB) fins a una novel·la (0,5–2 MB, 5.000–40.000 paràgrafs).
+- **Operacions que en depenen:**
+  - dibuix amb wordwrap (cal saber on comença cada paràgraf);
+  - cerca i substitució;
+  - correcció ortogràfica per paràgraf;
+  - desfer/refer.
+- **Codi:** ha de ser simple i robust en C.
+
+### Opcions
+
+| Estructura | Idea | Avantatges | Inconvenients |
+|-----------|------|------------|---------------|
+| **Vector de línies** | Array de punters a línies; cada línia és un array dinàmic d'UTF-8 | Molt simple. Encaixa amb Markdown (línia = paràgraf). Permet cache per línia (wrap, colors, ortografia). Cerca per línia amb `regexec` | Inserir o esborrar línies desplaça l'array (memmove de punters: ~300 KB en el pitjor cas, negligible). Les cerques que travessen línies són més incòmodes |
+| **Gap buffer únic** | Tot el text en un bloc amb un forat al cursor | Molt simple i molt compacte. Cerca sobre memòria contigua | Cal un índex d'inicis de línia a part, que s'ha d'anar actualitzant. Saltar lluny mou el forat (memmove de fins a 2 MB) |
+| **Piece table** | Fitxer original intacte + buffer d'afegits + taula de peces | El desfer és gairebé gratuït. Obertura instantània (mmap) | Més complexa. La cerca i el dibuix travessen peces. Cal índex de línies igualment |
+| **Rope** | Arbre de fragments | Escala a fitxers enormes | Excessiu per a aquest ús. Molt codi |
+| **Vector de línies amb gap per línia** | Com el primer, però cada línia té el seu forat | Edició O(1) dins paràgrafs llargs | Optimització prematura: un memmove de 5 KB són nanosegons |
+
+Referents: nano i mg (llista de línies), kilo (vector de línies), emacs (gap buffer), VS Code i vis (piece table).
+
+### Proposta: **vector de línies**
+
+```c
+typedef struct {
+    char   *text;       /* UTF-8, sense '\n' final */
+    size_t  len, cap;
+    /* caches, invalidades en editar la línia */
+    int     wrap_dirty; /* posicions de tall visual */
+    int     spell_dirty;
+} Line;
+
+typedef struct {
+    Line   *lines;
+    size_t  nlines, cap;
+    int     modified;
+} Buffer;
+
+/* Posició: (línia, offset en bytes); sempre en una frontera de caràcter UTF-8 */
+typedef struct { size_t line, col; } Pos;
+```
+
+Motius:
+
+1. **Línia = paràgraf:** l'editor pensa en les mateixes unitats que l'escriptor. El wordwrap, l'ortografia i els colors de Markdown es calculen i es guarden a la cache paràgraf a paràgraf. Una edició només n'invalida un.
+2. **Rendiment sobrat a la RPi:** cap operació habitual mou més de pocs KB. Sobrecost de memòria: ~40 bytes per línia (40.000 línies → 1,6 MB en el cas extrem).
+3. **Codi mínim i fàcil de depurar,** que és el que més compta en C.
+4. **Desfer/refer independent:** un registre d'operacions (`insert`/`delete` amb posició i text), agrupant les pulsacions consecutives. No depèn de l'estructura.
+
+Salvaguarda: la resta de l'editor només accedirà al text a través de l'API de `buffer.c` (`buf_insert`, `buf_delete`, `buf_line`, `buf_nlines`…). Si mai calgués canviar a un gap buffer o una piece table, el canvi quedaria localitzat en aquest mòdul.
+
+**Estat de la decisió:** ⏳ pendent de confirmar.
+
+## Arquitectura preliminar
 
 ```
 src/
   main.c        arrencada, arguments, bucle principal
-  buffer.c      emmagatzematge del text (gap buffer o vector de línies)
+  buffer.c      emmagatzematge del text (vector de línies, proposat)
+  command.c     registre d'ordres amb nom (les dreceres apunten a noms)
   utf8.c        utilitats UTF-8 i amplada de caràcters
   wrap.c        wordwrap suau a N columnes (línies lògiques vs. visuals)
   render.c      dibuix amb ncursesw, colors de Markdown mínims
@@ -106,7 +164,6 @@ src/
 
 Decisions de disseny pendents:
 
-- Estructura del buffer: *gap buffer* vs. *vector de línies* vs. *piece table*.
 - Wordwrap: suau (només visual) — recomanat per a prosa en Markdown — o dur (insereix salts).
 - Format del fitxer de configuració.
 - Joc de dreceres de teclat (estil nano? propi?).
@@ -132,3 +189,4 @@ Decisions de disseny pendents:
 
 - **2026-10-25** — Inici del projecte. Repositori git creat. Anàlisi de llenguatges; proposta: C + ncursesw + hunspell.
 - **2026-10-25** — Anàlisi C sol vs. C + Lua per a la configuració. Recomanació: C sol amb registre d'ordres, deixant Lua com a ampliació opcional.
+- **2026-10-25** — ✅ Confirmat: C sol + configuració declarativa + registre d'ordres. Anàlisi de l'estructura del buffer; proposta: vector de línies (línia = paràgraf).
