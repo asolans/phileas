@@ -27,23 +27,32 @@ static struct {
     int   (*add)(Hunhandle *h, const char *word);
 } hs;
 
-static void      *lib;
-static Hunhandle *handle;
-static char       lang[64];
-static char       error[256];
-static iconv_t    to_dic = (iconv_t)-1, from_dic = (iconv_t)-1;  /* si el diccionari no és UTF-8 */
+static void *lib;
+static char  error[256];
 
-/* ---- Cache de resultats: paraula -> correcta ---- */
+/* ---- Diccionaris carregats ---- */
 
-#define CACHE_SIZE 65536   /* potència de 2; es buida quan és mig plena */
+#define CACHE_SIZE 32768   /* potència de 2; es buida quan és mig plena */
+#define MAX_DICTS  2       /* F8 alterna català i castellà sense tornar-los a carregar */
 
 typedef struct {
     char *word;
     int   ok;
 } Slot;
 
-static Slot   cache[CACHE_SIZE];
-static size_t cache_used;
+/* Cada diccionari té la seva cache de resultats (paraula -> correcta) */
+typedef struct {
+    Hunhandle    *h;           /* NULL: lloc lliure */
+    char          lang[64];
+    iconv_t       to, from;    /* si el diccionari no és UTF-8 */
+    Slot         *cache;
+    size_t        used;
+    unsigned long last_use;
+} Dict;
+
+static Dict          dicts[MAX_DICTS];
+static Dict         *cur;      /* el diccionari actiu */
+static unsigned long uses;
 
 /* Paraules ignorades en aquesta sessió (sobreviuen al buidat de la cache) */
 static char **ignored;
@@ -59,45 +68,58 @@ static size_t hash(const char *s, size_t n)
     return (size_t)(h ^ (h >> 32));
 }
 
-static Slot *cache_find(const char *s, size_t n)
+static Slot *cache_find(Dict *d, const char *s, size_t n)
 {
     size_t i = hash(s, n) & (CACHE_SIZE - 1);
 
-    while (cache[i].word && (strlen(cache[i].word) != n || memcmp(cache[i].word, s, n)))
+    while (d->cache[i].word &&
+           (strlen(d->cache[i].word) != n || memcmp(d->cache[i].word, s, n)))
         i = (i + 1) & (CACHE_SIZE - 1);
-    return &cache[i];
+    return &d->cache[i];
 }
 
-static void cache_put(const char *s, size_t n, int ok)
+static void cache_clear(Dict *d)
+{
+    for (size_t i = 0; d->cache && i < CACHE_SIZE; i++) {
+        free(d->cache[i].word);
+        d->cache[i].word = NULL;
+    }
+    d->used = 0;
+}
+
+static void cache_put(Dict *d, const char *s, size_t n, int ok)
 {
     Slot *sl;
 
-    if (cache_used >= CACHE_SIZE / 2) {
-        for (size_t i = 0; i < CACHE_SIZE; i++) {
-            free(cache[i].word);
-            cache[i].word = NULL;
-        }
-        cache_used = 0;
+    if (d->used >= CACHE_SIZE / 2) {
+        cache_clear(d);
         for (size_t i = 0; i < nignored; i++)
-            cache_put(ignored[i], strlen(ignored[i]), 1);
+            cache_put(d, ignored[i], strlen(ignored[i]), 1);
     }
-    sl = cache_find(s, n);
+    sl = cache_find(d, s, n);
     if (!sl->word) {
         sl->word = xmalloc(n + 1);
         memcpy(sl->word, s, n);
         sl->word[n] = '\0';
-        cache_used++;
+        d->used++;
     }
     sl->ok = ok;
 }
 
-static void cache_clear(void)
+static void dict_free(Dict *d)
 {
-    for (size_t i = 0; i < CACHE_SIZE; i++) {
-        free(cache[i].word);
-        cache[i].word = NULL;
+    if (d->h) {
+        hs.destroy(d->h);
+        if (d->to != (iconv_t)-1)
+            iconv_close(d->to);
+        if (d->from != (iconv_t)-1)
+            iconv_close(d->from);
     }
-    cache_used = 0;
+    cache_clear(d);
+    free(d->cache);
+    memset(d, 0, sizeof *d);
+    if (cur == d)
+        cur = NULL;
 }
 
 /* ---- Càrrega ---- */
@@ -198,7 +220,7 @@ static void personal_path(char *out, size_t size)
     const char *xdg = getenv("XDG_CONFIG_HOME"), *home = getenv("HOME");
     char code[32];
 
-    spell_code(lang, code, sizeof code);
+    spell_code(cur ? cur->lang : NULL, code, sizeof code);
     if (xdg && *xdg)
         snprintf(out, size, "%s/phileas/diccionari-%s.txt", xdg, code);
     else
@@ -240,12 +262,20 @@ static void load_personal(void)
 
         if (n == 0)
             continue;
-        if ((w = convert(to_dic, line, n))) {
-            hs.add(handle, w);
+        if ((w = convert(cur->to, line, n))) {
+            hs.add(cur->h, w);
             free(w);
         }
     }
     fclose(f);
+}
+
+static Dict *find_loaded(const char *name)
+{
+    for (int i = 0; i < MAX_DICTS; i++)
+        if (dicts[i].h && !strcmp(dicts[i].lang, name))
+            return &dicts[i];
+    return NULL;
 }
 
 static int open_one(const char *name)
@@ -253,21 +283,63 @@ static int open_one(const char *name)
     char aff[1100], dic[1100];
     Hunhandle *h;
     const char *enc;
+    Dict *d;
 
+    if ((d = find_loaded(name))) {
+        cur = d;
+        d->last_use = ++uses;
+        return 0;
+    }
     if (!find_dict(name, aff, dic, sizeof aff))
         return -1;
     if (!(h = hs.create(aff, dic)))
         return -1;
-    spell_close();
-    handle = h;
-    snprintf(lang, sizeof lang, "%s", name);
+    /* Un lloc lliure, o el diccionari que fa més temps que no es fa servir */
+    d = &dicts[0];
+    for (int i = 0; i < MAX_DICTS; i++) {
+        if (!dicts[i].h) {
+            d = &dicts[i];
+            break;
+        }
+        if (dicts[i].last_use < d->last_use)
+            d = &dicts[i];
+    }
+    dict_free(d);
+    d->h = h;
+    d->to = d->from = (iconv_t)-1;
+    d->cache = calloc(CACHE_SIZE, sizeof *d->cache);
+    if (!d->cache)
+        die("sense memòria");
+    for (size_t i = 0; i < nignored; i++)
+        cache_put(d, ignored[i], strlen(ignored[i]), 1);
+    snprintf(d->lang, sizeof d->lang, "%s", name);
+    d->last_use = ++uses;
     enc = hs.get_dic_encoding(h);
     if (enc && strcmp(enc, "UTF-8") && strcmp(enc, "utf-8")) {
-        to_dic = iconv_open(enc, "UTF-8");
-        from_dic = iconv_open("UTF-8", enc);
+        d->to = iconv_open(enc, "UTF-8");
+        d->from = iconv_open("UTF-8", enc);
     }
+    cur = d;
     load_personal();
     return 0;
+}
+
+/* "es" -> "es_ES", "fr" -> "fr_FR"; 0 si name ja té país o variant. */
+static int full_name(const char *name, char *out, size_t size)
+{
+    if (strpbrk(name, "_-") || strlen(name) >= 8)
+        return 0;
+    snprintf(out, size, "%s_%s", name, name);
+    for (char *p = out + strlen(name) + 1; *p; p++)
+        *p = (char)toupper((unsigned char)*p);
+    return 1;
+}
+
+int spell_loaded(const char *name)
+{
+    char full[64];
+
+    return name && (find_loaded(name) || (full_name(name, full, sizeof full) && find_loaded(full)));
 }
 
 int spell_open(const char *name)
@@ -280,16 +352,14 @@ int spell_open(const char *name)
     if (name) {
         char full[64];
 
+        /* Primer el que ja hi ha carregat, sense buscar fitxers */
+        if (full_name(name, full, sizeof full) && !find_loaded(name) && find_loaded(full))
+            return open_one(full);
         if (open_one(name) == 0)
             return 0;
-        /* Només l'idioma: "es" -> "es_ES", "fr" -> "fr_FR" */
-        if (!strpbrk(name, "_-") && strlen(name) < 8) {
-            snprintf(full, sizeof full, "%s_%s", name, name);
-            for (char *p = full + strlen(name) + 1; *p; p++)
-                *p = (char)toupper((unsigned char)*p);
-            if (open_one(full) == 0)
-                return 0;
-        }
+        /* Només l'idioma: "es" -> "es_ES" */
+        if (full_name(name, full, sizeof full) && open_one(full) == 0)
+            return 0;
         snprintf(error, sizeof error, "no hi ha cap diccionari «%s»", name);
         return -1;
     }
@@ -315,21 +385,14 @@ int spell_open(const char *name)
 
 void spell_close(void)
 {
-    if (handle)
-        hs.destroy(handle);
-    handle = NULL;
-    lang[0] = '\0';
-    if (to_dic != (iconv_t)-1)
-        iconv_close(to_dic);
-    if (from_dic != (iconv_t)-1)
-        iconv_close(from_dic);
-    to_dic = from_dic = (iconv_t)-1;
-    cache_clear();
+    for (int i = 0; i < MAX_DICTS; i++)
+        dict_free(&dicts[i]);
+    cur = NULL;
 }
 
 const char *spell_lang(void)
 {
-    return handle ? lang : NULL;
+    return cur ? cur->lang : NULL;
 }
 
 const char *spell_error(void)
@@ -345,15 +408,15 @@ int spell_check(const char *s, size_t n)
     char *w;
     int ok;
 
-    if (!handle || n == 0)
+    if (!cur || n == 0)
         return 1;
-    sl = cache_find(s, n);
+    sl = cache_find(cur, s, n);
     if (sl->word)
         return sl->ok;
-    w = convert(to_dic, s, n);
-    ok = !w || hs.spell(handle, w) != 0;   /* el que no es pot convertir no es marca */
+    w = convert(cur->to, s, n);
+    ok = !w || hs.spell(cur->h, w) != 0;   /* el que no es pot convertir no es marca */
     free(w);
-    cache_put(s, n, ok);
+    cache_put(cur, s, n, ok);
     return ok;
 }
 
@@ -363,20 +426,20 @@ int spell_suggest(const char *s, size_t n, char ***list)
     int k, out = 0;
 
     *list = NULL;
-    if (!handle || !(w = convert(to_dic, s, n)))
+    if (!cur || !(w = convert(cur->to, s, n)))
         return 0;
-    k = hs.suggest(handle, &raw, w);
+    k = hs.suggest(cur->h, &raw, w);
     free(w);
     if (k <= 0)
         return 0;
     *list = xmalloc((size_t)k * sizeof **list);
     for (int i = 0; i < k; i++) {
-        char *u = convert(from_dic, raw[i], strlen(raw[i]));
+        char *u = convert(cur->from, raw[i], strlen(raw[i]));
 
         if (u)
             (*list)[out++] = u;
     }
-    hs.free_list(handle, &raw, k);
+    hs.free_list(cur->h, &raw, k);
     return out;
 }
 
@@ -407,11 +470,13 @@ int spell_add(const char *s, size_t n)
     char path[1024], *w;
     FILE *f;
 
-    if (handle && (w = convert(to_dic, s, n))) {
-        hs.add(handle, w);
+    if (!cur)
+        return 0;
+    if ((w = convert(cur->to, s, n))) {
+        hs.add(cur->h, w);
         free(w);
     }
-    cache_put(s, n, 1);
+    cache_put(cur, s, n, 1);
     personal_path(path, sizeof path);
     if (mkdir_parents(path) < 0 || !(f = fopen(path, "a")))
         return -1;
@@ -427,7 +492,9 @@ void spell_ignore(const char *s, size_t n)
     w[n] = '\0';
     ignored = xrealloc(ignored, (nignored + 1) * sizeof *ignored);
     ignored[nignored++] = w;
-    cache_put(s, n, 1);
+    for (int i = 0; i < MAX_DICTS; i++)
+        if (dicts[i].h)
+            cache_put(&dicts[i], s, n, 1);
 }
 
 /* ---- Paraules ---- */

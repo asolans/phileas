@@ -848,9 +848,24 @@ static void test_spell(void)
     CHECK(spell_next_error(s, strlen(s), st, 0, &a, &b) && a == 17 && b == 25);
     CHECK(!spell_next_error(s, strlen(s), st, 25, &a, &b));
     CHECK(spell_open("no_existeix") == -1 && !strcmp(spell_lang(), "ca"));
+    /* Dos diccionaris alhora: tornar-hi és instantani i cadascun té la seva cache */
+    if (spell_open("es") == 0) {
+        CHECK(spell_loaded("ca") && spell_loaded("es") && spell_loaded("es_ES"));
+        CHECK(OK("niño") && !OK("paraula"));
+        CHECK(spell_open("ca") == 0 && !strcmp(spell_lang(), "ca"));
+        CHECK(OK("paraula") && !OK("niño"));
+        CHECK(OK("Phileas"));   /* les paraules ignorades valen per a tots dos */
+        CHECK(spell_open("es") == 0 && OK("niño") && OK("Phileas"));
+        /* Un tercer descarta el que fa més temps que no es fa servir (ca) */
+        if (spell_open("ca_ES-valencia") == 0) {
+            CHECK(!spell_loaded("ca") && spell_loaded("es") && spell_loaded("ca_ES-valencia"));
+            CHECK(OK("paraula"));
+        }
+    }
 #undef OK
     spell_close();
     CHECK(spell_lang() == NULL && spell_check("xyzw", 4));
+    CHECK(!spell_loaded("es"));
 }
 
 int main(void)

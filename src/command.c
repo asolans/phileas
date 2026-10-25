@@ -434,9 +434,11 @@ static int need_dict(Editor *e)
 {
     if (spell_lang() && !strcmp(e->dict_loaded, e->dict))
         return 1;
-    ed_msg(e, "Carregant el diccionari %s…", e->dict);
-    render(e);
-    refresh();
+    if (!spell_loaded(e->dict)) {
+        ed_msg(e, "Carregant el diccionari %s…", e->dict);
+        render(e);
+        refresh();
+    }
     if (spell_open(e->dict) == 0) {
         snprintf(e->dict_loaded, sizeof e->dict_loaded, "%s", e->dict);
         e->msg[0] = '\0';

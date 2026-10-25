@@ -11,6 +11,13 @@
  * un idioma ("es"), també es prova "es_ES". Retorna 0, o -1 amb el motiu a
  * spell_error(). El diccionari anterior es manté si falla. */
 int  spell_open(const char *lang);
+
+/* Es mantenen carregats fins a dos diccionaris: tornar a obrir-ne un que
+ * ja hi és és instantani (F8). En carregar-ne un tercer, es descarta el
+ * que fa més temps que no es fa servir. spell_loaded diu si lang ja hi és. */
+int  spell_loaded(const char *lang);
+
+/* Descarrega tots els diccionaris. */
 void spell_close(void);
 const char *spell_lang(void);      /* NULL si no hi ha diccionari */
 

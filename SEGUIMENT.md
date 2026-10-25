@@ -609,7 +609,7 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **F8** alterna el diccionari: català ↔ castellà.
     - Si la correcció està activa, el canvi es veu de seguida.
     - Si no ho està, només es tria l'idioma, i el diccionari no es carrega fins que es prem F7.
-    - Cada canvi torna a carregar el diccionari: només n'hi ha un en memòria.
+    - El català i el castellà es mantenen carregats tots dos: només el primer canvi a cada idioma carrega el diccionari.
   - **Barra d'estat:** amb la correcció activa, hi consta `ca` o `es` abans de la línia i la columna.
   - **Maj+F7** salta a l'error següent (també l'ordre `revisar-ortografia` de la paleta).
   - **Diccionari personal per idioma:** `diccionari-ca.txt`, `diccionari-es.txt`… Una paraula afegida en castellà no s'accepta en català.
@@ -650,3 +650,21 @@ make clean && make debug   # amb AddressSanitizer i UBSan
     - el cost és cada canvi d'idioma amb F8 (1,4–3,1 s), perquè es torna a carregar el diccionari;
     - els suggeriments triguen ~1,3 s, i mentrestant la barra diu «Buscant suggeriments…».
   - **Per fer-ho permanent a la imatge** (decisió de l'usuari): afegir `libhunspell-1.7.so.0` i els diccionaris a l'arrel (p. ex. `/usr/lib` i `/usr/share/hunspell`), o deixar-los a `/data` i exportar `LD_LIBRARY_PATH` i `DICPATH` al perfil.
+- **2026-10-25** — Decisió de l'usuari: **F8 instantani**, mantenint el català i el castellà carregats alhora.
+  - **Funcionament:**
+    - `spell.c` manté fins a dos diccionaris carregats, cadascun amb la seva cache de paraules (32.768 entrades);
+    - tornar a un diccionari que ja hi és no carrega res i no mostra «Carregant…»;
+    - si se'n carrega un tercer (per exemple, `ca_ES-valencia` amb l'ordre `idioma`), es descarta el que fa més temps que no es fa servir;
+    - les paraules ignorades valen per a tots dos.
+  - **A la Pi:**
+
+    | Acció | Temps | Memòria (RSS) |
+    |-------|-------|---------------|
+    | F7: carregar el català | 2,5 s | 16 MB |
+    | F8: primer canvi al castellà (el carrega) | 1,0 s | 20 MB |
+    | F8: canvis següents | 0,01 s | 20 MB |
+    | F7 i F8 amb l'ortografia desactivada | 0,01 s | 20 MB |
+
+    La memòria és la mateixa que abans: la glibc no retornava al sistema la memòria del diccionari descarregat.
+  - **Proves:** 1.561 comprovacions unitàries, també amb sanititzadors (dos diccionaris, cache independent per idioma, paraules ignorades compartides, descart del menys usat).
+  - **A la Pi, per provar-ho:** `/tmp/phileas/ph FITXER`, un guió que arrenca `phileas-nou` amb la biblioteca i els diccionaris de `/tmp/phileas`.
