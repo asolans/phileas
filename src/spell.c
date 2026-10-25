@@ -6,6 +6,7 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <iconv.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -47,13 +48,14 @@ static size_t cache_used;
 static char **ignored;
 static size_t nignored;
 
+/* FNV-1a de 64 bits (també en màquines de 32 bits) */
 static size_t hash(const char *s, size_t n)
 {
-    size_t h = 14695981039346656037u;
+    uint64_t h = 14695981039346656037u;
 
     for (size_t i = 0; i < n; i++)
         h = (h ^ (unsigned char)s[i]) * 1099511628211u;
-    return h;
+    return (size_t)(h ^ (h >> 32));
 }
 
 static Slot *cache_find(const char *s, size_t n)

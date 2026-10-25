@@ -1,7 +1,10 @@
-CC      ?= cc
-OPT     ?= -O2
-CFLAGS  += $(OPT) -std=c11 -Wall -Wextra -Wpedantic $(shell pkg-config --cflags ncursesw)
-LDLIBS  += $(shell pkg-config --libs ncursesw)
+# Compilació creuada: make CC=arm-linux-gcc PKG_CONFIG=.../pkg-config
+CC        ?= cc
+PKG_CONFIG ?= pkg-config
+OPT       ?= -O2
+CFLAGS    += $(OPT) -std=c11 -Wall -Wextra -Wpedantic -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600 \
+             $(shell $(PKG_CONFIG) --cflags ncursesw)
+LDLIBS    += $(shell $(PKG_CONFIG) --libs ncursesw)
 
 SRC  = $(wildcard src/*.c)
 OBJ  = $(SRC:src/%.c=build/%.o)

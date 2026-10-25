@@ -840,8 +840,10 @@ static void test_spell(void)
 
 int main(void)
 {
-    if (!setlocale(LC_ALL, "C.UTF-8")) {
-        fputs("cal la configuració regional C.UTF-8\n", stderr);
+    /* Qualsevol configuració UTF-8 (una Raspberry amb buildroot pot no tenir C.UTF-8) */
+    if (!setlocale(LC_ALL, "C.UTF-8") && !setlocale(LC_ALL, "ca_ES.UTF-8") &&
+        !setlocale(LC_ALL, "en_US.UTF-8")) {
+        fputs("cal una configuració regional UTF-8 (C.UTF-8, ca_ES.UTF-8 o en_US.UTF-8)\n", stderr);
         return 1;
     }
     if (!mkdtemp(tmpdir)) {

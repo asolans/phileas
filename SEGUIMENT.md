@@ -578,3 +578,26 @@ make clean && make debug   # amb AddressSanitizer i UBSan
     - Alt+Enter carrega el diccionari si cal, però no activa el marcatge;
     - `-d IDIOMA` l'activa des de l'arrencada amb aquest diccionari.
   - **Diccionari:** sense `-d`, el de la configuració regional.
+- **2026-10-25** — **Primera prova en una Raspberry Pi real:** Raspberry Pi 1 Model B Rev 2 (ARMv6 a 700 MHz, 475 MB de RAM), amb una imatge de Buildroot 2026.02.
+  - **Compilació creuada:** amb la toolchain de buildroot de l'usuari (`~/byok-build/output-pi1b-wg`, només de lectura). La Pi no té compilador, i l'arrel és de només lectura (squashfs, plena): les proves es fan a `/tmp`, que és en RAM.
+    ```
+    make CC=.../host/bin/arm-linux-gcc PKG_CONFIG=.../host/bin/pkg-config \
+         PKG_CONFIG_SYSROOT_DIR=.../sysroot PKG_CONFIG_LIBDIR=.../sysroot/usr/lib/pkgconfig
+    ```
+    Executable: 83 KB (sense símbols). Només depèn de `libncursesw.so.6` i de la glibc.
+  - **Correccions trobades:**
+    - el hash de la cache d'ortografia feia servir una constant de 64 bits que es truncava a 32 bits: ara el càlcul sempre es fa en 64 bits;
+    - les macros `_DEFAULT_SOURCE` i `_XOPEN_SOURCE` arribaven per casualitat amb `pkg-config ncursesw`: ara són al Makefile, que també accepta `PKG_CONFIG` per a la compilació creuada;
+    - les proves unitàries no requereixen `C.UTF-8`, que la Pi no té: provaran també `ca_ES.UTF-8` i `en_US.UTF-8`.
+  - **Proves unitàries a la Pi:** 1.530 comprovacions, 0 errors, en 0,14 s. Les de hunspell se salten perquè la Pi no té la biblioteca.
+  - **Rendiment** (document de 2,7 MB, 10.047 paràgrafs, per SSH):
+
+    | Prova | CPU | Memòria (RSS) |
+    |-------|-----|---------------|
+    | Carregar i mostrar el document | 0,32 s | 5,6 MB |
+    | Cada pulsació de navegació (AvPàg, fletxes) | ~6 ms | 5,6 MB |
+    | Cada lletra escrita | ~10 ms | 5,7 MB |
+    | Inici / fi del document | 0,02 s | 5,7 MB |
+
+  - **Observació:** el servidor SSH de la Pi (dropbear) no obre terminals (`ssh -tt` es tanca). Per a les proves s'ha fet servir un petit programa auxiliar (`ptyrun`, amb `forkpty`), que no forma part de Phileas.
+  - **Pendent:** l'ortografia a la Pi. Cal hunspell compilat per a ARM i el diccionari català.
