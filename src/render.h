@@ -28,6 +28,12 @@ void render(Editor *e);
 int  prompt(Editor *e, const char *label, char *buf, size_t size,
             void (*changed)(Editor *e, const char *text));
 
+/* Com prompt(), però Tab crida complete, que pot allargar buf i deixar a
+ * hint un text (p. ex. les opcions) que es mostra atenuat darrere. */
+int  prompt_complete(Editor *e, const char *label, char *buf, size_t size,
+                     void (*complete)(Editor *e, char *buf, size_t size,
+                                      char *hint, size_t hintsz));
+
 /* Pregunta amb resposta d'una tecla d'entre choices (minúscules). Retorna
  * la tecla triada, o 0 amb Esc. */
 int  prompt_choice(Editor *e, const char *question, const char *choices);

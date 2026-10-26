@@ -172,7 +172,7 @@ Detalls de comportament proposats:
 3. **Moviment del cursor:** ↑/↓ i Inici/Fi es mouen per **línies visuals**, que és com s'espera quan s'escriu prosa.
 4. **Sagnat penjant:** les línies de continuació d'un element de llista (`- `, `1. `) o d'una cita (`> `) s'alineen amb el text, no amb el marcador.
 5. **Columna centrada** (opcional, `centrar = si`): si el terminal és més ample que `columnes`, el text es dibuixa centrat, en mode escriptura.
-   **Marges** (2026-10-26): `marge-esquerre = 2` i `marge-dret = 2` per defecte (0–100). El text comença a la columna `marge-esquerre` i, si el terminal és més estret que `columnes` + marges, l'amplada es redueix perquè quedin `marge-dret` columnes buides a la dreta. Amb `centrar = si`, es centra entre els marges. Si amb els marges no hi caben 20 columnes, s'ignoren. La barra d'estat ocupa tota l'amplada.
+   **Marges** (2026-10-26): `marge-esquerre = 4` i `marge-dret = 4` per defecte (0–100; eren 2 i 2 fins al 2026-10-26, a la tarda). El text comença a la columna `marge-esquerre` i, si el terminal és més estret que `columnes` + marges, l'amplada es redueix perquè quedin `marge-dret` columnes buides a la dreta. Amb `centrar = si`, es centra entre els marges. Si amb els marges no hi caben 20 columnes, s'ignoren. La barra d'estat ocupa tota l'amplada.
 6. **Cache:** les posicions de tall es guarden a cada `Line` i només es recalculen quan s'edita la línia o canvien les columnes o l'amplada del terminal.
 
 Interoperabilitat amb fitxers tallats a mà (fases posteriors):
@@ -508,7 +508,7 @@ Llista oberta: l'usuari hi afegeix, en treu i n'ordena la prioritat.
 
 | # | Millora | Àmbit | Notes |
 |---|---------|-------|-------|
-| C1 | Autocompleció a la paleta (Ctrl+P) | Tots dos | Pendent de la F8. Tab completa el nom de l'ordre; amb diverses opcions, les mostra a la barra. |
+| C1 | Autocompleció a la paleta (Ctrl+P) | Tots dos | ✅ Fet (2026-10-26): Tab completa el nom de l'ordre; amb diverses opcions, les mostra atenuades. |
 | C2 | Recordar la posició del cursor per fitxer | Tots dos | En tornar a obrir un document, el cursor torna on era. Fitxer petit al directori de configuració. |
 | C3 | Fitxers recents | Tots dos | Llista dels últims documents, a la paleta o al navegador de fitxers. |
 | C4 | Comptador de paraules | Tots dos | A la barra d'estat (al costat de les pàgines) o com a ordre; amb la selecció, les de la selecció. |
@@ -952,3 +952,9 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 - **2026-10-26** — **Prova de l'usuari a la Pi (D2):** amb nom, correcte. Sense nom, «no ha funcionat»: el rescat s'havia desat, però a `/data/phileas` (el directori de configuració), on l'usuari no el veu i on no arriben el navegador de fitxers, `exporta` ni `envia`. **Canvi:** el rescat va primer al **directori actual** (a la BYOK, `/data/textos`; al PC, on s'ha obert Phileas), després al de configuració i després a `$HOME`. Proves: 1.656 comprovacions (directori actual, directori actual esborrat → configuració, → `$HOME`, enlloc) i prova interactiva amb SIGTERM.
 - **2026-10-26** — **D1, primera prova:** Phileas a GNOME Terminal (Wayland, 96×34) amb un document de mostra i el corrector català. Prova de l'usuari: **tot correcte** («tot ok»; se li havien proposat els colors, els marges, F1, Alt+C, Ctrl+P, Ctrl+Maj+fletxes, el canvi de mida de la finestra i el desat en tancar-la). Queden Konsole, xterm i altres.
 - **2026-10-26** — **D1, xterm:** amb la configuració per defecte (sense `.Xresources`; només `-fa Monospace -fs 12`), el mateix document i el corrector català. Prova de l'usuari: **tot correcte**, també les tecles Alt (es temia que xterm les enviés com a caràcters de 8 bits). Queden Konsole, kitty i altres, en un ordinador que els tingui.
+- **2026-10-26** — **C1: autocompleció a la paleta.**
+  - **Tab** allarga el nom fins al prefix comú més llarg de les ordres que hi coincideixen (també les externes del `phileasrc`). Si n'hi ha una de sola, la completa sencera amb un espai darrere, per escriure-hi arguments o prémer Retorn. Si n'hi ha diverses, les mostra atenuades darrere del text, tantes com hi càpiguen; si no n'hi ha cap, «(cap ordre comença així)». Els arguments no es completen.
+  - Amb la paleta buida, «(Tab completa el nom)» atenuat; l'ajuda (F1) també ho diu.
+  - **Codi:** `complete.c` (sense ncurses, a les proves), `prompt_complete()` a `render.c` (el `prompt()` de sempre hi passa sense autocompleció) i `palette_complete()` a `command.c`.
+  - **Proves:** 1.663 comprovacions, també amb sanititzadors (prefix comú, únic, cap, buit, nom complet que és prefix d'un altre, sense lloc). Interactives: llista, completat únic i Retorn (executa `centrar`), cap coincidència, Tab amb la paleta buida, edició després del Tab.
+- **2026-10-26** — Marges per defecte a **4 i 4** (eren 2 i 2), a petició de l'usuari; també al `phileasrc` de br2-phileas. C1 provada per l'usuari a GNOME Terminal: funciona.

@@ -1,4 +1,5 @@
 #include "command.h"
+#include "complete.h"
 #include "config.h"
 #include "filebrowser.h"
 #include "help.h"
@@ -255,6 +256,38 @@ static void c_redraw(Editor *e)
     clearok(curscr, TRUE);
 }
 
+/* Tab a la paleta: completa el nom de l'ordre i, si n'hi ha més d'una,
+ * les mostra. Els arguments no es completen. */
+static void palette_complete(Editor *e, char *buf, size_t size, char *hint, size_t hintsz)
+{
+    size_t n = cmd_count(), matches, len, used;
+    const char **names = xmalloc(n * sizeof *names);
+    char *word = buf + strspn(buf, " ");
+
+    (void)e;
+    hint[0] = '\0';
+    if (strchr(word, ' ')) {
+        free(names);
+        return;
+    }
+    for (size_t i = 0; i < n; i++)
+        names[i] = cmd_at(i)->name;
+    matches = complete_word(word, size - (size_t)(word - buf), names, n);
+    len = strlen(word);
+    if (matches == 0) {
+        snprintf(hint, hintsz, "  (cap ordre comença així)");
+    } else if (matches == 1) {
+        if (strlen(buf) + 1 < size)
+            strcat(buf, " ");
+    } else {
+        used = (size_t)snprintf(hint, hintsz, " ");
+        for (size_t i = 0; i < n && used + 1 < hintsz; i++)
+            if (!strncmp(names[i], word, len))
+                used += (size_t)snprintf(hint + used, hintsz - used, " %s", names[i]);
+    }
+    free(names);
+}
+
 /* Ctrl+P: el nom de l'ordre i, separats per espais, els arguments (només
  * per a les ordres externes: «lletra +») */
 static void c_palette(Editor *e)
@@ -263,7 +296,7 @@ static void c_palette(Editor *e)
     char *name, *args;
     const Command *c;
 
-    if (!prompt(e, "Ordre: ", line, sizeof line, NULL))
+    if (!prompt_complete(e, "Ordre: ", line, sizeof line, palette_complete))
         return;
     name = line + strspn(line, " ");
     if (!*name)

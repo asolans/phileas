@@ -1,6 +1,7 @@
 /* Proves dels mòduls que no depenen de ncurses: make test */
 #include "autosave.h"
 #include "buffer.h"
+#include "complete.h"
 #include "config.h"
 #include "dirlist.h"
 #include "editor.h"
@@ -982,7 +983,7 @@ static void test_config(void)
     CHECK(SET("centrar", "sí") == 0 && e.center == 1);
     CHECK(SET("centrar", "no") == 0 && e.center == 0);
     CHECK(SET("centrar", "potser") < 0);
-    CHECK(e.margin_left == 2 && e.margin_right == 2);
+    CHECK(e.margin_left == 4 && e.margin_right == 4);
     CHECK(SET("marge-esquerre", "4") == 0 && e.margin_left == 4);
     CHECK(SET("marge-dret", "0") == 0 && e.margin_right == 0);
     CHECK(SET("marge-dret", "-1") < 0 && e.margin_right == 0);
@@ -1105,6 +1106,30 @@ static void test_plain(void)
     unlink(path);
 }
 
+/* Autocompleció de la paleta */
+static void test_complete(void)
+{
+    static const char *const names[] = { "capcalera-1", "capcalera-2", "centrar",
+                                         "colors", "copiar", "desar", "desar-com" };
+    const size_t n = sizeof names / sizeof *names;
+    char w[32];
+
+    strcpy(w, "cap");          /* dos: fins al prefix comú */
+    CHECK(complete_word(w, sizeof w, names, n) == 2 && !strcmp(w, "capcalera-"));
+    strcpy(w, "ce");           /* un: el nom sencer */
+    CHECK(complete_word(w, sizeof w, names, n) == 1 && !strcmp(w, "centrar"));
+    strcpy(w, "c");            /* sense prefix comú més llarg: no canvia */
+    CHECK(complete_word(w, sizeof w, names, n) == 5 && !strcmp(w, "c"));
+    strcpy(w, "desar");        /* complet, però també prefix d'un altre */
+    CHECK(complete_word(w, sizeof w, names, n) == 2 && !strcmp(w, "desar"));
+    strcpy(w, "x");
+    CHECK(complete_word(w, sizeof w, names, n) == 0 && !strcmp(w, "x"));
+    strcpy(w, "");             /* buit: tots, sense prefix comú */
+    CHECK(complete_word(w, sizeof w, names, n) == n && !strcmp(w, ""));
+    strcpy(w, "ce");           /* no hi cap: no es toca */
+    CHECK(complete_word(w, 5, names, n) == 1 && !strcmp(w, "ce"));
+}
+
 /* Desat d'emergència (SIGHUP, SIGTERM) */
 static void test_emergency(void)
 {
@@ -1206,6 +1231,7 @@ int main(void)
     test_plain();
     test_config();
     test_emergency();
+    test_complete();
     rmdir(tmpdir);
 
     printf("%d comprovacions, %d errors\n", checks, failures);

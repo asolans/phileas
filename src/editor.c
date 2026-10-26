@@ -25,7 +25,7 @@ void ed_init(Editor *e, int columns)
     e->autosave = e->autosave_last = 30;
     e->autosave_max = 300;
     e->recenter = 1;
-    e->margin_left = e->margin_right = 2;
+    e->margin_left = e->margin_right = 4;
     e->colors = 1;
     e->tw_mode = TW_SALT;
     e->tw_limit = 80;

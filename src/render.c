@@ -322,11 +322,30 @@ static void draw_prompt(const char *label, const char *buf)
     addstr(buf);
 }
 
-int prompt(Editor *e, const char *label, char *buf, size_t size,
-           void (*changed)(Editor *e, const char *text))
+/* Text atenuat darrere de la resposta; el cursor es queda on era. */
+static void draw_hint(const char *hint)
+{
+    int y, x;
+
+    getyx(stdscr, y, x);
+    if (!*hint || x >= COLS - 1)
+        return;
+    attron(A_DIM);
+    addnstr(hint, (int)fit_chars(hint, COLS - x - 1));
+    attroff(A_DIM);
+    move(y, x);
+}
+
+static int prompt_ex(Editor *e, const char *label, char *buf, size_t size,
+                     void (*changed)(Editor *e, const char *text),
+                     void (*complete)(Editor *e, char *buf, size_t size,
+                                      char *hint, size_t hintsz))
 {
     size_t len = strlen(buf), old;
+    char hint[512] = "";
 
+    if (complete && !len)
+        snprintf(hint, sizeof hint, "  (Tab completa el nom)");
     key_set_timeout(-1);
     for (;;) {
         wint_t wc;
@@ -334,11 +353,20 @@ int prompt(Editor *e, const char *label, char *buf, size_t size,
 
         render(e);
         draw_prompt(label, buf);
+        draw_hint(hint);
         refresh();
         r = key_get_wch(&wc);
         if (r == ERR)
             continue;
         old = len;
+        if (r == OK && wc == '\t') {
+            if (complete) {
+                complete(e, buf, size, hint, sizeof hint);
+                len = strlen(buf);
+            }
+            continue;
+        }
+        hint[0] = '\0';
         if (r == KEY_CODE_YES) {
             if (wc == KEY_ENTER)
                 return 1;
@@ -363,6 +391,19 @@ int prompt(Editor *e, const char *label, char *buf, size_t size,
         if (changed && len != old)
             changed(e, buf);
     }
+}
+
+int prompt(Editor *e, const char *label, char *buf, size_t size,
+           void (*changed)(Editor *e, const char *text))
+{
+    return prompt_ex(e, label, buf, size, changed, NULL);
+}
+
+int prompt_complete(Editor *e, const char *label, char *buf, size_t size,
+                    void (*complete)(Editor *e, char *buf, size_t size,
+                                     char *hint, size_t hintsz))
+{
+    return prompt_ex(e, label, buf, size, NULL, complete);
 }
 
 int prompt_choice(Editor *e, const char *question, const char *choices)
