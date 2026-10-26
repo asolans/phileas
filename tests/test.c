@@ -1,4 +1,5 @@
 /* Proves dels mòduls que no depenen de ncurses: make test */
+#include "autosave.h"
 #include "buffer.h"
 #include "config.h"
 #include "dirlist.h"
@@ -7,6 +8,7 @@
 #include "search.h"
 #include "spell.h"
 #include "utf8.h"
+#include "util.h"
 #include "wrap.h"
 
 #include <locale.h>
@@ -1103,6 +1105,66 @@ static void test_plain(void)
     unlink(path);
 }
 
+/* Desat d'emergència (SIGHUP, SIGTERM) */
+static void test_emergency(void)
+{
+    Editor e;
+    Buffer b;
+    char path[1100], conf[600], file[600], home[600];
+    const char *old_home = getenv("HOME");
+    char saved_home[600];
+
+    snprintf(saved_home, sizeof saved_home, "%s", old_home ? old_home : "");
+    snprintf(conf, sizeof conf, "%s/conf", tmpdir);
+    snprintf(file, sizeof file, "%s/doc.md", tmpdir);
+    setenv("PHILEAS_CONFIG", conf, 1);
+    buf_init(&b);
+
+    /* Sense canvis: no es desa res */
+    ed_init(&e, 72);
+    CHECK(autosave_emergency(&e, path, sizeof path) == 0 && path[0] == '\0');
+
+    /* Amb nom: sobre el mateix fitxer */
+    ed_open(&e, file);
+    ed_insert(&e, "Hola", 4);
+    CHECK(autosave_emergency(&e, path, sizeof path) == 0 && !strcmp(path, file));
+    CHECK(buf_load(&b, file) == 0 && !strcmp(b.lines[0].text, "Hola"));
+    unlink(file);
+    ed_free(&e);
+
+    /* Sense nom: rescat al directori de configuració, que es crea */
+    ed_init(&e, 72);
+    ed_insert(&e, "Sense nom", 9);
+    CHECK(autosave_emergency(&e, path, sizeof path) == 0);
+    CHECK(!strncmp(path, conf, strlen(conf)) && strstr(path, "/rescat-") &&
+          !strcmp(path + strlen(path) - 3, ".md"));
+    CHECK(buf_load(&b, path) == 0 && !strcmp(b.lines[0].text, "Sense nom"));
+    unlink(path);
+    rmdir(conf);
+
+    /* Fitxer que no es pot escriure i configuració impossible: a $HOME */
+    snprintf(conf, sizeof conf, "%s/no/existeix", tmpdir);
+    setenv("PHILEAS_CONFIG", conf, 1);
+    snprintf(home, sizeof home, "%s", tmpdir);
+    setenv("HOME", home, 1);
+    e.filename = xstrdup("/no/existeix/doc.md");
+    ed_insert(&e, "!", 1);   /* desar ha deixat el document sense canvis */
+    CHECK(autosave_emergency(&e, path, sizeof path) == 0 &&
+          !strncmp(path, tmpdir, strlen(tmpdir)) && strstr(path, "/rescat-"));
+    unlink(path);
+
+    /* Enlloc */
+    setenv("HOME", "/no/existeix", 1);
+    ed_insert(&e, "!", 1);
+    CHECK(autosave_emergency(&e, path, sizeof path) == -1 && path[0] == '\0');
+
+    ed_free(&e);
+    buf_free(&b);
+    unsetenv("PHILEAS_CONFIG");
+    if (saved_home[0])
+        setenv("HOME", saved_home, 1);
+}
+
 int main(void)
 {
     /* Qualsevol configuració UTF-8 (una Raspberry amb buildroot pot no tenir C.UTF-8) */
@@ -1131,6 +1193,7 @@ int main(void)
     test_typewriter();
     test_plain();
     test_config();
+    test_emergency();
     rmdir(tmpdir);
 
     printf("%d comprovacions, %d errors\n", checks, failures);

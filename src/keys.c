@@ -120,6 +120,37 @@ int key_parse(const char *name)
     return -1;
 }
 
+void (*key_quit_hook)(int sig);
+static volatile sig_atomic_t quit_signal;
+
+static void on_quit_signal(int sig)
+{
+    quit_signal = sig;
+}
+
+void key_signals(void)
+{
+    struct sigaction sa;
+
+    memset(&sa, 0, sizeof sa);
+    sa.sa_handler = on_quit_signal;   /* sense SA_RESTART: la lectura s'interromp */
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGHUP, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+}
+
+int key_get_wch(wint_t *wc)
+{
+    int r;
+
+    if (quit_signal && key_quit_hook)
+        key_quit_hook(quit_signal);
+    r = get_wch(wc);
+    if (quit_signal && key_quit_hook)
+        key_quit_hook(quit_signal);
+    return r;
+}
+
 void key_set_timeout(int ms)
 {
     wait_ms = ms;
@@ -184,7 +215,7 @@ static void read_paste(void)
 
     paste_len = 0;
     timeout(-1);
-    while ((r = get_wch(&wc)) != ERR) {
+    while ((r = key_get_wch(&wc)) != ERR) {
         if (r == KEY_CODE_YES) {
             if (wc == PASTE_END)
                 break;
@@ -258,7 +289,7 @@ static int read_escape(int intro)
     int r, key = -1;
 
     timeout(ALT_WAIT);
-    while ((r = get_wch(&wc)) == OK) {
+    while ((r = key_get_wch(&wc)) == OK) {
         if (wc >= 0x40 && wc <= 0x7E) {   /* byte final */
             params[n] = '\0';
             if (intro == '[' && !strcmp(params, "200") && wc == '~') {
@@ -282,7 +313,7 @@ static int read_escape(int intro)
 int key_read(void)
 {
     wint_t wc, wc2;
-    int r = get_wch(&wc);
+    int r = key_get_wch(&wc);
 
     if (r == ERR)
         return -1;
@@ -304,7 +335,7 @@ int key_read(void)
         return KEY_FLAG_FN | KEY_BACKSPACE;
     if (wc == 27) {
         timeout(ALT_WAIT);
-        r = get_wch(&wc2);
+        r = key_get_wch(&wc2);
         timeout(wait_ms);
         if (r == OK && (wc2 == '[' || wc2 == 'O'))
             return read_escape((int)wc2);

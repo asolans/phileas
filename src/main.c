@@ -20,6 +20,23 @@
 #define PHILEAS_VERSION  "1.0.0"
 #define DEFAULT_COLUMNS  72
 
+static Editor *editor;   /* per al desat d'emergència */
+
+/* SIGHUP (s'ha tancat el terminal) o SIGTERM (p. ex. l'apagada de la BYOK):
+ * es desa el document i se surt. */
+static void quit_on_signal(int sig)
+{
+    char path[1100];
+    int r = autosave_emergency(editor, path, sizeof path);
+
+    ui_end();
+    if (r < 0)
+        fprintf(stderr, "phileas: %s: no s'ha pogut desar el document\n", strsignal(sig));
+    else if (path[0])
+        fprintf(stderr, "phileas: %s: document desat a %s\n", strsignal(sig), path);
+    _exit(128 + sig);
+}
+
 static void usage(FILE *f)
 {
     fputs("Ús: phileas [-c COLUMNES] [-a SEGONS] [-d IDIOMA] [FITXER]\n"
@@ -122,6 +139,9 @@ int main(int argc, char **argv)
 
     ui_init();
     die_hook = ui_end;
+    editor = &e;
+    key_quit_hook = quit_on_signal;
+    key_signals();
     render_colors(&e);
 
     /* L'ortografia només s'activa en arrencar si es demana (-d o l'opció

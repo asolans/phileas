@@ -1,7 +1,9 @@
 #ifndef PHILEAS_KEYS_H
 #define PHILEAS_KEYS_H
 
+#include <signal.h>
 #include <stddef.h>
+#include <wchar.h>
 
 /* Codificació interna d'una tecla en un int:
  *   caràcter Unicode (Ctrl+lletra = 1..26, Ctrl+Espai = 0)
@@ -46,5 +48,17 @@ int key_read(void);
 
 /* Text de l'últim KEY_PASTE, en UTF-8 i amb salts '\n'. */
 const char *key_paste_text(size_t *n);
+
+/* get_wch() de ncurses que, si s'ha rebut SIGHUP o SIGTERM, crida
+ * key_quit_hook en lloc de continuar esperant tecles. Totes les lectures de
+ * tecles hi passen (també les dels diàlegs). */
+int key_get_wch(wint_t *wc);
+
+/* Instal·la els gestors de SIGHUP i SIGTERM (després de ui_init, perquè
+ * ncurses en posa uns de propis). El gestor només anota el senyal; la
+ * lectura de tecles l'interromp i crida key_quit_hook(senyal), que no ha
+ * de tornar. */
+void key_signals(void);
+extern void (*key_quit_hook)(int sig);
 
 #endif

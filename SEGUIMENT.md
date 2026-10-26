@@ -4,7 +4,7 @@ Editor de text per a consola (Linux), orientat a escriure prosa en Markdown.
 
 ## Estat
 
-- **Fase actual:** 8 — Integració al projecte BYOK (F0–F7 completades)
+- **Fase actual:** 8 — Integració al projecte BYOK (F0–F7 completades). Proposta de la F9 (Pi i escriptori), pendent de confirmar
 - **Última actualització:** 2026-10-26
 
 ## Requeriments (versió inicial)
@@ -470,6 +470,55 @@ Així el fitxer de configuració (i qualsevol altre) es pot editar amb el mateix
 
 **Estat de la decisió:** ✅ Confirmada (2026-10-25).
 
+## Phileas a la Pi i a l'escriptori (proposta, pendent de confirmar)
+
+Objectiu (2026-10-26): millorar el cor de l'aplicació i tenir-la disponible tant a la BYOK (Raspberry Pi 1B, consola de Linux) com en ordinadors Linux x86_64 (terminals d'escriptori).
+
+### Principi: un sol programa
+
+- **Una sola línia de desenvolupament** (`master`), sense cap branca «versió PC». Cada millora del cor arriba als dos llocs alhora.
+- **Les diferències van fora del codi:**
+  - **Pi:** `br2-phileas`, amb el seu `/etc/phileas/phileasrc` (ordres `lletra`, `gira`, `exporta`, `envia`);
+  - **PC:** l'empaquetat (vegeu D5) i un `phileasrc` pensat per a l'escriptori.
+- **El que depèn de l'entorn es detecta en temps d'execució**, com ja es fa amb hunspell (`dlopen`): si una eina hi és, es fa servir; si no, Phileas funciona igual sense. No hi ha opcions de compilació per plataforma.
+- **Branques curtes** (`git switch -c NOM`) només per a canvis grossos del cor que ocupin diverses sessions; es fusionen a `master` quan funcionen. Els canvis petits van directament a `master`.
+- **Una sola numeració:** les etiquetes `vX.Y` de Phileas serveixen per als dos llocs. `br2-phileas` en tria una per a cada imatge; el paquet de PC es genera de la mateixa etiqueta.
+
+### Proves de cada versió
+
+1. `make test` i `make debug` (proves unitàries, sense ncurses: no depenen de la plataforma).
+2. Prova interactiva al PC en els terminals de D1.
+3. Abans d'etiquetar: `make O=../output-phileas phileas-rebuild all` i prova a la Pi.
+
+### Requisits de l'escriptori
+
+| # | Requisit | Àmbit | Estat |
+|---|----------|-------|-------|
+| D1 | **Tecles als terminals d'escriptori.** Provar GNOME Terminal, Konsole, xterm i, si cal, kitty/foot. Combinacions sensibles: Ctrl+Maj+fletxes, Alt+lletra, Maj+F7, Ctrl+Espai, F1 i F10 (alguns terminals les capturen). Possibles ajustos a `keys.c` i una taula a l'ajuda de les tecles que no arriben. | PC | Per fer |
+| D2 | **Desat en tancar.** En rebre SIGHUP (s'ha tancat el terminal o la connexió SSH) o SIGTERM (p. ex. l'apagada de la BYOK), Phileas desa el document si té canvis i surt (codi 128 + senyal). Si no té nom o no s'hi pot desar, el desa a `rescat-AAAAMMDD-HHMMSS.md` (o `.txt`) al directori de configuració (a la Pi, `/data/phileas`) o, si no, a `$HOME`. Funciona també amb un diàleg obert. | Tots dos | ✅ Fet (2026-10-26) |
+| D3 | **Porta-retalls del sistema.** Opcional i detectat: `wl-copy`/`wl-paste` (Wayland), `xclip` o `xsel` (X11), o OSC 52 (també per SSH). Copiar envia el text també al sistema; enganxar continua sent el de Phileas, i Maj+Ins (o l'enganxat delimitat del terminal, que ja funciona) porta el del sistema. Sense cap eina, com ara. | PC | Proposta |
+| D4 | **Colors.** Avui 8 colors bàsics, que el tema del terminal ja adapta. Proposta: mantenir-ho (és el que veu la consola de la Pi) i provar que es llegeix bé amb temes clars i foscos. | PC | Per provar |
+| D5 | **Empaquetat.** Opcions: (a) `make install` des del codi, ja funciona; (b) paquet `.deb` amb dependència de `libncursesw6` i recomanació de `libhunspell-1.7-0`, `hunspell-ca` i `hunspell-es`; (c) binari estàtic amb musl, un sol fitxer per a qualsevol distribució; però un binari estàtic no pot carregar amb `dlopen` la `libhunspell` del sistema, de manera que caldria enllaçar-hi hunspell (uns 700 KB més) o quedar-se sense ortografia. Proposta: (b) per a Debian/Ubuntu i (a) per a la resta. | PC | Proposta |
+| D6 | **`phileasrc` d'escriptori.** Sense les ordres de BYOK. Possibles ordres externes d'exemple: `exporta` amb pandoc (`.docx`, `.odt`, `.pdf`) si hi és, i `paraules = wc -w`. | PC | Proposta |
+| D7 | **Diccionaris.** Al PC es fan servir els del sistema (`/usr/share/hunspell`). Comprovar que `ca` i `es` es troben amb els noms dels paquets de Debian/Ubuntu i de Fedora/Arch, i que el missatge quan no n'hi ha cap explica què cal instal·lar. | PC | Per provar |
+
+### Millores del cor (candidates, per prioritzar)
+
+Llista oberta: l'usuari hi afegeix, en treu i n'ordena la prioritat.
+
+| # | Millora | Àmbit | Notes |
+|---|---------|-------|-------|
+| C1 | Autocompleció a la paleta (Ctrl+P) | Tots dos | Pendent de la F8. Tab completa el nom de l'ordre; amb diverses opcions, les mostra a la barra. |
+| C2 | Recordar la posició del cursor per fitxer | Tots dos | En tornar a obrir un document, el cursor torna on era. Fitxer petit al directori de configuració. |
+| C3 | Fitxers recents | Tots dos | Llista dels últims documents, a la paleta o al navegador de fitxers. |
+| C4 | Comptador de paraules | Tots dos | A la barra d'estat (al costat de les pàgines) o com a ordre; amb la selecció, les de la selecció. |
+| C5 | Ordre `reformatar` | Tots dos | Ja prevista com a opcional a «Decisió de wordwrap»: còpia amb salts durs a N columnes. |
+| C6 | Objectiu d'escriptura | Tots dos | Paraules per sessió o per document, amb el progrés a la barra d'estat. |
+
+### Estat de la decisió
+
+Pendent de confirmar: el principi d'un sol programa, els requisits D1–D7 i l'ordre de les millores C1–C6.
+
 ## Arquitectura
 
 ```
@@ -546,6 +595,8 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - paquets `phileas` (font local: aquest repositori, `make phileas-rebuild`), `hunspell` (només la biblioteca), `hunspell-ca` (Softcatalà 3.0.9) i `hunspell-es` (LibreOffice, `es_ES`);
   - l'executable a `/usr/libexec/phileas/phileas`; `/usr/bin/phileas` (i l'enllaç `ph`) és un script que posa `PHILEAS_CONFIG=/data/phileas` i en sortir fa `sync` i `clear`, com feia `wg`;
   - `/etc/phileas/phileasrc` de la imatge: `idiomes = es ca` i les ordres externes `lletra`, `gira`, `exporta` (breus) i `envia` (interactiva).
+
+- [ ] **F9** — Phileas a la Pi i a l'escriptori: requisits D1–D7 i millores del cor C1–C6 (vegeu «Phileas a la Pi i a l'escriptori»). Proposta del 2026-10-26, pendent de confirmar.
 
 ## Registre
 
@@ -891,3 +942,10 @@ make clean && make debug   # amb AddressSanitizer i UBSan
     - `recarregar-configuracio` les esborra i les torna a llegir. La plantilla (`--config`) les explica.
   - **Proves:** 1.636 comprovacions unitàries, també amb sanititzadors (sintaxi, noms incorrectes, valor buit, nom d'una ordre de Phileas, comentari al final de la línia); interactives: arguments amb cometes, desat previ, error amb codi, tecla F12, ordre interna amb arguments, ordre interactiva i tornada, recàrrega, i tot plegat amb ASan/UBSan sense errors.
 - **2026-10-26** — Provat a la Pi dins la imatge BYOK Phileas: tot correcte. **Versió 1.0** (`PHILEAS_VERSION` 1.0.0, etiqueta `v1.0`), la de la imatge BYOK Phileas 1.0.
+- **2026-10-26** — **Marges** `marge-esquerre` i `marge-dret` (2 i 2 per defecte), a petició de l'usuari. Proposta de la **F9**: un sol programa per a la Pi i per a l'escriptori, sense branca pròpia; requisits de l'escriptori (D1–D7) i millores candidates del cor (C1–C6). Pendent de confirmar.
+- **2026-10-26** — **D2: desat en rebre SIGHUP o SIGTERM.**
+  - **Mecanisme:** el gestor del senyal només l'anota (`sigaction` sense `SA_RESTART`, instal·lat després de `ui_init` perquè ncurses en posa uns de propis). Totes les lectures de tecles passen per `key_get_wch()` (`keys.c`, també les dels diàlegs de `render.c`): quan hi ha un senyal pendent, criden `key_quit_hook`, que desa amb `autosave_emergency()` (`autosave.c`), restaura el terminal, escriu on ha desat a stderr i acaba amb `_exit(128 + senyal)`. El desat es fa fora del gestor, en un punt on el document és coherent.
+  - **On desa:** sobre el fitxer del document; si no té nom o no s'hi pot escriure, `rescat-AAAAMMDD-HHMMSS.md` (`.txt` en text pla) al directori de configuració, que es crea si cal; si tampoc, a `$HOME`.
+  - **Límit conegut:** si el senyal arriba just entre la comprovació i el `read()` de ncurses, no es desa fins a la tecla següent (finestra de microsegons).
+  - **BYOK (br2-phileas):** `apagada` ja enviava SIGTERM a Phileas i esperava 1 s; ara espera que acabi, com a molt 5 s, abans de desmuntar `/data`.
+  - **Proves:** 1.652 comprovacions unitàries, també amb sanititzadors (sense canvis, amb nom, rescat al directori de configuració, a `$HOME`, i cap lloc possible). Interactives en un pseudoterminal: SIGTERM i tancament del terminal (SIGHUP), amb nom i sense, i SIGTERM amb el diàleg de cerca obert: tot desat (amb accents) i sortida immediata. **Pendent:** l'apagada a la Pi.

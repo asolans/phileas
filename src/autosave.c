@@ -1,7 +1,11 @@
 #include "autosave.h"
+#include "util.h"
 
 #include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <time.h>
 
 double now_seconds(void)
@@ -59,4 +63,33 @@ int autosave_wait_ms(const Editor *e, double now)
     if (due <= now)
         return 0;
     return (int)((due - now) * 1000) + 10;
+}
+
+int autosave_emergency(Editor *e, char *path, size_t size)
+{
+    char dir[1024];
+    const char *home = getenv("HOME");
+    time_t t;
+    struct tm tm;
+
+    path[0] = '\0';
+    if (!e->buf.modified)
+        return 0;
+    if (e->filename && buf_save(&e->buf, e->filename) == 0) {
+        snprintf(path, size, "%s", e->filename);
+        return 0;
+    }
+    t = time(NULL);
+    localtime_r(&t, &tm);
+    config_dir(dir, sizeof dir);
+    mkdir(dir, 0700);   /* si ja existeix, res */
+    for (int i = 0; i < 2; i++) {
+        snprintf(path, size, "%s/rescat-%04d%02d%02d-%02d%02d%02d.%s", i ? home : dir,
+                 tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min,
+                 tm.tm_sec, e->buf.plain ? "txt" : "md");
+        if ((i == 0 || (home && *home)) && buf_save(&e->buf, path) == 0)
+            return 0;
+    }
+    path[0] = '\0';
+    return -1;
 }

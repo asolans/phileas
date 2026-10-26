@@ -335,7 +335,7 @@ int prompt(Editor *e, const char *label, char *buf, size_t size,
         render(e);
         draw_prompt(label, buf);
         refresh();
-        r = get_wch(&wc);
+        r = key_get_wch(&wc);
         if (r == ERR)
             continue;
         old = len;
@@ -375,7 +375,7 @@ int prompt_choice(Editor *e, const char *question, const char *choices)
         render(e);
         draw_prompt(question, "");
         refresh();
-        r = get_wch(&wc);
+        r = key_get_wch(&wc);
         if (r != OK)
             continue;
         if (wc == 27)
@@ -395,7 +395,7 @@ int prompt_yesno(Editor *e, const char *question)
         render(e);
         draw_prompt(question, " (s/n) ");
         refresh();
-        r = get_wch(&wc);
+        r = key_get_wch(&wc);
         if (r == OK && (wc == 's' || wc == 'S'))
             return 1;
         if (r == OK && (wc == 'n' || wc == 'N' || wc == 27))
