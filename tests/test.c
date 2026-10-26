@@ -1110,7 +1110,7 @@ static void test_emergency(void)
 {
     Editor e;
     Buffer b;
-    char path[1100], conf[600], file[600], home[600];
+    char path[1100], conf[600], file[600], home[600], cwd[600], old_cwd[1024];
     const char *old_home = getenv("HOME");
     char saved_home[600];
 
@@ -1132,13 +1132,24 @@ static void test_emergency(void)
     unlink(file);
     ed_free(&e);
 
-    /* Sense nom: rescat al directori de configuració, que es crea */
+    /* Sense nom: rescat al directori actual (amb el camí absolut) */
+    getcwd(old_cwd, sizeof old_cwd);
+    snprintf(cwd, sizeof cwd, "%s/textos", tmpdir);
+    mkdir(cwd, 0700);
+    CHECK(chdir(cwd) == 0);
     ed_init(&e, 72);
     ed_insert(&e, "Sense nom", 9);
     CHECK(autosave_emergency(&e, path, sizeof path) == 0);
-    CHECK(!strncmp(path, conf, strlen(conf)) && strstr(path, "/rescat-") &&
+    CHECK(!strncmp(path, cwd, strlen(cwd)) && !strncmp(path + strlen(cwd), "/rescat-", 8) &&
           !strcmp(path + strlen(path) - 3, ".md"));
     CHECK(buf_load(&b, path) == 0 && !strcmp(b.lines[0].text, "Sense nom"));
+    unlink(path);
+
+    /* Directori actual esborrat: al de configuració, que es crea */
+    rmdir(cwd);
+    ed_insert(&e, "!", 1);
+    CHECK(autosave_emergency(&e, path, sizeof path) == 0);
+    CHECK(!strncmp(path, conf, strlen(conf)) && strstr(path, "/rescat-"));
     unlink(path);
     rmdir(conf);
 
@@ -1163,6 +1174,7 @@ static void test_emergency(void)
     unsetenv("PHILEAS_CONFIG");
     if (saved_home[0])
         setenv("HOME", saved_home, 1);
+    CHECK(chdir(old_cwd) == 0);
 }
 
 int main(void)

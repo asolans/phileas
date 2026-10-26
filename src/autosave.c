@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <unistd.h>
 
 double now_seconds(void)
 {
@@ -67,8 +68,8 @@ int autosave_wait_ms(const Editor *e, double now)
 
 int autosave_emergency(Editor *e, char *path, size_t size)
 {
-    char dir[1024];
-    const char *home = getenv("HOME");
+    char cwd[1024], conf[1024];
+    const char *home = getenv("HOME"), *dirs[3];
     time_t t;
     struct tm tm;
 
@@ -81,13 +82,18 @@ int autosave_emergency(Editor *e, char *path, size_t size)
     }
     t = time(NULL);
     localtime_r(&t, &tm);
-    config_dir(dir, sizeof dir);
-    mkdir(dir, 0700);   /* si ja existeix, res */
-    for (int i = 0; i < 2; i++) {
-        snprintf(path, size, "%s/rescat-%04d%02d%02d-%02d%02d%02d.%s", i ? home : dir,
+    dirs[0] = getcwd(cwd, sizeof cwd);
+    config_dir(conf, sizeof conf);
+    mkdir(conf, 0700);   /* si ja existeix, res */
+    dirs[1] = conf;
+    dirs[2] = home && *home ? home : NULL;
+    for (int i = 0; i < 3; i++) {
+        if (!dirs[i])
+            continue;
+        snprintf(path, size, "%s/rescat-%04d%02d%02d-%02d%02d%02d.%s", dirs[i],
                  tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min,
                  tm.tm_sec, e->buf.plain ? "txt" : "md");
-        if ((i == 0 || (home && *home)) && buf_save(&e->buf, path) == 0)
+        if (buf_save(&e->buf, path) == 0)
             return 0;
     }
     path[0] = '\0';

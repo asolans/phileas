@@ -15,10 +15,11 @@ void autosave_tick(Editor *e, double now);
 int  autosave_wait_ms(const Editor *e, double now);
 
 /* Desat d'emergència (en rebre SIGHUP o SIGTERM): si hi ha canvis, desa el
- * document sobre el seu fitxer. Si no té nom o no s'hi pot desar, el desa al
- * directori de configuració com a rescat-AAAAMMDD-HHMMSS.md (o .txt), i si
- * tampoc, a $HOME. Retorna 0 si no hi havia canvis (path buit) o si s'ha
- * desat (path = on), i -1 si no s'ha pogut desar enlloc. */
+ * document sobre el seu fitxer. Si no té nom o no s'hi pot desar, el desa
+ * com a rescat-AAAAMMDD-HHMMSS.md (o .txt) al directori actual (on hi ha els
+ * textos: a la BYOK, /data/textos), o si no, al de configuració, o a $HOME.
+ * Retorna 0 si no hi havia canvis (path buit) o si s'ha desat (path = on,
+ * camí absolut), i -1 si no s'ha pogut desar enlloc. */
 int  autosave_emergency(Editor *e, char *path, size_t size);
 
 #endif
