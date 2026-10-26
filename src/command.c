@@ -109,7 +109,7 @@ static void c_center(Editor *e)
     e->center = !e->center;
     if (!e->center)
         ed_msg(e, "Columna a l'esquerra");
-    else if (COLS > e->columns)
+    else if (COLS - e->margin_left - e->margin_right > e->columns)
         ed_msg(e, "Columna centrada");
     else
         ed_msg(e, "No hi ha marge per centrar (terminal %d < text %d)", COLS, e->columns);

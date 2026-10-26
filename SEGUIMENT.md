@@ -172,6 +172,7 @@ Detalls de comportament proposats:
 3. **Moviment del cursor:** ↑/↓ i Inici/Fi es mouen per **línies visuals**, que és com s'espera quan s'escriu prosa.
 4. **Sagnat penjant:** les línies de continuació d'un element de llista (`- `, `1. `) o d'una cita (`> `) s'alineen amb el text, no amb el marcador.
 5. **Columna centrada** (opcional, `centrar = si`): si el terminal és més ample que `columnes`, el text es dibuixa centrat, en mode escriptura.
+   **Marges** (2026-10-26): `marge-esquerre = 2` i `marge-dret = 2` per defecte (0–100). El text comença a la columna `marge-esquerre` i, si el terminal és més estret que `columnes` + marges, l'amplada es redueix perquè quedin `marge-dret` columnes buides a la dreta. Amb `centrar = si`, es centra entre els marges. Si amb els marges no hi caben 20 columnes, s'ignoren. La barra d'estat ocupa tota l'amplada.
 6. **Cache:** les posicions de tall es guarden a cada `Line` i només es recalculen quan s'edita la línia o canvien les columnes o l'amplada del terminal.
 
 Interoperabilitat amb fitxers tallats a mà (fases posteriors):

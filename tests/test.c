@@ -980,6 +980,25 @@ static void test_config(void)
     CHECK(SET("centrar", "sí") == 0 && e.center == 1);
     CHECK(SET("centrar", "no") == 0 && e.center == 0);
     CHECK(SET("centrar", "potser") < 0);
+    CHECK(e.margin_left == 2 && e.margin_right == 2);
+    CHECK(SET("marge-esquerre", "4") == 0 && e.margin_left == 4);
+    CHECK(SET("marge-dret", "0") == 0 && e.margin_right == 0);
+    CHECK(SET("marge-dret", "-1") < 0 && e.margin_right == 0);
+
+    /* Marges: el text comença a marge-esquerre i deixa marge-dret si el
+     * terminal és més estret que les columnes */
+    SET("marge-esquerre", "2");
+    SET("marge-dret", "3");
+    ed_layout(&e, 50, 20);
+    CHECK(e.margin == 2 && e.width == 45);
+    ed_layout(&e, 100, 20);
+    CHECK(e.margin == 2 && e.width == 60);
+    SET("centrar", "si");
+    ed_layout(&e, 100, 20);
+    CHECK(e.margin == 2 + (95 - 60) / 2 && e.width == 60);
+    SET("centrar", "no");
+    ed_layout(&e, 22, 20);             /* no hi caben 20 columnes: sense marges */
+    CHECK(e.margin == 0 && e.width == 22);
     CHECK(SET("maquina-escriure", "fixa") == 0 && e.tw_mode == TW_FIXA);
     CHECK(SET("maquina-escriure", "clàssic") == 0 && e.tw_mode == TW_CLASSIC);
     CHECK(SET("maquina-escriure", "lenta") < 0);

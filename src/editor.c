@@ -25,6 +25,7 @@ void ed_init(Editor *e, int columns)
     e->autosave = e->autosave_last = 30;
     e->autosave_max = 300;
     e->recenter = 1;
+    e->margin_left = e->margin_right = 2;
     e->colors = 1;
     e->tw_mode = TW_SALT;
     e->tw_limit = 80;
@@ -256,12 +257,18 @@ static void typewriter_layout(Editor *e)
 void ed_layout(Editor *e, int screen_cols, int screen_lines)
 {
     size_t cr, tl, tr;
+    int ml = e->margin_left, avail = screen_cols - ml - e->margin_right;
 
-    e->width = e->columns < screen_cols ? e->columns : screen_cols;
+    /* Si amb els marges no hi caben 20 columnes, el text ocupa tota l'amplada */
+    if (avail < 20 && avail < e->columns) {
+        ml = 0;
+        avail = screen_cols;
+    }
+    e->width = e->columns < avail ? e->columns : avail;
     if (e->width < 1)
         e->width = 1;
     e->height = screen_lines - 2 > 0 ? screen_lines - 2 : 1;
-    e->margin = e->center && screen_cols > e->width ? (screen_cols - e->width) / 2 : 0;
+    e->margin = ml + (e->center && avail > e->width ? (avail - e->width) / 2 : 0);
 
     /* La fila de dalt pot haver quedat fora de rang si ha canviat l'amplada */
     if (e->top_line >= e->buf.nlines)

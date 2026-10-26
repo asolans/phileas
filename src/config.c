@@ -145,6 +145,10 @@ int config_set(Editor *e, const char *key, const char *v, char *err, size_t errs
         if (parse_int(v, 10, 1000, &n, err, errsz) < 0)
             return -1;
         e->columns = n;
+    } else if (!strcmp(key, "marge-esquerre")) {
+        return parse_int(v, 0, 100, &e->margin_left, err, errsz);
+    } else if (!strcmp(key, "marge-dret")) {
+        return parse_int(v, 0, 100, &e->margin_right, err, errsz);
     } else if (!strcmp(key, "centrar")) {
         return parse_bool(v, &e->center, err, errsz);
     } else if (!strcmp(key, "colors")) {
@@ -279,6 +283,8 @@ static void defaults(Editor *e)
     ed_init(&d, 72);
     e->columns = d.columns;
     e->center = d.center;
+    e->margin_left = d.margin_left;
+    e->margin_right = d.margin_right;
     e->colors = d.colors;
     e->tw_mode = d.tw_mode;
     e->tw_limit = d.tw_limit;
@@ -335,7 +341,9 @@ void config_template(FILE *f)
           "\n"
           "# Text\n"
           "columnes = 72                      # amplada de la columna de text\n"
-          "centrar = no                       # centrar la columna a la pantalla\n"
+          "marge-esquerre = 2                 # columnes buides a l'esquerra\n"
+          "marge-dret = 2                     # i a la dreta (si el terminal és estret)\n"
+          "centrar = no                       # centrar la columna entre els marges\n"
           "colors = si                        # colors de Markdown\n"
           "\n"
           "# Màquina d'escriure: salt, fixa o classic\n"

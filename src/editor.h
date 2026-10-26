@@ -48,6 +48,8 @@ typedef struct {
 
     int     columns;           /* amplada de text configurada */
     int     center;            /* columna de text centrada a la pantalla */
+    int     margin_left;       /* columnes buides a l'esquerra de la pantalla */
+    int     margin_right;      /* i a la dreta, si el terminal és estret */
     int     tw_mode;           /* TW_* */
     int     tw_limit;          /* % de l'alçada que el cursor no passa en baixar (salt) */
     int     tw_anchor;         /* % de l'alçada on queda el cursor després d'un salt */
