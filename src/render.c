@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 #include <wctype.h>
 
 /* Parelles de colors (fons per defecte del terminal) */
@@ -165,6 +167,29 @@ void ui_end(void)
         endwin();
         key_end();
     }
+}
+
+void ui_suspend(void)
+{
+    ui_end();
+}
+
+void ui_resume(void)
+{
+    reset_prog_mode();
+    key_init();
+    ui_sync_size();
+    clearok(curscr, TRUE);
+    refresh();
+}
+
+void ui_sync_size(void)
+{
+    struct winsize ws;
+
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_row > 0 && ws.ws_col > 0 &&
+        (ws.ws_row != LINES || ws.ws_col != COLS))
+        resize_term(ws.ws_row, ws.ws_col);
 }
 
 /* Dibuixa la fila r de la línia y. [s0, s1) és la part seleccionada. */

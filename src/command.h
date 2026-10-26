@@ -15,6 +15,15 @@ typedef struct {
 
 const Command *cmd_find(const char *name);
 
+/* Executa una ordre. args: el que s'ha escrit a la paleta després del nom
+ * (NULL o "" si no res); només les ordres externes n'admeten. */
+void cmd_run(Editor *e, const Command *c, const char *args);
+
+/* Ordres externes (phileasrc: externa.NOM i externa-breu.NOM). Una
+ * definició nova amb el mateix nom substitueix l'anterior. */
+int  cmd_config_extern(const char *name, const char *shell, int brief, char *err, size_t errsz);
+void cmd_extern_clear(void);
+
 /* Per a l'ajuda: totes les ordres, i les tecles assignades a cadascuna
  * (com a molt max; retorna quantes n'hi ha). */
 size_t cmd_count(void);

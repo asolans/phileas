@@ -954,6 +954,18 @@ static int fake_bind(const char *key, const char *cmd)
     return 0;
 }
 
+static char last_extern[128];
+
+static int fake_extern(const char *name, const char *shell, int brief, char *err, size_t errsz)
+{
+    if (!strcmp(name, "desar")) {
+        snprintf(err, errsz, "ja és una ordre");
+        return -1;
+    }
+    snprintf(last_extern, sizeof last_extern, "%s%s=%s", brief ? "breu:" : "", name, shell);
+    return 0;
+}
+
 static void test_config(void)
 {
     Editor e;
@@ -985,6 +997,17 @@ static void test_config(void)
     CHECK(SET("tecla.ctrl-h", "") == 0 && !strcmp(last_bind, "ctrl-h="));
     CHECK(SET("tecla.tecla-dolenta", "desar") < 0);
     CHECK(SET("tecla.", "desar") < 0);
+    /* Ordres externes: sense hook només es comprova la sintaxi */
+    CHECK(SET("externa.envia", "envia") == 0);
+    CHECK(SET("externa.Envia", "envia") < 0 && strstr(err, "incorrecte"));
+    CHECK(SET("externa.", "envia") < 0);
+    CHECK(SET("externa-breu.lletra", "") < 0 && strstr(err, "falta"));
+    config_extern_hook = fake_extern;
+    CHECK(SET("externa.envia", "envia") == 0 && !strcmp(last_extern, "envia=envia"));
+    CHECK(SET("externa-breu.lletra-mes", "lletra +") == 0 &&
+          !strcmp(last_extern, "breu:lletra-mes=lletra +"));
+    CHECK(SET("externa.desar", "x") < 0 && strstr(err, "ja és"));
+    config_extern_hook = NULL;
 #undef SET
     ed_free(&e);
 
@@ -996,13 +1019,15 @@ static void test_config(void)
     fclose(f);
     f = fopen(user, "w");
     fputs("# comentari\n\n  columnes=64   # de l'usuari\nopcio-rara = 1\nsense igual\n"
-          "tecla.f9 = colors\nautodesat = 10\n", f);
+          "tecla.f9 = colors\nautodesat = 10\nexterna-breu.gira = gira  # comentari\n", f);
     fclose(f);
     ed_init(&e, 72);
+    config_extern_hook = fake_extern;
     CHECK(config_load(&e, sys, user, msg, sizeof msg) == 2);
     CHECK(strstr(msg, "usuari, línia 4") && strstr(msg, "i 1 error més"));
     CHECK(e.columns == 64 && e.colors == 0 && e.tw_mode == TW_FIXA && e.autosave == 10);
     CHECK(!strcmp(last_bind, "f9=colors"));
+    CHECK(!strcmp(last_extern, "breu:gira=gira"));
     CHECK(!strcmp(e.dict, e.langs[0]));
     /* Sense fitxers: es torna als valors interns */
     CHECK(config_load(&e, "/no/existeix", "/no/existeix", msg, sizeof msg) == 0);
@@ -1025,6 +1050,7 @@ static void test_config(void)
     unlink(sys);
     unlink(user);
     config_bind_hook = NULL;
+    config_extern_hook = NULL;
 }
 
 static void test_plain(void)

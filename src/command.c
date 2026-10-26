@@ -16,6 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 /* Moviment: sense Maj cancel·la la selecció feta amb Maj+fletxes, però
  * amplia la feta amb Ctrl+Espai. Amb Maj, la comença o l'amplia. */
@@ -253,18 +255,28 @@ static void c_redraw(Editor *e)
     clearok(curscr, TRUE);
 }
 
+/* Ctrl+P: el nom de l'ordre i, separats per espais, els arguments (només
+ * per a les ordres externes: «lletra +») */
 static void c_palette(Editor *e)
 {
-    char name[64] = "";
+    char line[256] = "";
+    char *name, *args;
     const Command *c;
 
-    if (!prompt(e, "Ordre: ", name, sizeof name, NULL) || !name[0])
+    if (!prompt(e, "Ordre: ", line, sizeof line, NULL))
         return;
+    name = line + strspn(line, " ");
+    if (!*name)
+        return;
+    args = name + strcspn(name, " ");
+    if (*args)
+        *args++ = '\0';
+    args += strspn(args, " ");
     if (!(c = cmd_find(name))) {
         ed_msg(e, "Ordre desconeguda: %s", name);
         return;
     }
-    c->fn(e);
+    cmd_run(e, c, args);
 }
 
 static void c_undo(Editor *e)
@@ -440,6 +452,7 @@ static void c_reload_config(Editor *e)
     int n;
 
     cmd_bind_defaults();
+    cmd_extern_clear();
     n = config_load(e, CONFIG_SYSTEM, NULL, msg, sizeof msg);
     render_colors(e);
     config_user_path(path, sizeof path);
@@ -849,22 +862,216 @@ static struct {
 } bindings[MAX_BINDINGS];
 static size_t nbindings;
 
+#define NCOMMANDS (sizeof commands / sizeof commands[0])
+
+/* ---- Ordres externes ---- */
+
+/* El Command ha de ser el primer camp: cmd_run() passa d'un a l'altre */
+typedef struct {
+    Command cmd;
+    char    name[32];
+    char    desc[96];
+    char   *shell;
+    int     brief;
+} External;
+
+#define MAX_EXTERNALS 32
+static External externals[MAX_EXTERNALS];
+static size_t nexternals;
+
+static External *as_external(const Command *c)
+{
+    if (c >= &externals[0].cmd && c < &externals[nexternals].cmd)
+        return (External *)c;
+    return NULL;
+}
+
+void cmd_extern_clear(void)
+{
+    for (size_t i = 0; i < nexternals; i++)
+        free(externals[i].shell);
+    nexternals = 0;
+}
+
+int cmd_config_extern(const char *name, const char *shell, int brief, char *err, size_t errsz)
+{
+    External *x = NULL;
+
+    for (size_t i = 0; i < NCOMMANDS; i++) {
+        if (!strcmp(commands[i].name, name)) {
+            snprintf(err, errsz, "«%s» ja és una ordre de Phileas", name);
+            return -1;
+        }
+    }
+    for (size_t i = 0; i < nexternals && !x; i++)
+        if (!strcmp(externals[i].name, name))
+            x = &externals[i];
+    if (!x) {
+        if (nexternals == MAX_EXTERNALS) {
+            snprintf(err, errsz, "massa ordres externes (com a molt %d)", MAX_EXTERNALS);
+            return -1;
+        }
+        x = &externals[nexternals++];
+        snprintf(x->name, sizeof x->name, "%s", name);
+        x->shell = NULL;
+    }
+    free(x->shell);
+    x->shell = xstrdup(shell);
+    x->brief = brief;
+    snprintf(x->desc, sizeof x->desc, "Ordre externa: %s", shell);
+    x->cmd = (Command){ x->name, NULL, x->desc, ACT_NONE };
+    return 0;
+}
+
+/* L'ordre de shell amb els arguments, cadascun entre cometes simples */
+static char *extern_command(const External *x, const char *args)
+{
+    size_t cap = strlen(x->shell) + 4 * strlen(args ? args : "") + 16, n;
+    char *s = xmalloc(cap);
+
+    n = (size_t)snprintf(s, cap, "%s", x->shell);
+    while (args && *args) {
+        size_t len = strcspn(args, " ");
+
+        s[n++] = ' ';
+        s[n++] = '\'';
+        for (size_t i = 0; i < len; i++) {
+            if (args[i] == '\'') {
+                memcpy(s + n, "'\\''", 4);
+                n += 4;
+            } else {
+                s[n++] = args[i];
+            }
+        }
+        s[n++] = '\'';
+        args += len;
+        args += strspn(args, " ");
+    }
+    s[n] = '\0';
+    return s;
+}
+
+/* Missatge d'error segons l'estat de sortida (de system o pclose) */
+static int extern_failed(Editor *e, const External *x, int st, const char *last)
+{
+    if (st != -1 && WIFEXITED(st) && WEXITSTATUS(st) == 0)
+        return 0;
+    if (st != -1 && WIFEXITED(st) && WEXITSTATUS(st) == 127)
+        ed_msg(e, "%s: no s'ha trobat l'ordre «%s»", x->name, x->shell);
+    else if (st != -1 && WIFEXITED(st))
+        ed_msg(e, "%s: %s%s(error %d)", x->name, last ? last : "", last && *last ? " " : "",
+               WEXITSTATUS(st));
+    else
+        ed_msg(e, "%s: no s'ha pogut executar", x->name);
+    return 1;
+}
+
+/* Breu: sense teclat, i la darrera línia de la sortida a la barra d'estat */
+static void run_brief(Editor *e, const External *x, const char *cmd)
+{
+    char *full = xmalloc(strlen(cmd) + 32);
+    char line[256], last[256] = "";
+    FILE *p;
+    int st;
+
+    ed_msg(e, "%s: executant…", x->name);
+    render(e);
+    refresh();
+    sprintf(full, "%s </dev/null 2>&1", cmd);
+    p = popen(full, "r");
+    free(full);
+    if (!p) {
+        ed_msg(e, "%s: no s'ha pogut executar", x->name);
+        return;
+    }
+    while (fgets(line, sizeof line, p)) {
+        line[strcspn(line, "\r\n")] = '\0';
+        if (line[0])
+            snprintf(last, sizeof last, "%s", line);
+    }
+    st = pclose(p);
+    /* La lletra o el gir de la consola en canvien la mida, i el que hi
+     * hagi escrit l'ordre s'ha d'esborrar */
+    ui_sync_size();
+    clearok(curscr, TRUE);
+    if (extern_failed(e, x, st, last))
+        return;
+    if (last[0])
+        ed_msg(e, "%s", last);
+    else
+        ed_msg(e, "%s: fet", x->name);
+}
+
+/* Interactiva: el terminal en mode normal; Retorn torna a Phileas */
+static void run_interactive(Editor *e, const External *x, const char *cmd)
+{
+    const char *clear = tigetstr("clear");
+    char ch;
+    int st;
+
+    ui_suspend();
+    if (clear && clear != (char *)-1)
+        putp(clear);
+    fflush(stdout);
+    st = system(cmd);
+    fputs("\nPrem Retorn per tornar a Phileas.", stdout);
+    fflush(stdout);
+    while (read(STDIN_FILENO, &ch, 1) == 1 && ch != '\n')
+        ;
+    ui_resume();
+    if (!extern_failed(e, x, st, NULL))
+        ed_msg(e, "%s: fet", x->name);
+}
+
+static void run_external(Editor *e, const External *x, const char *args)
+{
+    char *cmd;
+
+    /* L'ordre pot llegir el document (exporta, envia): primer es desa */
+    if (e->buf.modified && e->filename) {
+        save_to(e, e->filename);
+        if (e->buf.modified)
+            return;
+    }
+    cmd = extern_command(x, args);
+    if (x->brief)
+        run_brief(e, x, cmd);
+    else
+        run_interactive(e, x, cmd);
+    free(cmd);
+}
+
+void cmd_run(Editor *e, const Command *c, const char *args)
+{
+    const External *x = as_external(c);
+
+    if (x)
+        run_external(e, x, args);
+    else if (args && *args)
+        ed_msg(e, "L'ordre %s no admet arguments", c->name);
+    else
+        c->fn(e);
+}
+
 const Command *cmd_find(const char *name)
 {
-    for (size_t i = 0; i < sizeof commands / sizeof commands[0]; i++)
+    for (size_t i = 0; i < NCOMMANDS; i++)
         if (!strcmp(commands[i].name, name))
             return &commands[i];
+    for (size_t i = 0; i < nexternals; i++)
+        if (!strcmp(externals[i].name, name))
+            return &externals[i].cmd;
     return NULL;
 }
 
 size_t cmd_count(void)
 {
-    return sizeof commands / sizeof commands[0];
+    return NCOMMANDS + nexternals;
 }
 
 const Command *cmd_at(size_t i)
 {
-    return &commands[i];
+    return i < NCOMMANDS ? &commands[i] : &externals[i - NCOMMANDS].cmd;
 }
 
 int cmd_keys(const Command *c, int *keys, int max)

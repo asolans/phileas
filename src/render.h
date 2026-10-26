@@ -9,6 +9,16 @@ void ui_init(void);
 void render_colors(Editor *e);
 void ui_end(void);
 
+/* Deixa el terminal en mode normal per executar un altre programa, i hi
+ * torna. ui_resume() redibuixa la pantalla sencera i adopta la mida
+ * actual del terminal, que el programa pot haver canviat. */
+void ui_suspend(void);
+void ui_resume(void);
+
+/* Si la mida del terminal ha canviat (p. ex. una altra lletra de la
+ * consola), l'adopta sense esperar el senyal. */
+void ui_sync_size(void);
+
 /* Recalcula la disposició i dibuixa la pantalla (sense refresh()). */
 void render(Editor *e);
 

@@ -5,7 +5,7 @@ Editor de text per a consola (Linux), orientat a escriure prosa en Markdown.
 ## Estat
 
 - **Fase actual:** 8 — Integració al projecte BYOK (F0–F7 completades)
-- **Última actualització:** 2026-10-25
+- **Última actualització:** 2026-10-26
 
 ## Requeriments (versió inicial)
 
@@ -526,7 +526,7 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 - [x] **F6b** — Ajuda: F1 obre una finestra amb una guia de totes les dreceres de teclat
 - [x] **F6c** — Mode màquina d'escriure («typewriter»): la línia on s'escriu es manté a una altura fixa de la pantalla i el text no arriba mai a baix de tot (pensat per a una pantalla en vertical)
 - [x] **F7** — Configuració i proves en Raspberry Pi
-- [ ] **F8** — Integració al projecte BYOK (`~/byok-build`), quan el processador estigui avançat:
+- [ ] **F8** — Integració al projecte BYOK (`~/byok-build`). **En curs des del 2026-10-26:** fork `byok/br2-phileas` de la base BYOK, amb Phileas en lloc de micro i WordGrinder. Instruccions, decisions i particions: `BYOK/byok/02 - Fork Phileas.md`.
   - afegir Phileas a la imatge com a paquet de buildroot;
   - afegir-hi la biblioteca `libhunspell-1.7.so.0` (compilada com a la prova del 2026-10-25) a `/usr/lib`;
   - posar els diccionaris `ca` i `es_ES` (`.aff` i `.dic`) a `/usr/share/hunspell`, on Phileas els troba sense variables d'entorn;
@@ -540,6 +540,11 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **Arrencada:** al missatge de `tty1` (`/etc/profile.d/byok.sh`), afegir Phileas al costat de `wg`.
   - **Eines de prova** a `tools/`: `ptyrun.c` (pseudoterminal a la Pi, on dropbear no n'obre), `screen.py` i `simple.ti` (emulador de pantalla mínim per a les proves interactives).
   - **A la Pi, `/tmp/phileas`** (es perd en reiniciar): `phileas-nou`, el guió `ph`, `lib/libhunspell-1.7.so.0`, `dict/` i `config/phileasrc`.
+
+  **Fet al fork `br2-phileas`** (2026-10-26):
+  - paquets `phileas` (font local: aquest repositori, `make phileas-rebuild`), `hunspell` (només la biblioteca), `hunspell-ca` (Softcatalà 3.0.9) i `hunspell-es` (LibreOffice, `es_ES`);
+  - l'executable a `/usr/libexec/phileas/phileas`; `/usr/bin/phileas` (i l'enllaç `ph`) és un script que posa `PHILEAS_CONFIG=/data/phileas` i en sortir fa `sync` i `clear`, com feia `wg`;
+  - `/etc/phileas/phileasrc` de la imatge: `idiomes = es ca` i les ordres externes `lletra`, `gira`, `exporta` (breus) i `envia` (interactiva).
 
 ## Registre
 
@@ -874,3 +879,14 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **Solució:** `keyok(KEY_SUSPEND, FALSE)` a `key_init()`, perquè ncurses no tradueixi aquesta tecla. És l'única tecla d'un sol caràcter de control en aquesta situació: `kbs`, el Retrocés, ja es tractava.
   - **Proves:** desfer després d'escriure i d'esborrar amb Supr, i refer, amb TERM=linux, screen i xterm-256color al PC, i a la Pi amb TERM=linux.
 - **2026-10-25** — Final de la jornada: totes les fases F0–F7 completades i provades a la Raspberry Pi 1. Afegits `make install` (per al paquet de buildroot) i les eines de prova a `tools/`. **Pla:** l'endemà s'integra Phileas al projecte BYOK, i tots dos projectes evolucionaran junts des d'allà (vegeu les notes de la F8).
+- **2026-10-26** — **Inici de la F8.** Instruccions de l'usuari: fork de BYOK anomenat phileas, sense micro ni WordGrinder; la paleta ha de cridar `lletra`, `gira`, `exporta` i `envia`; en sortir, `sync` i `clear`. Document: `BYOK/byok/02 - Fork Phileas.md`.
+  - **Ordres externes** (perquè Phileas continuï sent genèric, sense les ordres de BYOK escrites al codi):
+    - `externa.NOM = ORDRE` i `externa-breu.NOM = ORDRE` al `phileasrc`. `NOM` passa a ser una ordre més: surt a la paleta i a l'ajuda (secció «Ordres de la paleta») i se li pot assignar una tecla amb `tecla.`, en una línia posterior;
+    - a la paleta, el que s'escriu després del nom en són els arguments (`lletra +`, `gira dreta`), cadascun entre cometes simples. Les ordres de Phileas responen «no admet arguments»;
+    - abans d'executar-la es desa el document, si té nom i canvis;
+    - **breu:** sense teclat (`</dev/null`), «NOM: executant…» a la barra, i després la darrera línia de la sortida (o «NOM: fet»). Redibuixa la pantalla sencera i adopta la mida nova del terminal (`ui_sync_size`), perquè `lletra` i `gira` la canvien;
+    - **interactiva:** el terminal torna al mode normal (`ui_suspend`), s'esborra la pantalla, s'executa l'ordre, «Prem Retorn per tornar a Phileas.» i es torna a l'editor (`ui_resume`);
+    - errors: «no s'ha trobat l'ordre» (127) i «(error N)» amb la darrera línia;
+    - `recarregar-configuracio` les esborra i les torna a llegir. La plantilla (`--config`) les explica.
+  - **Proves:** 1.636 comprovacions unitàries, també amb sanititzadors (sintaxi, noms incorrectes, valor buit, nom d'una ordre de Phileas, comentari al final de la línia); interactives: arguments amb cometes, desat previ, error amb codi, tecla F12, ordre interna amb arguments, ordre interactiva i tornada, recàrrega, i tot plegat amb ASan/UBSan sense errors.
+- **2026-10-26** — Provat a la Pi dins la imatge BYOK Phileas: tot correcte. **Versió 1.0** (`PHILEAS_VERSION` 1.0.0, etiqueta `v1.0`), la de la imatge BYOK Phileas 1.0.

@@ -12,6 +12,12 @@
  * ncurses); sense, les línies "tecla." només es comproven per sobre. */
 extern int (*config_bind_hook)(const char *key, const char *cmd);
 
+/* Defineix una ordre externa (externa.NOM o externa-breu.NOM = ORDRE).
+ * Retorna -1 amb el motiu a err. La fixa main.c; sense, les línies
+ * «externa» només es comproven per sobre. */
+extern int (*config_extern_hook)(const char *name, const char *shell, int brief,
+                                 char *err, size_t errsz);
+
 /* Una opció de la línia d'ordres, que mana sobre els fitxers. Es tornen a
  * aplicar en recarregar la configuració. */
 void config_override(const char *key, const char *value);

@@ -7,6 +7,18 @@
 #include <strings.h>
 
 int (*config_bind_hook)(const char *key, const char *cmd);
+int (*config_extern_hook)(const char *name, const char *shell, int brief, char *err, size_t errsz);
+
+/* Nom d'ordre: lletres minúscules, xifres i guionets */
+static int valid_command_name(const char *s)
+{
+    if (!*s || strlen(s) >= 32)
+        return 0;
+    for (; *s; s++)
+        if (!((*s >= 'a' && *s <= 'z') || (*s >= '0' && *s <= '9') || *s == '-'))
+            return 0;
+    return 1;
+}
 
 /* Opcions de la línia d'ordres, en l'ordre en què s'han donat */
 #define MAX_OVERRIDES 16
@@ -106,6 +118,23 @@ int config_set(Editor *e, const char *key, const char *v, char *err, size_t errs
             snprintf(err, errsz, "tecla «%s» o ordre «%s» desconeguda", key + 6, v);
             return -1;
         }
+        return 0;
+    }
+    if (!strncmp(key, "externa.", 8) || !strncmp(key, "externa-breu.", 13)) {
+        int brief = key[7] == '-';
+        const char *name = key + (brief ? 13 : 8);
+
+        if (!valid_command_name(name)) {
+            snprintf(err, errsz, "nom d'ordre «%s» incorrecte (lletres minúscules, xifres i "
+                     "guionets)", name);
+            return -1;
+        }
+        if (!*v) {
+            snprintf(err, errsz, "falta l'ordre que executa «%s»", name);
+            return -1;
+        }
+        if (config_extern_hook)
+            return config_extern_hook(name, v, brief, err, errsz);
         return 0;
     }
     for (size_t i = 0; i < sizeof color_keys / sizeof *color_keys; i++)
@@ -337,6 +366,15 @@ void config_template(FILE *f)
           "# shift-, ctrl-, alt- o ctrl-shift- davant. La paleta (Ctrl+P) té els noms\n"
           "# de les ordres.\n"
           "# tecla.ctrl-t = maquina-escriure\n"
-          "# tecla.f9 = colors\n",
+          "# tecla.f9 = colors\n"
+          "\n"
+          "# Ordres externes: NOM passa a ser una ordre de la paleta que executa\n"
+          "# ORDRE amb /bin/sh. A la paleta, el que s'escriu després del nom en són\n"
+          "# els arguments. Abans d'executar-la es desa el document si té canvis.\n"
+          "#   externa.NOM = ORDRE       amb la pantalla del terminal; Retorn torna\n"
+          "#   externa-breu.NOM = ORDRE  la darrera línia de la sortida, a la barra\n"
+          "# Per assignar-hi una tecla, la línia tecla. va després de la definició.\n"
+          "# externa.terminal = sh\n"
+          "# externa-breu.paraules = wc -w\n",
           f);
 }

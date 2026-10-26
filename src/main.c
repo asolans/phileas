@@ -17,7 +17,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define PHILEAS_VERSION  "0.1.0"
+#define PHILEAS_VERSION  "1.0.0"
 #define DEFAULT_COLUMNS  72
 
 static void usage(FILE *f)
@@ -103,6 +103,7 @@ int main(int argc, char **argv)
     ed_init(&e, DEFAULT_COLUMNS);
     cmd_bind_defaults();
     config_bind_hook = cmd_config_bind;
+    config_extern_hook = cmd_config_extern;
     cfg_errors = config_load(&e, CONFIG_SYSTEM, NULL, cfg_msg, sizeof cfg_msg);
 
     if (optind < argc) {
@@ -175,7 +176,7 @@ int main(int argc, char **argv)
                 free(conv);
             }
         } else if ((c = cmd_for_key(key))) {
-            c->fn(&e);
+            cmd_run(&e, c, NULL);
         } else if (!(key & (KEY_FLAG_FN | KEY_FLAG_ALT)) && utf8_printable((wchar_t)key)) {
             char s[4];
             ed_insert(&e, s, utf8_encode((wchar_t)key, s));
@@ -188,6 +189,7 @@ int main(int argc, char **argv)
 
     ui_end();
     spell_close();
+    cmd_extern_clear();
     ed_free(&e);
     return 0;
 }
