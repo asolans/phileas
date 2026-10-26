@@ -994,6 +994,8 @@ static int extern_failed(Editor *e, const External *x, int st, const char *last)
     else if (st != -1 && WIFEXITED(st))
         ed_msg(e, "%s: %s%s(error %d)", x->name, last ? last : "", last && *last ? " " : "",
                WEXITSTATUS(st));
+    else if (st != -1 && WIFSIGNALED(st))
+        ed_msg(e, "%s: l'ordre s'ha interromput (%s)", x->name, strsignal(WTERMSIG(st)));
     else
         ed_msg(e, "%s: no s'ha pogut executar", x->name);
     return 1;
@@ -1017,10 +1019,19 @@ static void run_brief(Editor *e, const External *x, const char *cmd)
         ed_msg(e, "%s: no s'ha pogut executar", x->name);
         return;
     }
-    while (fgets(line, sizeof line, p)) {
-        line[strcspn(line, "\r\n")] = '\0';
-        if (line[0])
-            snprintf(last, sizeof last, "%s", line);
+    /* Fins al final de la sortida. Un senyal pot interrompre la lectura: la
+     * lletra o el gir de la consola envien SIGWINCH, i si es deixés de
+     * llegir, l'ordre moriria (SIGPIPE) en escriure la darrera línia. */
+    for (;;) {
+        if (fgets(line, sizeof line, p)) {
+            line[strcspn(line, "\r\n")] = '\0';
+            if (line[0])
+                snprintf(last, sizeof last, "%s", line);
+        } else if (ferror(p) && errno == EINTR) {
+            clearerr(p);
+        } else {
+            break;
+        }
     }
     st = pclose(p);
     /* La lletra o el gir de la consola en canvien la mida, i el que hi
