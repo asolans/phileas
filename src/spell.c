@@ -4,7 +4,9 @@
 #include "util.h"
 
 #include <ctype.h>
+#ifndef PHILEAS_HUNSPELL_STATIC
 #include <dlfcn.h>
+#endif
 #include <errno.h>
 #include <iconv.h>
 #include <stdint.h>
@@ -27,7 +29,19 @@ static struct {
     int   (*add)(Hunhandle *h, const char *word);
 } hs;
 
+#ifdef PHILEAS_HUNSPELL_STATIC
+/* Executable estàtic (make HUNSPELL_STATIC=1): no hi ha dlopen i la
+ * biblioteca va enllaçada */
+Hunhandle *Hunspell_create(const char *aff, const char *dic);
+void  Hunspell_destroy(Hunhandle *h);
+int   Hunspell_spell(Hunhandle *h, const char *word);
+char *Hunspell_get_dic_encoding(Hunhandle *h);
+int   Hunspell_suggest(Hunhandle *h, char ***list, const char *word);
+void  Hunspell_free_list(Hunhandle *h, char ***list, int n);
+int   Hunspell_add(Hunhandle *h, const char *word);
+#else
 static void *lib;
+#endif
 static char  error[256];
 
 /* ---- Diccionaris carregats ---- */
@@ -124,6 +138,19 @@ static void dict_free(Dict *d)
 
 /* ---- Càrrega ---- */
 
+#ifdef PHILEAS_HUNSPELL_STATIC
+static int load_lib(void)
+{
+    hs.create = Hunspell_create;
+    hs.destroy = Hunspell_destroy;
+    hs.spell = Hunspell_spell;
+    hs.get_dic_encoding = Hunspell_get_dic_encoding;
+    hs.suggest = Hunspell_suggest;
+    hs.free_list = Hunspell_free_list;
+    hs.add = Hunspell_add;
+    return 0;
+}
+#else
 static int load_lib(void)
 {
     static const char *names[] = { "libhunspell-1.7.so.0", "libhunspell-1.7.so",
@@ -154,6 +181,7 @@ bad:
     lib = NULL;
     return -1;
 }
+#endif
 
 static int exists(const char *path)
 {

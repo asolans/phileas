@@ -5,6 +5,12 @@ OPT       ?= -O2
 CFLAGS    += $(OPT) -std=c11 -Wall -Wextra -Wpedantic -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600 \
              $(shell $(PKG_CONFIG) --cflags ncursesw)
 LDLIBS    += $(shell $(PKG_CONFIG) --libs ncursesw)
+# Executable estàtic (Phileas portable): make HUNSPELL_STATIC=1 LDFLAGS=-static
+# hi enllaça hunspell, que no es pot carregar amb dlopen
+ifdef HUNSPELL_STATIC
+CFLAGS    += -DPHILEAS_HUNSPELL_STATIC
+LDLIBS    += $(shell $(PKG_CONFIG) --static --libs hunspell) -lstdc++
+endif
 
 SRC  = $(wildcard src/*.c)
 OBJ  = $(SRC:src/%.c=build/%.o)
