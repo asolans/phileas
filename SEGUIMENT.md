@@ -5,7 +5,7 @@ Editor de text per a consola (Linux), orientat a escriure prosa en Markdown.
 ## Estat
 
 - **Fase actual:** 8 — Integració al projecte BYOK (F0–F7 completades). Proposta de la F9 (Pi i escriptori), pendent de confirmar
-- **Última actualització:** 2026-10-26
+- **Última actualització:** 2026-10-27
 
 ## Requeriments (versió inicial)
 
@@ -268,7 +268,7 @@ Interoperabilitat amb fitxers tallats a mà (fases posteriors):
 | F2 | mostrar/amagar la barra d'ajuda inferior (estil nano) |
 | F1 | `ajuda` (✅ ordres per temes, amb les tecles actuals; escriure filtra) |
 | **Ctrl+P** | **`paleta`**: escriure el nom de qualsevol ordre (amb autocompleció) |
-| Esc | cancel·lar el diàleg o la selecció |
+| Esc | ✅ `menu` (2026-10-27): menús i submenús a l'estil WordGrinder; si hi ha selecció, primer la cancel·la. Als diàlegs, continua cancel·lant |
 
 Lliures per al futur: Ctrl+D, Ctrl+E, Ctrl+J, Ctrl+K, Ctrl+T, Ctrl+U, F4–F6, F9–F12 i la majoria d'Alt+lletra.
 
@@ -962,3 +962,10 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **Causa:** `lletra` canvia la mida de la consola i el nucli envia SIGWINCH a Phileas mentre llegeix la sortida de l'ordre breu. El senyal interrompia el `fgets()` (EINTR), Phileas deixava de llegir i tancava la canonada, i l'ordre moria per SIGPIPE en escriure la darrera línia («Lletra … caràcters»). Una ordre acabada per un senyal es mostrava com «no s'ha pogut executar».
   - **Solució:** la lectura continua després d'un EINTR, fins al final de la sortida. Si una ordre acaba per un senyal, ara es diu: «l'ordre s'ha interromput (senyal)».
   - **Proves:** al PC, una ordre breu que escriu després d'un SIGWINCH (canvi de mida del pseudoterminal): abans «(error 1)», ara la darrera línia a la barra. 1.663 comprovacions. **Pendent:** a la Pi.
+- **2026-10-27** — **Menús a l'estil WordGrinder** (ordre `menu`, a Esc), a petició de l'usuari.
+  - **Comportament:** Esc obre el menú principal (Fitxer, Edita, Cerca, Ortografia, Vista, BYOK, Ajuda i configuració). ↑↓ i Enter, o la lletra de l'opció, hi entren; → obre un submenú; ← o Esc tornen un nivell enrere i, al principal, el tanquen. Cada opció mostra la seva drecera actual (la de l'usuari si l'ha canviada al `phileasrc`). Si hi ha selecció, Esc primer la cancel·la (l'ordre `cancellar` continua a la paleta).
+  - **Disseny:** `src/menu.c`, una taula fixa en C. `menu_choose()` només retorna l'ordre triada; l'executa `c_menu()` amb `cmd_run()`, amb el menú ja tancat. Les opcions d'ordres que no existeixen no es mostren, ni els submenús buits.
+  - **Submenú BYOK:** només hi és si hi ha ordres externes. Les conegudes tenen etiqueta i arguments propis (Lletra més gran = `lletra +`, Lletra més petita = `lletra -`, Gira la pantalla, Exporta al pendrive, Envia a un ordinador). Les altres externes s'hi afegeixen amb el seu nom. Es torna a construir cada vegada, perquè la configuració es pot recarregar.
+  - **Pantalles petites:** les caixes es desplacen per cabre i, si no hi caben d'alt, la llista es desplaça amb el cursor (fletxes ↑↓ a la vora).
+  - **Limitació:** com que Esc cancel·la la selecció, Talla i Copia del menú no tenen mai res seleccionat; cal Ctrl+X i Ctrl+C.
+  - **Proves:** al PC amb `tools/screen.py` (80×24 i 40×10): menú, submenús, lletres, ←, Esc Esc, Esc amb selecció, BYOK amb externes de prova (`lletra -` arriba amb l'argument), l'ajuda. 1.663 comprovacions. **Pendent:** a la Pi (caràcters de les vores i fletxa → a la consola).

@@ -4,6 +4,7 @@
 #include "filebrowser.h"
 #include "help.h"
 #include "keys.h"
+#include "menu.h"
 #include "render.h"
 #include "search.h"
 #include "spell.h"
@@ -310,6 +311,20 @@ static void c_palette(Editor *e)
         return;
     }
     cmd_run(e, c, args);
+}
+
+/* Esc: si hi ha selecció, la cancel·la; si no, obre el menú */
+static void c_menu(Editor *e)
+{
+    const Command *c;
+    const char *args;
+
+    if (e->sel_mode != SEL_NONE) {
+        ed_sel_clear(e);
+        return;
+    }
+    if ((c = menu_choose(e, &args)))
+        cmd_run(e, c, args);
 }
 
 static void c_undo(Editor *e)
@@ -820,6 +835,7 @@ static const Command commands[] = {
     { "sortir",            c_quit,       "Surt de Phileas", ACT_NONE },
     { "redibuixar",        c_redraw,     "Torna a dibuixar la pantalla", ACT_NONE },
     { "paleta",            c_palette,    "Executa una ordre pel nom", ACT_NONE },
+    { "menu",              c_menu,       "Obre el menú (si hi ha selecció, primer la cancel·la)", ACT_NONE },
     { "ajuda",             c_help,       "Mostra aquesta ajuda", ACT_NONE },
 
     { "desfer",            c_undo,       "Desfà l'últim canvi", ACT_NONE },
@@ -861,7 +877,7 @@ static const char *const default_bindings[][2] = {
     { "ctrl-shift-end", "seleccio-fi-document" },
     { "ctrl-space", "marca" },
     { "ctrl-a", "seleccionar-tot" },
-    { "esc", "cancellar" },
+    { "esc", "menu" },
 
     { "enter", "nova-linia" },
     { "tab", "tabulador" },

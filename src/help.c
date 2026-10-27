@@ -38,12 +38,13 @@ static const struct {
     { "Vista", (const char *const[]){
         "maquina-escriure", "centrar", "colors", "redibuixar", NULL } },
     { "Configuració i ajuda", (const char *const[]){
-        "ajuda", "paleta", "recarregar-configuracio", "autodesat", NULL } },
+        "menu", "ajuda", "paleta", "recarregar-configuracio", "autodesat", NULL } },
 };
 #define NSECTIONS (sizeof sections / sizeof sections[0])
 
 /* Text fix del principi */
 static const char *const intro[] = {
+    "Esc (menú): les ordres per temes; la lletra o Enter tria, ← o Esc torna enrere.",
     "Ctrl+P (paleta): executa qualsevol ordre pel nom; Tab completa el nom.",
     "Les tecles es canvien al phileasrc: tecla.NOM = ordre.",
     "Navegador (Ctrl+O): Enter obre, ← puja, escriu per filtrar.",
