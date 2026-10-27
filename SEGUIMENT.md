@@ -969,3 +969,4 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **Pantalles petites:** les caixes es desplacen per cabre i, si no hi caben d'alt, la llista es desplaça amb el cursor (fletxes ↑↓ a la vora).
   - **Limitació:** com que Esc cancel·la la selecció, Talla i Copia del menú no tenen mai res seleccionat; cal Ctrl+X i Ctrl+C.
   - **Proves:** al PC amb `tools/screen.py` (80×24 i 40×10): menú, submenús, lletres, ←, Esc Esc, Esc amb selecció, BYOK amb externes de prova (`lletra -` arriba amb l'argument), l'ajuda. 1.663 comprovacions. **Pendent:** a la Pi (caràcters de les vores i fletxa → a la consola).
+- **2026-10-27** — Menús gravats a la SD i provats a la Pi per l'usuari: correctes («milloren molt la usabilitat»). **Versió 2.0** (`PHILEAS_VERSION` 2.0.0, etiqueta `v2.0`): v1.0 + autocompleció a la paleta (C1), marges, desat en rebre SIGHUP/SIGTERM, rescat al directori actual, correcció d'EINTR a les ordres breus i els menús (Esc).

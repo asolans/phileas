@@ -17,7 +17,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define PHILEAS_VERSION  "1.0.0"
+#define PHILEAS_VERSION  "2.0.0"
 #define DEFAULT_COLUMNS  72
 
 static Editor *editor;   /* per al desat d'emergència */
