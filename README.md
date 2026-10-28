@@ -270,12 +270,13 @@ l'usuari: `$PHILEAS_CONFIG/phileasrc` si hi ha aquesta variable, si no
 `$XDG_CONFIG_HOME/phileas/phileasrc` o `~/.config/phileas/phileasrc`. Les
 opcions de la línia d'ordres manen sobre tots dos.
 
-Per fer-se'n un a partir dels valors per defecte:
-
-```bash
-mkdir -p ~/.config/phileas
-phileas --config > ~/.config/phileas/phileasrc
-```
+Les opcions del menú Vista (columna centrada, colors, màquina d'escriure i
+tema) es desen soles al fitxer de l'usuari. Per tenir-lo complet, amb totes les
+opcions i els valors actuals, dins Phileas: Ctrl+P `desar-configuracio` (o
+Esc → Ajuda i configuració → Desa la configuració). Conserva les línies
+`tecla.` i `externa` que hi hagués, i deixa l'anterior a `phileasrc.anterior`.
+`phileas --config` escriu el mateix a la sortida; no el redirigiu al mateix
+`phileasrc`, que el shell buida abans que Phileas el llegeixi.
 
 Només cal deixar-hi les opcions que es volen canviar. Un exemple:
 

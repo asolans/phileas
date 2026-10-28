@@ -31,6 +31,10 @@ int  config_set(Editor *e, const char *key, const char *value, char *err, size_t
  * d'errors i deixa el primer a msg (fitxer, línia i motiu). */
 int  config_load(Editor *e, const char *sys, const char *user, char *msg, size_t msgsz);
 
+/* Com config_load, sense les opcions de la línia d'ordres: els valors dels
+ * fitxers, per desar-los. */
+int  config_load_files(Editor *e, const char *sys, const char *user, char *msg, size_t msgsz);
+
 /* Camí del fitxer de l'usuari. */
 void config_user_path(char *out, size_t size);
 
@@ -40,7 +44,14 @@ void config_user_path(char *out, size_t size);
  * fitxer i el directori si cal. Retorna -1 amb errno si no pot. */
 int  config_store(const char *path, const char *key, const char *value);
 
-/* Escriu un fitxer de configuració complet amb els valors per defecte. */
-void config_template(FILE *f);
+/* Desa a path la configuració completa amb els valors de e (config_template;
+ * e, de config_load_files),
+ * més les línies tecla. i externa del fitxer que hi hagués, que queda a
+ * path.anterior. Retorna -1 amb errno si no pot. */
+int  config_save_all(const char *path, const Editor *e);
+
+/* Escriu un fitxer de configuració complet amb els valors de e (els que
+ * hi ha després de llegir la configuració). */
+void config_template(FILE *f, const Editor *e);
 
 #endif

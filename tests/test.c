@@ -1113,7 +1113,6 @@ static void test_config(void)
           !strcmp(last_extern, "breu:lletra-mes=lletra +"));
     CHECK(SET("externa.desar", "x") < 0 && strstr(err, "ja és"));
     config_extern_hook = NULL;
-#undef SET
     ed_free(&e);
 
     /* Fitxers: el del sistema i després el de l'usuari, amb comentaris i errors */
@@ -1143,15 +1142,42 @@ static void test_config(void)
           e.colors == 0);
     ed_free(&e);
 
-    /* La plantilla és un fitxer correcte amb els valors per defecte */
-    f = fopen(user, "w");
-    config_template(f);
-    fclose(f);
+    /* La plantilla és un fitxer correcte amb els valors de l'editor */
     ed_init(&e, 72);
+    f = fopen(user, "w");
+    config_template(f, &e);
+    fclose(f);
     e.columns = 99;
     CHECK(config_load(&e, NULL, user, msg, sizeof msg) == 0);
     CHECK(e.columns == 40 && e.tw_limit == 80 && e.tw_anchor == 50 && e.palette[PAL_H1] == 5);
     ed_free(&e);
+
+    /* Amb valors canviats, el fitxer els conserva tots (també un color
+     * retocat sobre el tema), i les línies tecla. i externa de l'anterior */
+    ed_init(&e, 72);
+    SET("tema", "sepia");
+    SET("color-codi", "blau");
+    SET("centrar", "si");
+    SET("idiomes", "es ca");
+    SET("maquina-escriure", "fixa");
+    SET("autodesat", "45");
+    SET("diccionari", "ca_ES-valencia");
+    f = fopen(user, "w");
+    fputs("centrar = no\ntecla.f9 = colors\nexterna-breu.dia = date\n", f);
+    fclose(f);
+    CHECK(config_save_all(user, &e) == 0);
+    ed_free(&e);
+    ed_init(&e, 72);
+    CHECK(config_load(&e, NULL, user, msg, sizeof msg) == 0);
+    CHECK(e.center == 1 && e.theme == 3 && e.palette[PAL_CODE] == 4 &&
+          e.palette[PAL_BG] == 7 && !strcmp(e.langs[0], "es") && e.tw_mode == TW_FIXA &&
+          e.autosave == 45 && !strcmp(e.dict, "ca_ES-valencia"));
+    CHECK(strstr(slurp(user), "\ntecla.f9 = colors\nexterna-breu.dia = date\n") != NULL);
+    snprintf(sys, sizeof sys, "%.500s.anterior", user);
+    CHECK(!strcmp(slurp(sys), "centrar = no\ntecla.f9 = colors\nexterna-breu.dia = date\n"));
+    unlink(sys);
+    ed_free(&e);
+#undef SET
     unlink(sys);
     unlink(user);
     config_bind_hook = NULL;

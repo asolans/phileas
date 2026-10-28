@@ -83,6 +83,7 @@ static const Menu m_help = { "Ajuda", (const MenuItem[]){
     { 'p', "Paleta d'ordres…",     "paleta",                  NULL, NULL },
     { 'd', "Autodesat",            "autodesat",               NULL, NULL },
     { 'r', "Recarrega la configuració", "recarregar-configuracio", NULL, NULL },
+    { 'c', "Desa la configuració",      "desar-configuracio",      NULL, NULL },
     { 0 } } };
 
 /* Ordres externes de la imatge BYOK (phileasrc). Les altres externes que

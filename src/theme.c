@@ -94,6 +94,11 @@ static const char *const color_names[16] = {
     "cian-clar", "blanc-clar",
 };
 
+const char *theme_color_name(short c)
+{
+    return c >= 0 && c < 16 ? color_names[c] : "cap";
+}
+
 short theme_color_parse(const char *name)
 {
     if (!strcasecmp(name, "cap"))

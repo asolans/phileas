@@ -313,7 +313,8 @@ static void defaults(Editor *e)
     ed_free(&d);
 }
 
-int config_load(Editor *e, const char *sys, const char *user, char *msg, size_t msgsz)
+static int load_all(Editor *e, const char *sys, const char *user, char *msg, size_t msgsz,
+                    int with_overrides)
 {
     char path[1100], err[256];
     int nerr = 0;
@@ -327,7 +328,7 @@ int config_load(Editor *e, const char *sys, const char *user, char *msg, size_t 
         user = path;
     }
     load_file(e, user, &nerr, msg, msgsz);
-    for (int i = 0; i < noverrides; i++)
+    for (int i = 0; with_overrides && i < noverrides; i++)
         if (config_set(e, overrides[i].key, overrides[i].value, err, sizeof err) < 0)
             note_error(&nerr, msg, msgsz, "línia d'ordres", 0, err);
     /* Sense «diccionari», l'ortografia comença amb el primer idioma */
@@ -340,6 +341,16 @@ int config_load(Editor *e, const char *sys, const char *user, char *msg, size_t 
                  nerr - 1);
     }
     return nerr;
+}
+
+int config_load(Editor *e, const char *sys, const char *user, char *msg, size_t msgsz)
+{
+    return load_all(e, sys, user, msg, msgsz, 1);
+}
+
+int config_load_files(Editor *e, const char *sys, const char *user, char *msg, size_t msgsz)
+{
+    return load_all(e, sys, user, msg, msgsz, 0);
 }
 
 /* Clau d'una línia del fitxer ("" si és buida o un comentari) */
@@ -448,66 +459,141 @@ int config_store(const char *path, const char *key, const char *value)
     return 0;
 }
 
-void config_template(FILE *f)
+int config_save_all(const char *path, const Editor *e)
 {
-    fputs("# Phileas: configuració\n"
-          "#\n"
-          "# Una opció per línia: clau = valor. Les línies que comencen per # són\n"
-          "# comentaris. Aquest fitxer té els valors per defecte; només cal deixar-hi\n"
-          "# les opcions que es volen canviar.\n"
-          "#\n"
-          "# Es llegeix /etc/phileas/phileasrc i després el de l'usuari:\n"
-          "# $PHILEAS_CONFIG/phileasrc, o bé ~/.config/phileas/phileasrc.\n"
-          "# Les opcions de la línia d'ordres (-c, -a, -d) manen sobre tots dos.\n"
-          "\n"
-          "# Text\n"
-          "columnes = 72                      # amplada de la columna de text\n"
-          "marge-esquerre = 4                 # columnes buides a l'esquerra\n"
-          "marge-dret = 4                     # i a la dreta (si el terminal és estret)\n"
-          "centrar = no                       # centrar la columna entre els marges\n"
-          "colors = si                        # colors de Markdown\n"
-          "\n"
-          "# Màquina d'escriure: salt, fixa o classic\n"
-          "maquina-escriure = salt\n"
-          "maquina-escriure-limit = 80        # % de l'alçada on salta el text\n"
-          "maquina-escriure-ancoratge = 50    # % de l'alçada on queda el cursor\n"
-          "\n"
-          "# Desat\n"
-          "autodesat = 30                     # segons sense escriure; 0 = desactivat\n"
-          "autodesat-maxim = 300              # segons com a molt amb canvis sense desar\n"
-          "\n"
-          "# Ortografia\n"
-          "ortografia = no                    # activa en arrencar (si no, F7)\n"
-          "idiomes = ca es                    # rotació de F8; el primer, en arrencar\n"
-          "# diccionari = ca_ES-valencia      # un diccionari concret en arrencar\n"
-          "\n"
-          "# Tema de colors: terminal (els colors del terminal), fosc, clar, sepia\n"
-          "# o fosfor. També es canvia des del menú Vista o amb l'ordre «tema»,\n"
-          "# que el deixen desat en aquesta línia.\n"
-          "tema = terminal\n"
-          "paleta-consola = si    # a la consola de Linux, els colors propis del tema\n"
-          "\n"
-          "# Colors que canvien els del tema (van després de la línia «tema»):\n"
-          "# negre, vermell, verd, groc, blau, magenta, cian, blanc, gris,\n"
-          "# vermell-clar, verd-clar, groc-clar, blau-clar, magenta-clar, cian-clar,\n"
-          "# blanc-clar o cap (el del terminal). Sense colors, la barra i la\n"
-          "# selecció van en vídeo invers.\n"
-          "# color-capcalera-1 = magenta\n"
-          "# color-capcalera-2 = cian\n"
-          "# color-capcalera-3 = verd\n"
-          "# color-codi = groc\n"
-          "# color-cita = verd\n"
-          "# color-error = vermell\n"
-          "# color-marcadors = cap      # els signes de Markdown (cap: atenuats)\n"
-          "# color-text = cap\n"
-          "# color-fons = cap\n"
-          "# color-barra = cap\n"
-          "# color-barra-fons = cap\n"
-          "# color-seleccio = cap\n"
-          "# color-seleccio-fons = cap\n"
-          "# color-menu = cap\n"
-          "# color-menu-fons = cap\n"
-          "\n"
+    char *old = NULL, *tmp, *bak, k[128];
+    size_t len = 0, cap = 0, n;
+    int kept = 0, err = 0;
+    FILE *f;
+
+    if ((f = fopen(path, "r"))) {
+        char buf[4096];
+
+        while ((n = fread(buf, 1, sizeof buf, f)) > 0) {
+            if (len + n + 1 > cap)
+                old = xrealloc(old, cap = (len + n + 1) * 2);
+            memcpy(old + len, buf, n);
+            len += n;
+        }
+        fclose(f);
+        old[len] = '\0';
+    } else if (errno != ENOENT) {
+        return -1;
+    }
+
+    tmp = xmalloc(strlen(path) + 16);
+    bak = xmalloc(strlen(path) + 16);
+    sprintf(tmp, "%s.nou", path);
+    sprintf(bak, "%s.anterior", path);
+    if (old) {   /* còpia del fitxer anterior */
+        if (!(f = fopen(bak, "w")) || fwrite(old, 1, len, f) != len || fclose(f) != 0)
+            err = errno ? errno : EIO;
+    }
+    if (!err && !(f = fopen(tmp, "w")))
+        err = errno;
+    if (!err) {
+        config_template(f, e);
+        /* Les dreceres i les ordres externes del fitxer anterior */
+        for (const char *p = old; p && *p; ) {
+            const char *end = strchr(p, '\n');
+
+            n = end ? (size_t)(end - p) + 1 : strlen(p);
+            line_key(p, k, sizeof k);
+            if (!strncmp(k, "tecla.", 6) || !strncmp(k, "externa", 7)) {
+                if (!kept++)
+                    fputs("\n# Del fitxer anterior\n", f);
+                fwrite(p, 1, n, f);
+                if (!end)
+                    fputc('\n', f);
+            }
+            p += n;
+        }
+        if (fflush(f) != 0 || fsync(fileno(f)) != 0)
+            err = errno;
+        fclose(f);
+        if (!err && rename(tmp, path) < 0)
+            err = errno;
+        if (err)
+            unlink(tmp);
+    }
+    free(old);
+    free(tmp);
+    free(bak);
+    errno = err;
+    return err ? -1 : 0;
+}
+
+void config_template(FILE *f, const Editor *e)
+{
+    const short *th = theme_at((size_t)e->theme)->pal;
+    char langs[MAX_LANGS * 17] = "";
+
+    for (int i = 0; i < e->nlangs; i++) {
+        strcat(langs, i ? " " : "");
+        strcat(langs, e->langs[i]);
+    }
+    fprintf(f, "# Phileas: configuració\n"
+            "#\n"
+            "# Una opció per línia: clau = valor. Les línies que comencen per # són\n"
+            "# comentaris. Els valors són els que hi havia en crear el fitxer (els de\n"
+            "# Phileas, els del sistema i els de l'usuari); només cal deixar-hi les\n"
+            "# opcions que es volen canviar.\n"
+            "#\n"
+            "# Es llegeix /etc/phileas/phileasrc i després el de l'usuari:\n"
+            "# $PHILEAS_CONFIG/phileasrc, o bé ~/.config/phileas/phileasrc.\n"
+            "# Les opcions de la línia d'ordres (-c, -a, -d) manen sobre tots dos.\n"
+            "# Les opcions del menú Vista (centrar, colors, màquina d'escriure i tema)\n"
+            "# es desen soles en aquest fitxer.\n"
+            "\n"
+            "# Text\n"
+            "columnes = %-24d# amplada de la columna de text\n"
+            "marge-esquerre = %-18d# columnes buides a l'esquerra\n"
+            "marge-dret = %-22d# i a la dreta (si el terminal és estret)\n"
+            "centrar = %-25s# centrar la columna entre els marges\n"
+            "colors = %-26s# colors de Markdown\n"
+            "\n"
+            "# Màquina d'escriure: salt, fixa o classic\n"
+            "maquina-escriure = %s\n"
+            "maquina-escriure-limit = %-10d# %% de l'alçada on salta el text\n"
+            "maquina-escriure-ancoratge = %-6d# %% de l'alçada on queda el cursor\n"
+            "\n"
+            "# Desat\n"
+            "autodesat = %-23d# segons sense escriure; 0 = desactivat\n"
+            "autodesat-maxim = %-17d# segons com a molt amb canvis sense desar\n"
+            "\n"
+            "# Ortografia\n"
+            "ortografia = %-22s# activa en arrencar (si no, F7)\n"
+            "idiomes = %-25s# rotació de F8; el primer, en arrencar\n",
+            e->columns, e->margin_left, e->margin_right, e->center ? "si" : "no",
+            e->colors ? "si" : "no",
+            e->tw_mode == TW_SALT ? "salt" : e->tw_mode == TW_FIXA ? "fixa" : "classic",
+            e->tw_limit, e->tw_anchor, e->autosave, e->autosave_max,
+            e->spell_start ? "si" : "no", langs);
+    /* Sense «diccionari», config_load hi posa el primer idioma */
+    if (e->dict[0] && strcmp(e->dict, e->langs[0]))
+        fprintf(f, "diccionari = %-22s# un diccionari concret en arrencar\n", e->dict);
+    else
+        fputs("# diccionari = ca_ES-valencia      # un diccionari concret en arrencar\n", f);
+    fprintf(f, "\n"
+            "# Tema de colors: terminal (els colors del terminal), fosc, clar, sepia\n"
+            "# o fosfor. També es canvia des del menú Vista o amb l'ordre «tema»,\n"
+            "# que el deixen desat en aquesta línia.\n"
+            "tema = %s\n"
+            "paleta-consola = %s    # a la consola de Linux, els colors propis del tema\n"
+            "\n"
+            "# Colors que canvien els del tema (van després de la línia «tema»):\n"
+            "# negre, vermell, verd, groc, blau, magenta, cian, blanc, gris,\n"
+            "# vermell-clar, verd-clar, groc-clar, blau-clar, magenta-clar, cian-clar,\n"
+            "# blanc-clar o cap (el del terminal). Sense colors, la barra i la\n"
+            "# selecció van en vídeo invers. Els comentats són els del tema.\n",
+            theme_at((size_t)e->theme)->name, e->console_palette ? "si" : "no");
+    for (size_t i = 0; i < sizeof color_keys / sizeof *color_keys; i++) {
+        int pal = color_keys[i].pal;
+
+        fprintf(f, "%s%s = %s\n", e->palette[pal] == th[pal] ? "# " : "", color_keys[i].key,
+                theme_color_name(e->palette[pal]));
+    }
+    fputs("\n"
           "# Dreceres: tecla.NOM = ordre, o tecla.NOM = (buit) per treure-la.\n"
           "# Noms: ctrl-a ... ctrl-z, alt-LLETRA, f1 ... f12, shift-f1 ... shift-f12,\n"
           "# up, down, left, right, home, end, pgup, pgdn, delete, insert, amb\n"
@@ -522,6 +608,7 @@ void config_template(FILE *f)
           "#   externa.NOM = ORDRE       amb la pantalla del terminal; Retorn torna\n"
           "#   externa-breu.NOM = ORDRE  la darrera línia de la sortida, a la barra\n"
           "# Per assignar-hi una tecla, la línia tecla. va després de la definició.\n"
+          "# (Les del fitxer del sistema ja hi són; no cal repetir-les.)\n"
           "# externa.terminal = sh\n"
           "# externa-breu.paraules = wc -w\n",
           f);

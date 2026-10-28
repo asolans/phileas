@@ -39,7 +39,8 @@ static const struct {
     { "Vista", (const char *const[]){
         "maquina-escriure", "centrar", "colors", "tema", "redibuixar", NULL } },
     { "Configuració i ajuda", (const char *const[]){
-        "menu", "ajuda", "paleta", "recarregar-configuracio", "autodesat", NULL } },
+        "menu", "ajuda", "paleta", "recarregar-configuracio", "desar-configuracio", "autodesat",
+        NULL } },
 };
 #define NSECTIONS (sizeof sections / sizeof sections[0])
 
@@ -96,16 +97,14 @@ static void add_command(const Command *c)
  * PHILEAS_CONFIG: a la BYOK, /data/phileas) */
 static void add_config_rows(void)
 {
-    static char where[1200], how[1200];
+    static char where[1200];
     char path[1100];
 
     config_user_path(path, sizeof path);
     snprintf(where, sizeof where, "Configuració pròpia: %s (mana sobre la del sistema).", path);
-    snprintf(how, sizeof how, "  phileas --config > %s", path);
     add_row(0)->text = where;
-    add_row(0)->text = "Per crear-la amb totes les opcions, des del terminal (fora de Phileas):";
-    add_row(0)->text = how;
-    add_row(0)->text = "  Si ja existeix, la substitueix: el tema i els altres canvis es perden.";
+    add_row(0)->text = "Per crear-la amb totes les opcions i els valors actuals: Ctrl+P";
+    add_row(0)->text = "  desar-configuracio (l'anterior queda a phileasrc.anterior).";
 }
 
 static void build(void)

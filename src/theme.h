@@ -22,7 +22,9 @@ const Theme *theme_find(const char *name);   /* NULL si no existeix */
 /* Copia els colors del tema a e->palette i el deixa com a tema actual. */
 void         theme_apply(Editor *e, const Theme *t);
 
-/* Color pel nom: 0-15, PAL_DEFAULT per a «cap» o -2 si no existeix. */
+/* Color pel nom: 0-15, PAL_DEFAULT per a «cap» o -2 si no existeix; i el
+ * nom d'un color. */
+const char  *theme_color_name(short c);
 short        theme_color_parse(const char *name);
 
 #endif

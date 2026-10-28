@@ -40,14 +40,16 @@ static void quit_on_signal(int sig)
 static void usage(FILE *f)
 {
     fputs("Ús: phileas [-c COLUMNES] [-a SEGONS] [-d IDIOMA] [FITXER]\n"
-          "     phileas --config > ~/.config/phileas/phileasrc\n"
+          "     phileas --config\n"
           "\n"
           "  -c N      amplada del text en columnes (per defecte 72)\n"
           "  -a N      desa sol després de N segons sense escriure (per defecte 30;\n"
           "            0 el desactiva). Desa sobre el mateix fitxer.\n"
           "  -d ID     activa l'ortografia amb aquest diccionari: ca, es, en_US...\n"
           "            (-d no la desactiva). Sense -d, F7 l'activa i F8 alterna ca i es.\n"
-          "  --config  escriu un fitxer de configuració amb els valors per defecte\n"
+          "  --config  escriu la configuració completa amb els valors actuals (no la\n"
+          "            redirigiu al mateix phileasrc: el shell el buida abans de llegir-lo;\n"
+          "            per desar-la, dins Phileas, Ctrl+P desar-configuracio)\n"
           "  -h        mostra aquesta ajuda\n"
           "  -v        mostra la versió\n"
           "\n"
@@ -81,8 +83,14 @@ int main(int argc, char **argv)
     int opt, cfg_errors;
 
     setlocale(LC_ALL, "");
+    /* La configuració completa amb els valors actuals (els del sistema i
+     * els de l'usuari), per fer-se un phileasrc sense perdre'n cap */
     if (argc > 1 && !strcmp(argv[1], "--config")) {
-        config_template(stdout);
+        ed_init(&e, 72);
+        if (config_load_files(&e, CONFIG_SYSTEM, NULL, cfg_msg, sizeof cfg_msg))
+            fprintf(stderr, "phileas: configuració: %s\n", cfg_msg);
+        config_template(stdout, &e);
+        ed_free(&e);
         return 0;
     }
     while ((opt = getopt(argc, argv, "a:c:d:hv")) != -1) {

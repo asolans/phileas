@@ -107,6 +107,18 @@ static void c_paste(Editor *e)
         ed_msg(e, "El porta-retalls és buit");
 }
 
+/* Les opcions de vista (centrar, colors, màquina d'escriure i tema) es
+ * desen al phileasrc de l'usuari, per a la vegada següent. Si no es pot,
+ * el missatge de l'ordre es canvia per l'error. */
+static void remember(Editor *e, const char *key, const char *value)
+{
+    char path[1100];
+
+    config_user_path(path, sizeof path);
+    if (config_store(path, key, value) < 0)
+        ed_msg(e, "No s'ha pogut desar «%s» a %s: %s", key, path, strerror(errno));
+}
+
 static void c_center(Editor *e)
 {
     e->center = !e->center;
@@ -116,6 +128,7 @@ static void c_center(Editor *e)
         ed_msg(e, "Columna centrada");
     else
         ed_msg(e, "No hi ha marge per centrar (terminal %d < text %d)", COLS, e->columns);
+    remember(e, "centrar", e->center ? "si" : "no");
 }
 
 static void c_goto_line(Editor *e)
@@ -493,6 +506,8 @@ static void c_typewriter(Editor *e)
         ed_msg(e, "Màquina d'escriure: línia fixa (al %d %% de l'alçada)", e->tw_anchor);
     else
         ed_msg(e, "Desplaçament clàssic (fins a baix de tot)");
+    remember(e, "maquina-escriure", e->tw_mode == TW_SALT ? "salt" :
+                                    e->tw_mode == TW_FIXA ? "fixa" : "classic");
 }
 
 static void c_reload_config(Editor *e)
@@ -511,6 +526,25 @@ static void c_reload_config(Editor *e)
         ed_msg(e, "Configuració recarregada (%s)", path);
 }
 
+/* Els valors dels fitxers, no els de la sessió: les opcions de la línia
+ * d'ordres (-a 0, -d) no s'hi han de quedar; les de Vista ja s'hi han desat */
+static void c_save_config(Editor *e)
+{
+    char path[1100], msg[256];
+    Editor cur;
+    int r;
+
+    config_user_path(path, sizeof path);
+    ed_init(&cur, 72);
+    config_load_files(&cur, CONFIG_SYSTEM, NULL, msg, sizeof msg);
+    r = config_save_all(path, &cur);
+    ed_free(&cur);
+    if (r < 0)
+        ed_msg(e, "No s'ha pogut desar %s: %s", path, strerror(errno));
+    else
+        ed_msg(e, "Configuració desada a %s (l'anterior: phileasrc.anterior)", path);
+}
+
 static void c_help(Editor *e)
 {
     help_show(e);
@@ -520,6 +554,7 @@ static void c_colors(Editor *e)
 {
     e->colors = !e->colors;
     ed_msg(e, e->colors ? "Colors de Markdown activats" : "Colors de Markdown desactivats");
+    remember(e, "colors", e->colors ? "si" : "no");
 }
 
 /* tema NOM, o sense nom, el següent */
@@ -527,7 +562,6 @@ static void c_theme(Editor *e)
 {
     const char *name = cmd_args();
     const Theme *t;
-    char path[1100];
 
     if (*name) {
         if (!(t = theme_find(name))) {
@@ -539,12 +573,8 @@ static void c_theme(Editor *e)
     }
     theme_apply(e, t);
     render_colors(e);
-    /* Es recorda a la configuració de l'usuari */
-    config_user_path(path, sizeof path);
-    if (config_store(path, "tema", t->name) < 0)
-        ed_msg(e, "Tema: %s (no s'ha pogut desar a %s: %s)", t->label, path, strerror(errno));
-    else
-        ed_msg(e, "Tema: %s", t->label);
+    ed_msg(e, "Tema: %s", t->label);
+    remember(e, "tema", t->name);
 }
 
 /* ---- Ortografia ---- */
@@ -854,6 +884,7 @@ static const Command commands[] = {
     { "maquina-escriure",  c_typewriter, "Desplaçament: salt, línia fixa o clàssic", ACT_NONE },
     { "recarregar-configuracio", c_reload_config, "Torna a llegir el fitxer phileasrc", ACT_NONE },
     { "colors",            c_colors,     "Activa o desactiva els colors de Markdown", ACT_NONE },
+    { "desar-configuracio", c_save_config, "Desa la configuració actual, amb totes les opcions, al phileasrc", ACT_NONE },
     { "tema",              c_theme,      "Canvia el tema de colors (tema NOM: terminal, fosc, clar, sepia, fosfor)", ACT_NONE },
     { "obrir",             c_open,       "Obre un document amb el navegador de fitxers", ACT_NONE },
     { "nou",               c_new,        "Comença un document nou sense nom", ACT_NONE },
