@@ -263,4 +263,10 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Llicència
 
-Pendent de definir.
+Copyright © 2026 Àngel Solans.
+
+Phileas és programari lliure: el podeu redistribuir i modificar d'acord amb
+els termes de la [Llicència Pública General de GNU](LICENSE), tal com la
+publica la Free Software Foundation, versió 3 o (a la vostra elecció)
+qualsevol de posterior (GPL-3.0-or-later). Es distribueix sense cap
+garantia.
