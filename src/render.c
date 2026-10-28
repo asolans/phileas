@@ -249,7 +249,7 @@ static void draw_status(Editor *e)
 {
     int y = LINES - 2;
     char left[512], right[64], code[16] = "";
-    Line *l = &e->buf.lines[e->cy];
+    size_t words = buf_words(&e->buf);
     int rlen;
 
     snprintf(left, sizeof left, " %s%s%s",
@@ -259,9 +259,8 @@ static void draw_status(Editor *e)
         spell_code(spell_lang(), code, sizeof code - 2);
         strcat(code, "  ");
     }
-    snprintf(right, sizeof right, "%sL %zu/%zu  C %zu  %zu pàg. ", code,
-             e->cy + 1, e->buf.nlines, utf8_count(l->text, e->cx) + 1,
-             buf_pages(&e->buf));
+    snprintf(right, sizeof right, "%s%zu %s  %zu pàg. ", code,
+             words, words == 1 ? "paraula" : "paraules", buf_pages(&e->buf));
     rlen = (int)utf8_count(right, strlen(right));
 
     attron(A_REVERSE);

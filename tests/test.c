@@ -493,6 +493,21 @@ static void set_text(Buffer *b, size_t n, const char *fill, size_t chars)
     buf_rescan_all(b);
 }
 
+static void test_words(void)
+{
+    Buffer b;
+
+    buf_init(&b);
+    CHECK(buf_words(&b) == 0);
+    const char *t = "# Títol\n\n- l'home **és** aquí, 3 cops — i·l·l";
+
+    buf_insert(&b, (Pos){ 0, 0 }, t, strlen(t));
+    CHECK(buf_words(&b) == 7);   /* «#», «-» i «—» no compten */
+    buf_insert(&b, (Pos){ 0, 0 }, "Un ", 3);
+    CHECK(buf_words(&b) == 8);   /* la línia modificada es torna a comptar */
+    buf_free(&b);
+}
+
 static void test_pages(void)
 {
     Buffer b;
@@ -1218,6 +1233,7 @@ int main(void)
     test_wrap();
     test_buffer();
     test_pages();
+    test_words();
     test_edit();
     test_md();
     test_style();

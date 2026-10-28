@@ -19,7 +19,7 @@ només serveix per escriure.
     - Les llistes continuen soles en prémer Retorn
     - i les paraules mal escrites es marquen en vermell (F7).
 
- cap1.md                                   ca L 3/4  C 12  1 pàg.
+ cap1.md                                   ca 56 paraules  1 pàg.
 ```
 
 ## Característiques
@@ -49,8 +49,8 @@ només serveix per escriure.
   (SIGHUP, SIGTERM), desa abans de sortir.
 - **Mode màquina d'escriure:** la línia on s'escriu es queda a una altura fixa
   de la pantalla.
-- **Navegador de fitxers** integrat (Ctrl+O) i **estimació de pàgines** a la
-  barra d'estat.
+- **Navegador de fitxers** integrat (Ctrl+O) i **recompte de paraules** i
+  **estimació de pàgines** a la barra d'estat.
 - **Ordres externes:** es poden afegir a la paleta ordres del sistema
   (exportar amb pandoc, comptar paraules, enviar el text…).
 - **UTF-8 complet:** accents, ç, l·l, cometes tipogràfiques i caràcters

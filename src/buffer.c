@@ -10,6 +10,7 @@
 #include <strings.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <wctype.h>
 
 static void line_init(Line *l, const char *s, size_t n)
 {
@@ -71,6 +72,7 @@ static void line_changed(Buffer *b, Line *l)
 {
     l->wrap_w = 0;
     l->print_lines = 0;
+    l->words = 0;
     l->kind = -1;
     b->modified = 1;
     mark_changed(b, (size_t)(l - b->lines), (size_t)(l - b->lines));
@@ -683,4 +685,38 @@ size_t buf_pages(Buffer *b)
     for (size_t i = b->nlines; i > 0 && b->lines[i - 1].len == 0; i--)
         half--;
     return half ? (half + per_page - 1) / per_page : 1;
+}
+
+static size_t line_words(Line *l)
+{
+    if (l->words == 0) {
+        size_t n = 0, i = 0;
+        int in_word = 0, counted = 0;
+
+        while (i < l->len) {
+            wchar_t wc;
+            size_t k = utf8_decode(l->text, l->len, i, &wc);
+
+            if (wc != UTF8_INVALID && iswspace((wint_t)wc)) {
+                in_word = 0;
+            } else {
+                if (!in_word)
+                    in_word = 1, counted = 0;
+                if (!counted && wc != UTF8_INVALID && iswalnum((wint_t)wc))
+                    n++, counted = 1;
+            }
+            i += k ? k : 1;
+        }
+        l->words = n + 1;
+    }
+    return l->words - 1;
+}
+
+size_t buf_words(Buffer *b)
+{
+    size_t n = 0;
+
+    for (size_t i = 0; i < b->nlines; i++)
+        n += line_words(&b->lines[i]);
+    return n;
 }

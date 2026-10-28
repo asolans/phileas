@@ -19,6 +19,8 @@ typedef struct {
 
     /* Cache de l'estimació de pàgines: mitges línies impreses; 0 = per calcular */
     size_t  print_lines;
+    /* Cache del recompte de paraules: paraules + 1; 0 = per calcular */
+    size_t  words;
 
     /* Tipus de bloc Markdown (MD_*); -1 = per calcular. st és l'estat
      * després d'aquesta línia. Els manté al dia buf_scan(). */
@@ -104,5 +106,9 @@ int  buf_save(Buffer *b, const char *path);
 
 /* Estimació orientativa de pàgines si s'imprimís en A4 a 12 punts. */
 size_t buf_pages(Buffer *b);
+
+/* Paraules del document: grups de caràcters sense espais amb alguna lletra
+ * o xifra (els marcadors de Markdown sols, com «-» o «#», no compten). */
+size_t buf_words(Buffer *b);
 
 #endif
