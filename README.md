@@ -65,7 +65,8 @@ La interfície és en català.
 
 A la pàgina de
 [versions publicades](https://github.com/asolans/phileas/releases) hi ha un
-paquet `.deb` per a x86-64:
+paquet `.deb` per a x86-64 (per a la Raspberry Pi, vegeu
+[més avall](#raspberry-pi)):
 
 ```bash
 sudo apt install ./phileas_2.0.0_amd64.deb
@@ -112,6 +113,101 @@ sudo pacman -S hunspell hunspell-ca hunspell-es_es            # Arch
 Els diccionaris es busquen a `/usr/share/hunspell`, `/usr/share/myspell`,
 `/usr/local/share/hunspell`, als directoris de `$DICPATH` i a
 `~/.local/share/hunspell`.
+
+### Raspberry Pi
+
+Phileas està pensat per funcionar en una Raspberry Pi petita, fins i tot una
+Pi 1 o una Pi Zero, connectada a una pantalla i amb el teclat com a únic
+perifèric. Hi ha dos camins.
+
+#### A. Raspberry Pi OS
+
+Funciona en qualsevol model amb Raspberry Pi OS. Per a una Pi 1 o una
+Pi Zero, cal la versió **Lite de 32 bits** (sense escriptori). El paquet
+`.deb` de les versions publicades és només per a x86-64; a la Pi, Phileas es
+compila des del codi font (uns quants minuts en una Pi 1).
+
+1. **Dependències** (per compilar i per a l'ortografia):
+
+   ```bash
+   sudo apt update
+   sudo apt install build-essential pkg-config libncurses-dev \
+                    libhunspell-1.7-0 hunspell-ca hunspell-es
+   ```
+
+2. **Compilar i instal·lar.** Baixeu `phileas-VERSIÓ.tar.gz` de les
+   [versions publicades](https://github.com/asolans/phileas/releases) i
+   copieu-lo a la Pi (per exemple amb `scp`), o bé cloneu el repositori amb
+   `git clone`. Després:
+
+   ```bash
+   tar xzf phileas-2.0.0.tar.gz
+   cd phileas-2.0.0
+   make
+   make test
+   sudo make install
+   ```
+
+   Si ho preferiu en forma de paquet (més fàcil de desinstal·lar amb
+   `sudo apt remove phileas`), en lloc de `sudo make install`:
+
+   ```bash
+   sudo apt install fakeroot
+   make deb
+   sudo apt install ./dist/phileas_2.0.0_armhf.deb
+   ```
+
+   El nom del paquet porta l'arquitectura de la Pi: `armhf` en 32 bits,
+   `arm64` en 64 bits.
+
+3. **Idioma i teclat.** Phileas necessita una configuració regional UTF-8
+   perquè els accents i la ç es vegin i s'escriguin bé:
+
+   ```bash
+   sudo raspi-config
+   ```
+
+   A *Localisation Options*, trieu *Locale* `ca_ES.UTF-8` (o `es_ES.UTF-8`)
+   i, a *Keyboard*, la disposició del teclat. La configuració regional
+   també decideix el diccionari amb què arrenca l'ortografia.
+
+4. **Lletra de la consola.** Amb `sudo dpkg-reconfigure console-setup` es
+   tria el joc de caràcters (*Guess optimal character set*) i la mida de la
+   lletra (per exemple Terminus 16×32, per escriure més còmodament).
+   Phileas ajusta el text a l'amplada que hi càpiga.
+
+5. **(Opcional) Un dispositiu només per escriure.** Perquè la Pi arrenqui
+   directament a Phileas, activeu l'inici automàtic de sessió a la consola
+   (`sudo raspi-config` → *System Options* → *Boot / Auto Login* →
+   *Console Autologin*) i afegiu al final de `~/.profile`:
+
+   ```bash
+   if [ "$(tty)" = /dev/tty1 ]; then
+       mkdir -p ~/textos && cd ~/textos
+       phileas
+   fi
+   ```
+
+   Si la Pi s'apaga de manera ordenada mentre escriviu, Phileas desa el
+   document abans de sortir. L'autodesat limita el que es pot perdre si es
+   talla el corrent.
+
+**Tecles a la consola.** A la consola de Linux (sense entorn gràfic), les
+combinacions de Ctrl o Maj amb les fletxes sovint no arriben al programa.
+Totes les ordres tenen una alternativa amb Alt+lletra o una tecla F (vegeu
+les [tecles principals](#tecles-principals)), i Esc obre els menús.
+
+#### B. Imatge BYOK
+
+El projecte BYOK té una imatge pròpia per a la **Raspberry Pi 1B**, feta
+amb Buildroot. Arrenca en pocs segons directament a Phileas, amb els
+diccionaris de català i castellà, i un sistema de només lectura que no es
+fa malbé si es talla el corrent. Té ordres per canviar la mida de la lletra,
+girar la pantalla, exportar al pendrive i enviar els textos a un ordinador.
+Aquesta imatge no forma part d'aquest repositori.
+
+Per compilar Phileas per a una altra imatge de Buildroot o amb una cadena
+de compilació creuada, vegeu [Desenvolupament](#desenvolupament).
 
 ## Ús
 
