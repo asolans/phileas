@@ -69,7 +69,7 @@ paquet `.deb` per a x86-64 (per a la Raspberry Pi, vegeu
 [més avall](#raspberry-pi)):
 
 ```bash
-sudo apt install ./phileas_2.0.0_amd64.deb
+sudo apt install ./phileas_2.0.1_amd64.deb
 ```
 
 `apt` hi afegeix les dependències (ncurses) i, com a recomanacions, hunspell
@@ -144,8 +144,8 @@ compila des del codi font (uns quants minuts en una Pi 1).
    `git clone`. Després:
 
    ```bash
-   tar xzf phileas-2.0.0.tar.gz
-   cd phileas-2.0.0
+   tar xzf phileas-2.0.1.tar.gz
+   cd phileas-2.0.1
    make
    make test
    sudo make install
@@ -157,7 +157,7 @@ compila des del codi font (uns quants minuts en una Pi 1).
    ```bash
    sudo apt install fakeroot
    make deb
-   sudo apt install ./dist/phileas_2.0.0_armhf.deb
+   sudo apt install ./dist/phileas_2.0.1_armhf.deb
    ```
 
    El nom del paquet porta l'arquitectura de la Pi: `armhf` en 32 bits,
@@ -358,6 +358,8 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.0.1** (2026-10-28): llançador per a l'escriptori (GNOME, KDE...) al
+  paquet `.deb`.
 - **2.0** (2026-10-27): menús a l'estil WordGrinder amb Esc, amb un submenú
   BYOK per a les ordres externes.
 - **1.0** (2026-10-26): primera versió completa, integrada a la imatge BYOK
