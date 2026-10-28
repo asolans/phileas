@@ -1,5 +1,6 @@
 #include "help.h"
 #include "command.h"
+#include "config.h"
 #include "keys.h"
 #include "tui.h"
 #include "utf8.h"
@@ -91,6 +92,22 @@ static void add_command(const Command *c)
     r->text = c->desc;
 }
 
+/* On és la configuració de l'usuari i com es crea (el camí depèn de
+ * PHILEAS_CONFIG: a la BYOK, /data/phileas) */
+static void add_config_rows(void)
+{
+    static char where[1200], how[1200];
+    char path[1100];
+
+    config_user_path(path, sizeof path);
+    snprintf(where, sizeof where, "Configuració pròpia: %s (mana sobre la del sistema).", path);
+    snprintf(how, sizeof how, "  phileas --config > %s", path);
+    add_row(0)->text = where;
+    add_row(0)->text = "Per crear-la amb totes les opcions, des del terminal (fora de Phileas):";
+    add_row(0)->text = how;
+    add_row(0)->text = "  Si ja existeix, la substitueix: el tema i els altres canvis es perden.";
+}
+
 static void build(void)
 {
     size_t ncmd = cmd_count();
@@ -101,6 +118,7 @@ static void build(void)
     memset(shown, 0, ncmd);
     for (size_t i = 0; i < NINTRO; i++)
         add_row(0)->text = intro[i];
+    add_config_rows();
 
     /* Les ordres sense tecla, que només es poden fer servir amb la paleta */
     add_row(1)->text = "Ordres de la paleta (Ctrl+P i el nom; no tenen tecla)";
