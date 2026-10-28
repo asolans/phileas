@@ -527,6 +527,7 @@ static void c_theme(Editor *e)
 {
     const char *name = cmd_args();
     const Theme *t;
+    char path[1100];
 
     if (*name) {
         if (!(t = theme_find(name))) {
@@ -538,7 +539,12 @@ static void c_theme(Editor *e)
     }
     theme_apply(e, t);
     render_colors(e);
-    ed_msg(e, "Tema: %s", t->label);
+    /* Es recorda a la configuració de l'usuari */
+    config_user_path(path, sizeof path);
+    if (config_store(path, "tema", t->name) < 0)
+        ed_msg(e, "Tema: %s (no s'ha pogut desar a %s: %s)", t->label, path, strerror(errno));
+    else
+        ed_msg(e, "Tema: %s", t->label);
 }
 
 /* ---- Ortografia ---- */

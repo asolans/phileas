@@ -509,6 +509,52 @@ static void test_words(void)
     buf_free(&b);
 }
 
+static char *slurp(const char *path)
+{
+    static char buf[4096];
+    FILE *f = fopen(path, "r");
+    size_t n = f ? fread(buf, 1, sizeof buf - 1, f) : 0;
+
+    if (f)
+        fclose(f);
+    buf[n] = '\0';
+    return buf;
+}
+
+static void test_config_store(void)
+{
+    char dir[] = "/tmp/phileas-store-XXXXXX", path[64];
+    FILE *f;
+
+    CHECK(mkdtemp(dir) != NULL);
+    snprintf(path, sizeof path, "%s/sub/phileasrc", dir);
+    /* Sense fitxer ni directori: es creen */
+    CHECK(config_store(path, "tema", "fosc") == 0);
+    CHECK(!strcmp(slurp(path), "tema = fosc\n"));
+    /* Es canvia la línia existent; la resta, igual */
+    f = fopen(path, "w");
+    fputs("# comentari tema = x\ncolumnes = 80\n  tema=clar   \nmarge-dret = 4", f);
+    fclose(f);
+    CHECK(config_store(path, "tema", "sepia") == 0);
+    CHECK(!strcmp(slurp(path), "# comentari tema = x\ncolumnes = 80\ntema = sepia\nmarge-dret = 4\n"));
+    /* Sense línia «tema»: abans del primer color-, que el retoca */
+    f = fopen(path, "w");
+    fputs("columnes = 80\ncolor-codi = blau\ncolor-cita = verd\n", f);
+    fclose(f);
+    CHECK(config_store(path, "tema", "fosfor") == 0);
+    CHECK(!strcmp(slurp(path), "columnes = 80\ntema = fosfor\ncolor-codi = blau\ncolor-cita = verd\n"));
+    /* Una línia «tema» després dels colors es canvia on és */
+    f = fopen(path, "w");
+    fputs("color-codi = blau\ntema = clar\n", f);
+    fclose(f);
+    CHECK(config_store(path, "tema", "fosc") == 0);
+    CHECK(!strcmp(slurp(path), "color-codi = blau\ntema = fosc\n"));
+    unlink(path);
+    snprintf(path, sizeof path, "%s/sub", dir);
+    rmdir(path);
+    rmdir(dir);
+}
+
 static void test_pages(void)
 {
     Buffer b;
@@ -1256,6 +1302,7 @@ int main(void)
     test_buffer();
     test_pages();
     test_words();
+    test_config_store();
     test_edit();
     test_md();
     test_style();

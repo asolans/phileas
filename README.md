@@ -28,7 +28,8 @@ només serveix per escriure.
   (capçaleres, negreta, cursiva, codi i cites) que funcionen fins i tot en
   terminals de 8 colors.
 - **Temes de colors:** terminal (els colors del terminal, per defecte), fosc,
-  clar, sèpia i fòsfor, des del menú Vista o amb l'ordre `tema`. A la consola
+  clar, sèpia i fòsfor, des del menú Vista o amb l'ordre `tema`, que el deixen
+  desat al `phileasrc` de l'usuari per a la vegada següent. A la consola
   de Linux (com a la imatge BYOK), cada tema hi posa els seus propis colors i,
   en sortir, torna a deixar els de la consola.
 - **Ajust de línia suau** a un nombre de columnes configurable (72 per

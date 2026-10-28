@@ -34,6 +34,12 @@ int  config_load(Editor *e, const char *sys, const char *user, char *msg, size_t
 /* Camí del fitxer de l'usuari. */
 void config_user_path(char *out, size_t size);
 
+/* Desa «key = value» al fitxer path (el de l'usuari): canvia les línies
+ * amb aquesta clau o, si no n'hi ha cap, l'afegeix abans dels «color-»
+ * (que la retoquen) o al final. La resta del fitxer no es toca. Crea el
+ * fitxer i el directori si cal. Retorna -1 amb errno si no pot. */
+int  config_store(const char *path, const char *key, const char *value);
+
 /* Escriu un fitxer de configuració complet amb els valors per defecte. */
 void config_template(FILE *f);
 

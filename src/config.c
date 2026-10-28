@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 int (*config_bind_hook)(const char *key, const char *cmd);
 int (*config_extern_hook)(const char *name, const char *shell, int brief, char *err, size_t errsz);
@@ -340,6 +342,112 @@ int config_load(Editor *e, const char *sys, const char *user, char *msg, size_t 
     return nerr;
 }
 
+/* Clau d'una línia del fitxer ("" si és buida o un comentari) */
+static void line_key(const char *line, char *key, size_t size)
+{
+    const char *s = line, *eq;
+    size_t n;
+
+    while (*s == ' ' || *s == '\t')
+        s++;
+    key[0] = '\0';
+    if (*s == '#' || !(eq = strchr(s, '=')))
+        return;
+    n = (size_t)(eq - s);
+    while (n > 0 && (s[n - 1] == ' ' || s[n - 1] == '\t'))
+        n--;
+    if (n < size) {
+        memcpy(key, s, n);
+        key[n] = '\0';
+    }
+}
+
+int config_store(const char *path, const char *key, const char *value)
+{
+    char *text = NULL, *tmp, *dir, *slash, k[128];
+    size_t len = 0, cap = 0, nl;
+    const char *p, *at = NULL;
+    int found = 0, err;
+    FILE *f;
+
+    if ((f = fopen(path, "r"))) {
+        char buf[4096];
+
+        while ((nl = fread(buf, 1, sizeof buf, f)) > 0) {
+            if (len + nl + 1 > cap)
+                text = xrealloc(text, cap = (len + nl + 1) * 2);
+            memcpy(text + len, buf, nl);
+            len += nl;
+        }
+        fclose(f);
+    } else if (errno != ENOENT) {
+        return -1;
+    }
+    if (!text)
+        text = xmalloc(1);
+    text[len] = '\0';
+
+    dir = xstrdup(path);
+    if ((slash = strrchr(dir, '/')) && slash != dir) {
+        *slash = '\0';
+        mkdir(dir, 0700);   /* si ja existeix, res */
+    }
+    free(dir);
+    tmp = xmalloc(strlen(path) + 8);
+    sprintf(tmp, "%s.nou", path);
+    if (!(f = fopen(tmp, "w"))) {
+        err = errno;
+        free(text);
+        free(tmp);
+        errno = err;
+        return -1;
+    }
+    /* Primer, on aniria si no hi és: abans del primer «color-» */
+    for (p = text; *p; p = strchr(p, '\n') ? strchr(p, '\n') + 1 : p + strlen(p)) {
+        line_key(p, k, sizeof k);
+        if (!strcmp(k, key))
+            found = 1;
+        if (!at && !strncmp(k, "color-", 6))
+            at = p;
+    }
+    for (p = text; *p; ) {
+        const char *end = strchr(p, '\n');
+
+        nl = end ? (size_t)(end - p) + 1 : strlen(p);
+        line_key(p, k, sizeof k);
+        if (!found && p == at)
+            fprintf(f, "%s = %s\n", key, value);
+        if (!strcmp(k, key))
+            fprintf(f, "%s = %s\n", key, value);
+        else
+            fwrite(p, 1, nl, f);
+        if (!end)
+            fputc('\n', f);
+        p += nl;
+    }
+    if (!found && !at)
+        fprintf(f, "%s = %s\n", key, value);
+    free(text);
+    if (fflush(f) != 0 || fsync(fileno(f)) != 0) {
+        err = errno;
+        fclose(f);
+        unlink(tmp);
+        free(tmp);
+        errno = err;
+        return -1;
+    }
+    fclose(f);
+    if (rename(tmp, path) < 0) {
+        err = errno;
+        unlink(tmp);
+        free(tmp);
+        errno = err;
+        return -1;
+    }
+    free(tmp);
+    return 0;
+}
+
 void config_template(FILE *f)
 {
     fputs("# Phileas: configuració\n"
@@ -374,7 +482,8 @@ void config_template(FILE *f)
           "# diccionari = ca_ES-valencia      # un diccionari concret en arrencar\n"
           "\n"
           "# Tema de colors: terminal (els colors del terminal), fosc, clar, sepia\n"
-          "# o fosfor. També es canvia des del menú Vista o amb l'ordre «tema».\n"
+          "# o fosfor. També es canvia des del menú Vista o amb l'ordre «tema»,\n"
+          "# que el deixen desat en aquesta línia.\n"
           "tema = terminal\n"
           "paleta-consola = si    # a la consola de Linux, els colors propis del tema\n"
           "\n"
