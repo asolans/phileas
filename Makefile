@@ -42,9 +42,18 @@ PREFIX  ?= /usr
 install: phileas
 	install -D -m 0755 phileas $(DESTDIR)$(PREFIX)/bin/phileas
 
+# Paquets a dist/: .deb (Debian, Ubuntu) i codi font de HEAD en .tar.gz
+VERSION = $(shell sed -n 's/^\#define PHILEAS_VERSION *"\(.*\)"/\1/p' src/main.c)
+deb: phileas
+	sh packaging/mkdeb.sh $(VERSION) dist
+
+dist:
+	mkdir -p dist
+	git archive --format=tar.gz --prefix=phileas-$(VERSION)/ -o dist/phileas-$(VERSION).tar.gz HEAD
+
 clean:
-	rm -rf build phileas
+	rm -rf build phileas dist
 
 -include $(OBJ:.o=.d)
 
-.PHONY: test debug clean install
+.PHONY: test debug clean install deb dist

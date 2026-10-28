@@ -2,3 +2,4 @@ build/
 *.o
 phileas
 tools/terminfo/
+dist/

@@ -1,0 +1,266 @@
+# Phileas
+
+Editor de text per a la consola de Linux, pensat per **escriure prosa en
+Markdown**, no per programar. És petit (un executable de ~180 KB escrit en C
+amb ncursesw), arrenca a l'instant i funciona igual en un terminal
+d'escriptori que a la consola d'una Raspberry Pi 1B sense entorn gràfic.
+
+Va néixer com l'editor del projecte **BYOK**: un dispositiu d'escriptura sense
+distraccions fet amb una Raspberry Pi, al qual es connecta un teclat i que
+només serveix per escriure.
+
+```
+    # Capítol 1
+
+    Phileas Fogg era un home que no feia res sense calcular-ho. El text
+    s'ajusta sol a 72 columnes i cada paràgraf és una sola línia al
+    fitxer, de manera que el Markdown que es desa és net.
+
+    - Les llistes continuen soles en prémer Retorn
+    - i les paraules mal escrites es marquen en vermell (F7).
+
+ cap1.md                                   ca L 3/4  C 12  1 pàg.
+```
+
+## Característiques
+
+- **Markdown sense previsualització:** només el marcatge, amb colors mínims
+  (capçaleres, negreta, cursiva, codi i cites) que funcionen fins i tot en
+  terminals de 8 colors.
+- **Ajust de línia suau** a un nombre de columnes configurable (72 per
+  defecte), amb sagnat penjant a les llistes i a les cites, marges i columna
+  centrada opcional.
+- **Model de paràgrafs:** Retorn separa paràgrafs; al fitxer s'escriu una
+  línia en blanc entre blocs. Els textos tallats a mà s'ajunten en obrir-los.
+  Els fitxers que no són `.md`, `.markdown` o `.txt` s'obren en mode text pla
+  i no es modifiquen.
+- **Dreceres a l'estil dels processadors de text** (Ctrl+S, Ctrl+Z, Ctrl+C,
+  Ctrl+V, Ctrl+F…), amb alternatives Alt+lletra per a la consola de Linux,
+  on moltes combinacions no arriben.
+- **Menús** a l'estil de WordGrinder (Esc) i **paleta d'ordres** amb
+  autocompleció (Ctrl+P): tota ordre té un nom i s'hi pot arribar encara que
+  no tingui tecla.
+- **Correcció ortogràfica** amb hunspell, en català i castellà (o qualsevol
+  altre diccionari instal·lat): marcatge instantani, suggeriments,
+  revisió d'error en error i diccionari personal.
+- **Desfer i refer** il·limitats (fins a 8 MB), **cerca i substitució**.
+- **Desat atòmic i autodesat:** desa sol després de 30 segons sense escriure
+  i, com a molt, cada 5 minuts. Si es tanca el terminal o el sistema s'apaga
+  (SIGHUP, SIGTERM), desa abans de sortir.
+- **Mode màquina d'escriure:** la línia on s'escriu es queda a una altura fixa
+  de la pantalla.
+- **Navegador de fitxers** integrat (Ctrl+O) i **estimació de pàgines** a la
+  barra d'estat.
+- **Ordres externes:** es poden afegir a la paleta ordres del sistema
+  (exportar amb pandoc, comptar paraules, enviar el text…).
+- **UTF-8 complet:** accents, ç, l·l, cometes tipogràfiques i caràcters
+  amples. Conserva els salts CRLF, la BOM i els bytes no UTF-8 del fitxer.
+- **Ajuda integrada** (F1), amb les tecles que hi ha assignades de debò.
+
+La interfície és en català.
+
+## Instal·lació
+
+### Paquet per a Debian i Ubuntu
+
+A la pàgina de
+[versions publicades](https://github.com/asolans/phileas/releases) hi ha un
+paquet `.deb` per a x86-64:
+
+```bash
+sudo apt install ./phileas_2.0.0_amd64.deb
+```
+
+`apt` hi afegeix les dependències (ncurses) i, com a recomanacions, hunspell
+i els diccionaris de català i castellà.
+
+### Des del codi font
+
+Cal un compilador de C11 i les capçaleres de ncursesw:
+
+```bash
+sudo apt install build-essential pkg-config libncurses-dev   # Debian, Ubuntu
+sudo dnf install gcc make pkgconf ncurses-devel               # Fedora
+sudo pacman -S base-devel ncurses                             # Arch
+```
+
+Compilar, provar i instal·lar:
+
+```bash
+git clone https://github.com/asolans/phileas.git
+cd phileas
+make
+make test
+sudo make install
+```
+
+`make install` copia l'executable a `/usr/bin/phileas`. Per instal·lar-lo en
+un altre lloc: `make PREFIX=$HOME/.local install`.
+
+### Ortografia
+
+hunspell **no cal per compilar**: Phileas carrega `libhunspell` quan
+s'executa (`dlopen`) i, si no la troba, funciona igual però sense
+ortografia. Per tenir-la:
+
+```bash
+sudo apt install libhunspell-1.7-0 hunspell-ca hunspell-es   # Debian, Ubuntu
+sudo dnf install hunspell hunspell-ca hunspell-es             # Fedora
+sudo pacman -S hunspell hunspell-ca hunspell-es_es            # Arch
+```
+
+Els diccionaris es busquen a `/usr/share/hunspell`, `/usr/share/myspell`,
+`/usr/local/share/hunspell`, als directoris de `$DICPATH` i a
+`~/.local/share/hunspell`.
+
+## Ús
+
+```
+phileas [-c COLUMNES] [-a SEGONS] [-d IDIOMA] [FITXER]
+```
+
+| Opció | Efecte |
+|-------|--------|
+| `-c N` | amplada del text en columnes (per defecte 72) |
+| `-a N` | autodesat després de N segons sense escriure; `0` el desactiva |
+| `-d ID` | activa l'ortografia amb aquest diccionari (`ca`, `es`, `en_US`…) |
+| `--config` | escriu una configuració amb tots els valors per defecte |
+| `-h`, `-v` | ajuda i versió |
+
+Sense fitxer, Phileas comença un document nou. Per començar, n'hi ha prou
+de recordar tres tecles: **Esc** (menús), **F1** (ajuda) i **Ctrl+P**
+(paleta d'ordres).
+
+### Tecles principals
+
+| Tecla | Ordre |
+|-------|-------|
+| Ctrl+S / Alt+S | desar / desar com |
+| Ctrl+O / Ctrl+N | obrir (navegador de fitxers) / document nou |
+| Ctrl+Q | sortir (demana confirmació si hi ha canvis) |
+| Ctrl+Z / Ctrl+Y | desfer / refer |
+| Ctrl+X / Ctrl+C / Ctrl+V | tallar / copiar / enganxar |
+| Ctrl+A, Ctrl+Espai, Maj+fletxes | seleccionar tot / començar la selecció / ampliar-la |
+| Ctrl+W / Alt+D | esborrar la paraula anterior / la següent |
+| Ctrl+F, Ctrl+G, Alt+G | cercar, següent, anterior |
+| Ctrl+R | substituir |
+| Ctrl+B / Alt+I | negreta / cursiva |
+| Alt+1 … Alt+6, Alt+0 | capçalera de nivell 1 a 6, treure-la |
+| Alt+B / Alt+F | paraula anterior / següent (també Ctrl+fletxes) |
+| Alt+P / Alt+N | paràgraf anterior / següent (també Ctrl+fletxes) |
+| Alt+< / Alt+> | inici / fi del document |
+| Alt+L | anar a una línia |
+| F7 / F8 | activar l'ortografia / canviar d'idioma |
+| Maj+F7 / Alt+Retorn | revisar d'error en error / suggeriments |
+| Alt+C | centrar la columna |
+| F2 | barra d'ajuda inferior |
+| Ctrl+L | redibuixar la pantalla |
+
+Les alternatives amb Alt existeixen perquè a la consola de Linux (sense
+entorn gràfic) les combinacions amb Ctrl+fletxes sovint no arriben.
+
+## Configuració
+
+Phileas llegeix, per aquest ordre, `/etc/phileas/phileasrc` i el fitxer de
+l'usuari: `$PHILEAS_CONFIG/phileasrc` si hi ha aquesta variable, si no
+`$XDG_CONFIG_HOME/phileas/phileasrc` o `~/.config/phileas/phileasrc`. Les
+opcions de la línia d'ordres manen sobre tots dos.
+
+Per fer-se'n un a partir dels valors per defecte:
+
+```bash
+mkdir -p ~/.config/phileas
+phileas --config > ~/.config/phileas/phileasrc
+```
+
+Només cal deixar-hi les opcions que es volen canviar. Un exemple:
+
+```ini
+columnes = 66
+marge-esquerre = 6
+maquina-escriure = salt        # salt, fixa o classic
+autodesat = 20
+ortografia = si
+idiomes = ca es                # F8 alterna; el primer és el de l'arrencada
+color-capcalera-1 = blau
+
+# Dreceres: tecla.NOM = ordre (buit = treure-la)
+tecla.f9 = colors
+
+# Ordres externes, que apareixen a la paleta (Ctrl+P)
+externa-breu.paraules = wc -w      # Ctrl+P, «paraules cap1.md»
+externa.terminal = sh              # obre un shell; en sortir, torna a Phileas
+```
+
+A la paleta, el que s'escriu després del nom d'una ordre externa se li passa
+com a arguments. Abans d'executar-la, Phileas desa el document si té canvis.
+Les ordres `externa-breu` mostren la darrera línia de la sortida a la barra
+d'estat; les `externa` deixen el terminal a l'ordre fins que acaba.
+
+Una línia incorrecta no impedeix arrencar: s'ignora i la barra d'estat en
+dona l'avís. Des de la paleta, `recarregar-configuracio` torna a llegir el
+fitxer sense sortir.
+
+## Desenvolupament
+
+```bash
+make                       # ./phileas
+make test                  # proves unitàries (sense ncurses)
+make clean && make debug   # amb AddressSanitizer i UBSan
+make deb                   # paquet .deb a dist/
+make dist                  # codi font en .tar.gz a dist/
+```
+
+**Compilació creuada** (p. ex. per a una Raspberry Pi amb Buildroot):
+
+```bash
+make CC=arm-linux-gcc PKG_CONFIG=/ruta/a/pkg-config
+make DESTDIR=/ruta/arrel PREFIX=/usr install
+```
+
+**Executable estàtic** (portable, sense dependències): un executable estàtic
+no pot carregar hunspell amb `dlopen`, i per això cal enllaçar-l'hi:
+
+```bash
+make HUNSPELL_STATIC=1 LDFLAGS=-static
+```
+
+Funciona millor amb musl que amb glibc. El projecte BYOK el compila amb una
+cadena musl de Buildroot.
+
+### Estructura del codi
+
+| Fitxer | Funció |
+|--------|--------|
+| `main.c` | arrencada, arguments i bucle principal |
+| `buffer.c` | vector de línies (una línia = un paràgraf), càrrega i desat atòmic |
+| `editor.c` | cursor, moviment, edició, selecció i porta-retalls |
+| `wrap.c` | ajust de línia suau amb sagnat penjant |
+| `md.c` | tipus de bloc Markdown i estils |
+| `render.c` | dibuix amb ncursesw, barra d'estat i diàlegs |
+| `command.c`, `keys.c` | registre d'ordres amb nom, dreceres i lectura de tecles |
+| `menu.c`, `complete.c`, `help.c` | menús, autocompleció de la paleta i ajuda |
+| `search.c`, `undo.c`, `autosave.c` | cerca, desfer/refer i autodesat |
+| `spell.c` | ortografia amb hunspell, carregat amb `dlopen` |
+| `filebrowser.c`, `dirlist.c` | navegador de fitxers |
+| `config.c` | fitxers de configuració |
+| `utf8.c`, `util.c` | UTF-8 i utilitats |
+
+Els mòduls que no depenen de ncurses es proven a `tests/test.c`. A `tools/`
+hi ha eines per a les proves interactives: `ptyrun.c` (executa Phileas en un
+pseudoterminal) i `screen.py` (emulador de pantalla mínim).
+
+Les decisions de disseny (llenguatge, estructura del buffer, ajust de línia,
+dreceres, model de paràgrafs, configuració…) i el registre complet del
+desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
+
+## Versions
+
+- **2.0** (2026-10-27): menús a l'estil WordGrinder amb Esc, amb un submenú
+  BYOK per a les ordres externes.
+- **1.0** (2026-10-26): primera versió completa, integrada a la imatge BYOK
+  per a Raspberry Pi 1B.
+
+## Llicència
+
+Pendent de definir.
