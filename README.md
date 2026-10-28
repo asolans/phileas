@@ -73,7 +73,10 @@ sudo apt install ./phileas_2.0.0_amd64.deb
 ```
 
 `apt` hi afegeix les dependències (ncurses) i, com a recomanacions, hunspell
-i els diccionaris de català i castellà.
+i els diccionaris de català i castellà. El paquet també instal·la un
+llançador per a l'escriptori (GNOME, KDE...): Phileas apareix entre les
+aplicacions i s'obre en un terminal; també es pot triar a «Obre amb» per als
+fitxers `.md` i `.txt`.
 
 ### Des del codi font
 
@@ -313,6 +316,9 @@ make dist                  # codi font en .tar.gz a dist/
 make CC=arm-linux-gcc PKG_CONFIG=/ruta/a/pkg-config
 make DESTDIR=/ruta/arrel PREFIX=/usr install
 ```
+
+`make install-desktop` hi afegeix el llançador (`.desktop`) i la icona;
+`make deb` ja ho fa.
 
 **Executable estàtic** (portable, sense dependències): un executable estàtic
 no pot carregar hunspell amb `dlopen`, i per això cal enllaçar-l'hi:

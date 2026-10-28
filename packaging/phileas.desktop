@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Name=Phileas
+GenericName=Text Editor
+GenericName[ca]=Editor de text
+GenericName[es]=Editor de texto
+Comment=Write prose in Markdown, in the terminal
+Comment[ca]=Escriu prosa en Markdown, a la consola
+Comment[es]=Escribe prosa en Markdown, en la consola
+Exec=phileas %f
+Icon=phileas
+Terminal=true
+Categories=Utility;TextEditor;
+MimeType=text/markdown;text/x-markdown;text/plain;
+Keywords=markdown;text;editor;writing;md;
+Keywords[ca]=markdown;text;editor;escriure;md;
+Keywords[es]=markdown;texto;editor;escribir;md;

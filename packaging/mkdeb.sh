@@ -12,7 +12,7 @@ PAQ="phileas_${VERSIO}_${ARQ}"
 ARREL="build/deb/$PAQ"
 
 rm -rf "$ARREL"
-make DESTDIR="$ARREL" PREFIX=/usr install
+make DESTDIR="$ARREL" PREFIX=/usr install install-desktop
 strip --strip-unneeded "$ARREL/usr/bin/phileas"
 
 DOC="$ARREL/usr/share/doc/phileas"

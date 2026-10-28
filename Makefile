@@ -42,6 +42,12 @@ PREFIX  ?= /usr
 install: phileas
 	install -D -m 0755 phileas $(DESTDIR)$(PREFIX)/bin/phileas
 
+# Llançador per als escriptoris (GNOME, KDE...): obre Phileas en un terminal.
+# No forma part d'install perquè la imatge de la BYOK no té escriptori.
+install-desktop:
+	install -D -m 0644 packaging/phileas.desktop $(DESTDIR)$(PREFIX)/share/applications/phileas.desktop
+	install -D -m 0644 packaging/phileas.svg $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps/phileas.svg
+
 # Paquets a dist/: .deb (Debian, Ubuntu) i codi font de HEAD en .tar.gz
 VERSION = $(shell sed -n 's/^\#define PHILEAS_VERSION *"\(.*\)"/\1/p' src/main.c)
 deb: phileas
@@ -56,4 +62,4 @@ clean:
 
 -include $(OBJ:.o=.d)
 
-.PHONY: test debug clean install deb dist
+.PHONY: test debug clean install install-desktop deb dist

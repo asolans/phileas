@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Icona de Phileas: un globus aerostàtic sobre una pantalla de consola -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="8" y="8" width="112" height="112" rx="20" fill="#1f2a36"/>
+  <rect x="8" y="8" width="112" height="112" rx="20" fill="none" stroke="#3b4b5c" stroke-width="2"/>
+  <!-- globus -->
+  <path d="M64 20c-18 0-30 13-30 29 0 14 11 25 22 33h16c11-8 22-19 22-33 0-16-12-29-30-29z" fill="#e8a33d"/>
+  <path d="M64 20c-7 0-12 13-12 29 0 14 4 25 7 33h10c3-8 7-19 7-33 0-16-5-29-12-29z" fill="#c9442f"/>
+  <path d="M57 82l3 12M71 82l-3 12" stroke="#c9d1d9" stroke-width="2"/>
+  <rect x="58" y="94" width="12" height="8" rx="2" fill="#8a5a2b"/>
+  <!-- cursor de text -->
+  <rect x="84" y="96" width="14" height="5" fill="#7ee787"/>
+</svg>
