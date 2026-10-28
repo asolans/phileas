@@ -8,6 +8,7 @@
 #include "render.h"
 #include "search.h"
 #include "spell.h"
+#include "theme.h"
 #include "utf8.h"
 #include "tui.h"
 #include "util.h"
@@ -521,6 +522,25 @@ static void c_colors(Editor *e)
     ed_msg(e, e->colors ? "Colors de Markdown activats" : "Colors de Markdown desactivats");
 }
 
+/* tema NOM, o sense nom, el següent */
+static void c_theme(Editor *e)
+{
+    const char *name = cmd_args();
+    const Theme *t;
+
+    if (*name) {
+        if (!(t = theme_find(name))) {
+            ed_msg(e, "Tema desconegut «%s» (terminal, fosc, clar, sepia o fosfor)", name);
+            return;
+        }
+    } else {
+        t = theme_at(((size_t)e->theme + 1) % theme_count());
+    }
+    theme_apply(e, t);
+    render_colors(e);
+    ed_msg(e, "Tema: %s", t->label);
+}
+
 /* ---- Ortografia ---- */
 
 /* El diccionari es carrega la primera vegada que es fa servir: en una
@@ -828,6 +848,7 @@ static const Command commands[] = {
     { "maquina-escriure",  c_typewriter, "Desplaçament: salt, línia fixa o clàssic", ACT_NONE },
     { "recarregar-configuracio", c_reload_config, "Torna a llegir el fitxer phileasrc", ACT_NONE },
     { "colors",            c_colors,     "Activa o desactiva els colors de Markdown", ACT_NONE },
+    { "tema",              c_theme,      "Canvia el tema de colors (tema NOM: terminal, fosc, clar, sepia, fosfor)", ACT_NONE },
     { "obrir",             c_open,       "Obre un document amb el navegador de fitxers", ACT_NONE },
     { "nou",               c_new,        "Comença un document nou sense nom", ACT_NONE },
     { "desar",             c_save,       "Desa el document", ACT_NONE },
@@ -1101,16 +1122,26 @@ static void run_external(Editor *e, const External *x, const char *args)
     free(cmd);
 }
 
+static const char *run_args = "";
+
+const char *cmd_args(void)
+{
+    return run_args;
+}
+
 void cmd_run(Editor *e, const Command *c, const char *args)
 {
     const External *x = as_external(c);
 
-    if (x)
+    if (x) {
         run_external(e, x, args);
-    else if (args && *args)
+    } else if (args && *args && c->fn != c_theme) {
         ed_msg(e, "L'ordre %s no admet arguments", c->name);
-    else
+    } else {
+        run_args = args ? args : "";
         c->fn(e);
+        run_args = "";
+    }
 }
 
 const Command *cmd_find(const char *name)

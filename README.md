@@ -27,6 +27,10 @@ només serveix per escriure.
 - **Markdown sense previsualització:** només el marcatge, amb colors mínims
   (capçaleres, negreta, cursiva, codi i cites) que funcionen fins i tot en
   terminals de 8 colors.
+- **Temes de colors:** terminal (els colors del terminal, per defecte), fosc,
+  clar, sèpia i fòsfor, des del menú Vista o amb l'ordre `tema`. A la consola
+  de Linux (com a la imatge BYOK), cada tema hi posa els seus propis colors i,
+  en sortir, torna a deixar els de la consola.
 - **Ajust de línia suau** a un nombre de columnes configurable (72 per
   defecte), amb sagnat penjant a les llistes i a les cites, marges i columna
   centrada opcional.
@@ -281,7 +285,8 @@ maquina-escriure = salt        # salt, fixa o classic
 autodesat = 20
 ortografia = si
 idiomes = ca es                # F8 alterna; el primer és el de l'arrencada
-color-capcalera-1 = blau
+tema = sepia                   # terminal, fosc, clar, sepia o fosfor
+color-capcalera-1 = blau       # retoca un color del tema (després de «tema»)
 
 # Dreceres: tecla.NOM = ordre (buit = treure-la)
 tecla.f9 = colors
@@ -290,6 +295,15 @@ tecla.f9 = colors
 externa-breu.paraules = wc -w      # Ctrl+P, «paraules cap1.md»
 externa.terminal = sh              # obre un shell; en sortir, torna a Phileas
 ```
+
+Els colors que es poden retocar són `color-text`, `color-fons`, `color-barra`,
+`color-barra-fons`, `color-seleccio`, `color-seleccio-fons`, `color-menu`,
+`color-menu-fons`, `color-marcadors`, `color-capcalera-1` a `-3`, `color-codi`,
+`color-cita` i `color-error`. Els valors són els 8 colors bàsics (`negre`,
+`vermell`, `verd`, `groc`, `blau`, `magenta`, `cian`, `blanc`), els clars
+(`gris`, `vermell-clar`… `blanc-clar`) o `cap`, el color del terminal. Sense
+color, la barra i la selecció van en vídeo invers. `paleta-consola = no` fa que
+a la consola de Linux es mantinguin els colors de la consola.
 
 A la paleta, el que s'escriu després del nom d'una ordre externa se li passa
 com a arguments. Abans d'executar-la, Phileas desa el document si té canvis.

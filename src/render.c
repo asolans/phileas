@@ -2,6 +2,7 @@
 #include "keys.h"
 #include "md.h"
 #include "spell.h"
+#include "theme.h"
 #include "tui.h"
 #include "utf8.h"
 #include "wrap.h"
@@ -13,14 +14,19 @@
 #include <unistd.h>
 #include <wctype.h>
 
-/* Parelles de colors (fons per defecte del terminal) */
-enum { PAIR_H1 = 1, PAIR_H2, PAIR_H3, PAIR_CODE, PAIR_QUOTE, PAIR_MARK, PAIR_ERROR };
+/* Parelles de colors */
+enum { PAIR_H1 = 1, PAIR_H2, PAIR_H3, PAIR_CODE, PAIR_QUOTE, PAIR_MARK, PAIR_ERROR,
+       PAIR_TEXT, PAIR_BAR, PAIR_SEL, PAIR_MENU, PAIR_N };
 
 static attr_t italic_attr = A_UNDERLINE;  /* si el terminal no té cursiva */
 static attr_t mark_attr;
 static attr_t no_color;   /* atributs que el terminal no combina amb colors (ncv) */
 static int    have_colors;
 static short  default_bg = -1;
+static attr_t pair_bold[PAIR_N];  /* A_BOLD on el color clar no existeix (8 colors) */
+static int    mark_colored;       /* els marcadors tenen color propi (si no, atenuats) */
+static int    role_on[UI_N];      /* la barra, la selecció o els menús tenen color */
+static const unsigned *console_rgb;  /* paleta del tema aplicada a la consola */
 
 /* Estils de la línia que s'està dibuixant */
 static unsigned char *styles, *errors;
@@ -42,13 +48,17 @@ static void colors_init(void)
             no_color = (ncv & 2 ? A_UNDERLINE : 0) | (ncv & 16 ? A_DIM : 0) |
                        (ncv & 0x8000 ? A_ITALIC : 0);
         default_bg = bg;
-        init_pair(PAIR_MARK, COLOR_BLUE, bg);
     }
     /* Marcadors atenuats; si el terminal no en sap, en blau */
     if (ta & A_DIM)
         mark_attr = A_DIM;
     else if (have_colors)
         mark_attr = COLOR_PAIR(PAIR_MARK);
+}
+
+static attr_t pair_attr(short pair)
+{
+    return COLOR_PAIR(pair) | pair_bold[pair];
 }
 
 static attr_t style_attr(unsigned char st)
@@ -73,32 +83,119 @@ static attr_t style_attr(unsigned char st)
         pair = PAIR_CODE;
     if (st & MS_MARK) {
         a &= ~A_BOLD;   /* negreta i atenuat es contradiuen */
-        if (mark_attr & A_DIM)
-            a |= A_DIM;
-        else
+        if (mark_colored || !(mark_attr & A_DIM))
             pair = PAIR_MARK;
+        else
+            a |= A_DIM;
     }
     /* A la consola de Linux, el subratllat i l'atenuat no van amb color:
      * mana l'atribut */
-    return have_colors && pair && !(a & no_color) ? a | COLOR_PAIR(pair) : a;
+    return have_colors && pair && !(a & no_color) ? a | pair_attr(pair) : a;
+}
+
+attr_t ui_attr(int role)
+{
+    static const short pairs[UI_N] = { PAIR_BAR, PAIR_SEL, PAIR_MENU };
+
+    if (have_colors && role_on[role])
+        return pair_attr(pairs[role]);
+    return role == UI_MENU ? A_NORMAL : A_REVERSE;
+}
+
+/* Un atribut amb el de la selecció (o un altre paper) a sobre: el color del
+ * paper substitueix el de l'estil, i el vídeo invers s'hi afegeix. */
+static attr_t over_role(attr_t a, int role)
+{
+    attr_t r = ui_attr(role);
+
+    return r & A_COLOR ? (a & ~A_COLOR) | r : a | r;
+}
+
+/* La consola de Linux permet redefinir els seus 16 colors (ESC ] P) i
+ * tornar als de sempre (ESC ] R). */
+static int linux_console(void)
+{
+    const char *t = getenv("TERM");
+
+    return t && !strncmp(t, "linux", 5);
+}
+
+static void console_palette(const unsigned *rgb)
+{
+    char seq[16 * 10 + 4];
+    int n = 0;
+
+    if (rgb)
+        for (int i = 0; i < 16; i++)
+            n += snprintf(seq + n, sizeof seq - (size_t)n, "\033]P%X%06X", i, rgb[i] & 0xFFFFFF);
+    else
+        n = snprintf(seq, sizeof seq, "\033]R");
+    if (write(STDOUT_FILENO, seq, (size_t)n) < 0) {
+        /* sense paleta pròpia: es veuen els colors normals */
+    }
+}
+
+/* Parella amb els colors c (primer pla) i b (fons) de la paleta; PAL_DEFAULT
+ * vol dir el del text. Els colors clars, si el terminal només en té 8, són
+ * el normal amb negreta (a la consola de Linux, la negreta els aclareix). */
+static void set_pair(short pair, short c, short b, short text_fg, short text_bg)
+{
+    pair_bold[pair] = 0;
+    if (c == PAL_DEFAULT)
+        c = text_fg;
+    if (c >= 8 && c >= COLORS) {
+        c -= 8;
+        pair_bold[pair] = A_BOLD;
+    }
+    if (b == PAL_DEFAULT)
+        b = text_bg;
+    else if (b >= 8 && b >= COLORS)
+        b -= 8;
+    init_pair(pair, c, b);
 }
 
 void render_colors(Editor *e)
 {
-    static const short pairs[PAL_N] = {
-        [PAL_H1] = PAIR_H1, [PAL_H2] = PAIR_H2, [PAL_H3] = PAIR_H3,
-        [PAL_CODE] = PAIR_CODE, [PAL_QUOTE] = PAIR_QUOTE, [PAL_ERROR] = PAIR_ERROR,
+    static const short md_pairs[][2] = {
+        { PAL_H1, PAIR_H1 }, { PAL_H2, PAIR_H2 }, { PAL_H3, PAIR_H3 },
+        { PAL_CODE, PAIR_CODE }, { PAL_QUOTE, PAIR_QUOTE }, { PAL_ERROR, PAIR_ERROR },
     };
+    static const short roles[UI_N][3] = {
+        { PAL_BAR, PAL_BAR_BG, PAIR_BAR }, { PAL_SEL, PAL_SEL_BG, PAIR_SEL },
+        { PAL_MENU, PAL_MENU_BG, PAIR_MENU },
+    };
+    const short *pal = e->palette;
+    const unsigned *rgb;
+    short text_fg, text_bg;
+    int themed;
 
     if (!have_colors)
         return;
-    for (int i = 0; i < PAL_N; i++) {
-        short fg = e->palette[i];
+    /* «cap»: el color normal, si el terminal en té (si no, blanc sobre negre) */
+    text_fg = pal[PAL_TEXT] != PAL_DEFAULT ? pal[PAL_TEXT] :
+              default_bg != -1 ? COLOR_WHITE : -1;
+    text_bg = pal[PAL_BG] != PAL_DEFAULT ? pal[PAL_BG] : default_bg;
+    if (text_bg >= 8 && text_bg >= COLORS)
+        text_bg -= 8;
 
-        /* «cap»: el color normal, si el terminal en té (si no, blanc) */
-        if (fg == PAL_DEFAULT && default_bg != -1)
-            fg = COLOR_WHITE;
-        init_pair(pairs[i], fg, default_bg);
+    set_pair(PAIR_TEXT, text_fg, text_bg, text_fg, text_bg);
+    themed = pal[PAL_TEXT] != PAL_DEFAULT || pal[PAL_BG] != PAL_DEFAULT;
+    bkgd(' ' | (themed ? pair_attr(PAIR_TEXT) : 0));
+
+    for (size_t i = 0; i < sizeof md_pairs / sizeof *md_pairs; i++)
+        set_pair(md_pairs[i][1], pal[md_pairs[i][0]], PAL_DEFAULT, text_fg, text_bg);
+    mark_colored = pal[PAL_MARK] != PAL_DEFAULT;
+    set_pair(PAIR_MARK, mark_colored ? pal[PAL_MARK] : COLOR_BLUE, PAL_DEFAULT, text_fg, text_bg);
+    for (int r = 0; r < UI_N; r++) {
+        role_on[r] = pal[roles[r][0]] != PAL_DEFAULT || pal[roles[r][1]] != PAL_DEFAULT;
+        set_pair(roles[r][2], pal[roles[r][0]], pal[roles[r][1]], text_fg, text_bg);
+    }
+
+    rgb = e->console_palette && linux_console() ? theme_at((size_t)e->theme)->rgb : NULL;
+    if (rgb != console_rgb) {
+        console_palette(rgb);
+        console_rgb = rgb;
+        clearok(curscr, TRUE);
     }
 }
 
@@ -108,7 +205,7 @@ static attr_t error_attr(attr_t a)
 {
     if (!have_colors)
         return a | A_UNDERLINE;
-    a = (a & ~(A_COLOR | no_color)) | COLOR_PAIR(PAIR_ERROR);
+    a = (a & ~(A_COLOR | no_color)) | pair_attr(PAIR_ERROR);
     return no_color & A_UNDERLINE ? a : a | A_UNDERLINE;
 }
 
@@ -166,6 +263,8 @@ void ui_end(void)
     if (!isendwin()) {
         endwin();
         key_end();
+        if (console_rgb)
+            console_palette(NULL);
     }
 }
 
@@ -178,6 +277,8 @@ void ui_resume(void)
 {
     reset_prog_mode();
     key_init();
+    if (console_rgb)
+        console_palette(console_rgb);
     ui_sync_size();
     clearok(curscr, TRUE);
     refresh();
@@ -210,10 +311,13 @@ static void draw_row(Editor *e, Line *l, size_t r, int y, size_t s0, size_t s1)
             break;
         if (styles_cap) {
             attr_t a = e->colors ? style_attr(styles[i]) : 0;
-            attrset(errors[i] ? error_attr(a) : a);
+
+            if (errors[i])
+                a = error_attr(a);
+            attrset(sel ? over_role(a, UI_SEL) : a);
+        } else if (sel) {
+            attrset(ui_attr(UI_SEL));
         }
-        if (sel)
-            attron(A_REVERSE);
         if (wc == L'\t') {
             for (int k = 0; k < w; k++)
                 addch(' ');
@@ -229,9 +333,9 @@ static void draw_row(Editor *e, Line *l, size_t r, int y, size_t s0, size_t s1)
     attrset(A_NORMAL);
     /* El salt de línia seleccionat es mostra com un espai al final */
     if (end == l->len && s1 > l->len && col < e->width - indent) {
-        attron(A_REVERSE);
+        attrset(ui_attr(UI_SEL));
         addch(' ');
-        attroff(A_REVERSE);
+        attrset(A_NORMAL);
     }
 }
 
@@ -263,12 +367,12 @@ static void draw_status(Editor *e)
              words, words == 1 ? "paraula" : "paraules", buf_pages(&e->buf));
     rlen = (int)utf8_count(right, strlen(right));
 
-    attron(A_REVERSE);
+    attrset(ui_attr(UI_BAR));
     mvhline(y, 0, ' ', COLS);
     mvaddnstr(y, 0, left, (int)fit_chars(left, COLS - rlen - 1));
     if (rlen < COLS)
         mvaddstr(y, COLS - rlen, right);
-    attroff(A_REVERSE);
+    attrset(A_NORMAL);
 }
 
 void render(Editor *e)

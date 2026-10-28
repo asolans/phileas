@@ -8,6 +8,7 @@
 #include "md.h"
 #include "search.h"
 #include "spell.h"
+#include "theme.h"
 #include "utf8.h"
 #include "util.h"
 #include "wrap.h"
@@ -1024,6 +1025,27 @@ static void test_config(void)
     CHECK(SET("color-codi", "blau") == 0 && e.palette[PAL_CODE] == 4);
     CHECK(SET("color-cita", "cap") == 0 && e.palette[PAL_QUOTE] == PAL_DEFAULT);
     CHECK(SET("color-cita", "rosa") < 0);
+    CHECK(SET("color-fons", "blanc-clar") == 0 && e.palette[PAL_BG] == 15);
+    CHECK(SET("color-barra", "gris") == 0 && e.palette[PAL_BAR] == 8);
+    /* Un tema canvia tots els colors; els color-* posteriors el retoquen */
+    CHECK(e.theme == 0 && !strcmp(theme_at(0)->name, "terminal"));
+    CHECK(SET("tema", "Sepia") == 0 && e.theme == 3 && e.palette[PAL_BG] == 7 &&
+          e.palette[PAL_BAR_BG] == 0 && e.palette[PAL_CODE] == 6);
+    CHECK(SET("color-codi", "verd") == 0 && e.palette[PAL_CODE] == 2 && e.theme == 3);
+    CHECK(SET("tema", "rosa") < 0 && e.theme == 3);
+    CHECK(SET("paleta-consola", "no") == 0 && e.console_palette == 0);
+    CHECK(SET("tema", "terminal") == 0 && e.palette[PAL_BG] == PAL_DEFAULT &&
+          e.palette[PAL_CODE] == 3 && e.palette[PAL_H1] == 5);
+    /* Tots els temes tenen nom únic, i els fons de 0 a 7 (consola de Linux) */
+    for (size_t i = 0; i < theme_count(); i++) {
+        const Theme *t = theme_at(i);
+
+        CHECK(theme_find(t->name) == t);
+        CHECK(t->pal[PAL_BG] < 8 && t->pal[PAL_BAR_BG] < 8 && t->pal[PAL_SEL_BG] < 8 &&
+              t->pal[PAL_MENU_BG] < 8);
+        for (int k = 0; k < PAL_N; k++)
+            CHECK(t->pal[k] >= PAL_DEFAULT && t->pal[k] < 16);
+    }
     CHECK(SET("idiomes", "es ca en_US") == 0 && e.nlangs == 3 && !strcmp(e.langs[2], "en_US"));
     CHECK(SET("idiomes", "") < 0 && e.nlangs == 3);
     CHECK(SET("idiomes", "a b c d e") < 0);

@@ -1,6 +1,7 @@
 #include "editor.h"
 #include "md.h"
 #include "spell.h"
+#include "theme.h"
 #include "utf8.h"
 #include "util.h"
 #include "wrap.h"
@@ -30,13 +31,8 @@ void ed_init(Editor *e, int columns)
     e->tw_mode = TW_SALT;
     e->tw_limit = 80;
     e->tw_anchor = 50;
-    /* magenta, cian, verd, groc, verd, vermell (els números de COLOR_* de ncurses) */
-    e->palette[PAL_H1] = 5;
-    e->palette[PAL_H2] = 6;
-    e->palette[PAL_H3] = 2;
-    e->palette[PAL_CODE] = 3;
-    e->palette[PAL_QUOTE] = 2;
-    e->palette[PAL_ERROR] = 1;
+    theme_apply(e, theme_at(0));
+    e->console_palette = 1;
     /* Rotació de F8: català i castellà, començant pel de la configuració
      * regional si és un d'aquests dos */
     spell_code(NULL, code, sizeof code);

@@ -24,8 +24,12 @@ enum {
     SEL_MARK,   /* Ctrl+Espai: els moviments l'amplien fins que es cancel·la */
 };
 
-/* Elements amb color configurable */
-enum { PAL_H1, PAL_H2, PAL_H3, PAL_CODE, PAL_QUOTE, PAL_ERROR, PAL_N };
+/* Elements amb color configurable (temes: theme.c). Els de la barra, la
+ * selecció i els menús, si no tenen cap color, van en vídeo invers (barra i
+ * selecció) o amb els colors del text (menús). */
+enum { PAL_H1, PAL_H2, PAL_H3, PAL_CODE, PAL_QUOTE, PAL_ERROR, PAL_MARK,
+       PAL_TEXT, PAL_BG, PAL_BAR, PAL_BAR_BG, PAL_SEL, PAL_SEL_BG,
+       PAL_MENU, PAL_MENU_BG, PAL_N };
 #define PAL_DEFAULT (-1)   /* el color normal del terminal */
 
 #define MAX_LANGS 4
@@ -54,7 +58,9 @@ typedef struct {
     int     tw_limit;          /* % de l'alçada que el cursor no passa en baixar (salt) */
     int     tw_anchor;         /* % de l'alçada on queda el cursor després d'un salt */
     int     colors;            /* colors de Markdown */
-    short   palette[PAL_N];    /* COLOR_* de ncurses (0-7) o PAL_DEFAULT */
+    short   palette[PAL_N];    /* colors 0-15 (els 8 de ncurses i els clars) o PAL_DEFAULT */
+    int     theme;             /* índex del tema (theme_at) */
+    int     console_palette;   /* a la consola de Linux, aplicar els colors rgb del tema */
     int     spell;             /* marcar els errors ortogràfics */
     char    dict[64];          /* diccionari triat: "ca", "es" (F8), o el de -d o «idioma» */
     char    dict_loaded[64];   /* el que hi ha carregat; "" = cap */

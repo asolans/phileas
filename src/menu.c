@@ -13,7 +13,7 @@ typedef struct {
     char        key;     /* lletra que la tria dins el menú; 0 = cap */
     const char *label;
     const char *cmd;     /* ordre; NULL si obre un submenú */
-    const char *args;    /* arguments (només ordres externes) */
+    const char *args;    /* arguments (ordres externes i «tema») */
     const Menu *sub;
 } MenuItem;
 
@@ -61,10 +61,20 @@ static const Menu m_spell = { "Ortografia", (const MenuItem[]){
     { 'd', "Tria el diccionari…",   "idioma",             NULL, NULL },
     { 0 } } };
 
+static const Menu m_theme = { "Tema", (const MenuItem[]){
+    { 't', "Terminal",             "tema", "terminal", NULL },
+    { 'f', "Fosc",                 "tema", "fosc",     NULL },
+    { 'c', "Clar",                 "tema", "clar",     NULL },
+    { 's', "Sèpia",                "tema", "sepia",    NULL },
+    { 'o', "Fòsfor",               "tema", "fosfor",   NULL },
+    { 'e', "El següent",           "tema", NULL,       NULL },
+    { 0 } } };
+
 static const Menu m_view = { "Vista", (const MenuItem[]){
     { 'm', "Màquina d'escriure",   "maquina-escriure", NULL, NULL },
     { 'c', "Centra la columna",    "centrar",          NULL, NULL },
     { 'o', "Colors de Markdown",   "colors",           NULL, NULL },
+    { 't', "Tema",                 NULL,               NULL, &m_theme },
     { 'r', "Redibuixa",            "redibuixar",       NULL, NULL },
     { 0 } } };
 
@@ -266,6 +276,7 @@ static void draw_level(const Level *l, int active)
     int iw = l->w - 2, rows = l->h - 2;
 
     /* Vores i títol */
+    attrset(ui_attr(UI_MENU));
     mvaddch(l->y, l->x, ACS_ULCORNER);
     hline(ACS_HLINE, iw);
     mvaddch(l->y, l->x + l->w - 1, ACS_URCORNER);
@@ -303,8 +314,10 @@ static void draw_level(const Level *l, int active)
             sc[0] = '\0';
             labelw = iw - 5;
         }
-        if (sel)
-            attron(active ? A_REVERSE : A_BOLD);
+        if (sel && active)
+            attrset(ui_attr(UI_SEL));
+        else if (sel)
+            attron(A_BOLD);
         mvhline(y, l->x + 1, ' ', iw);
         move(y, l->x + 2);
         if (it->key) {
@@ -324,8 +337,9 @@ static void draw_level(const Level *l, int active)
             put_str(sc, scw);
             attroff(A_DIM);
         }
-        attrset(A_NORMAL);
+        attrset(ui_attr(UI_MENU));
     }
+    attrset(A_NORMAL);
 }
 
 static void draw_hint(void)

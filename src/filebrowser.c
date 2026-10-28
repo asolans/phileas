@@ -178,7 +178,7 @@ static void draw_entry(Browser *b, size_t idx, int y, int selected)
 
     move(y, 0);
     if (selected)
-        attron(A_REVERSE);
+        attrset(ui_attr(UI_SEL));
     hline(' ', COLS);
     move(y, 1);
     if (idx == PARENT) {
@@ -207,8 +207,7 @@ static void draw_entry(Browser *b, size_t idx, int y, int selected)
         if (rw)
             mvaddstr(y, COLS - 1 - rw, right);
     }
-    if (selected)
-        attroff(A_REVERSE);
+    attrset(A_NORMAL);
 }
 
 static void draw(Browser *b)
@@ -224,13 +223,13 @@ static void draw(Browser *b)
         b->top = b->sel - (size_t)h + 1;
 
     erase();
-    attron(A_REVERSE);
+    attrset(ui_attr(UI_BAR));
     mvhline(0, 0, ' ', COLS);
     pretty_path(b->dir, path, sizeof path);
     move(0, 1);
     put_str("Obrir: ", COLS - 1);
     put_tail(path, COLS - 9);
-    attroff(A_REVERSE);
+    attrset(A_NORMAL);
 
     for (int y = 0; y < h && b->top + (size_t)y < b->nshown; y++)
         draw_entry(b, b->shown[b->top + (size_t)y], y + 1, b->top + (size_t)y == b->sel);
@@ -238,13 +237,13 @@ static void draw(Browser *b)
         mvaddnstr(1, 1, b->filter[0] ? "(cap coincidència: Enter crea un fitxer nou amb aquest nom)"
                                      : "(directori buit)", COLS - 2);
 
-    attron(A_REVERSE);
+    attrset(ui_attr(UI_BAR));
     mvhline(LINES - 2, 0, ' ', COLS);
     move(LINES - 2, 1);
     put_str(show_hidden ? "Enter obre · ← pare · escriu per filtrar · Ctrl+A amaga ocults · Esc surt"
                         : "Enter obre · ← pare · escriu per filtrar · Ctrl+A mostra ocults · Esc surt",
             COLS - 2);
-    attroff(A_REVERSE);
+    attrset(A_NORMAL);
 
     move(LINES - 1, 0);
     if (b->msg[0]) {

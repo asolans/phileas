@@ -36,7 +36,7 @@ static const struct {
     { "Ortografia", (const char *const[]){
         "ortografia", "alternar-idioma", "revisar-ortografia", "suggeriments", "idioma", NULL } },
     { "Vista", (const char *const[]){
-        "maquina-escriure", "centrar", "colors", "redibuixar", NULL } },
+        "maquina-escriure", "centrar", "colors", "tema", "redibuixar", NULL } },
     { "Configuració i ajuda", (const char *const[]){
         "menu", "ajuda", "paleta", "recarregar-configuracio", "autodesat", NULL } },
 };
@@ -198,11 +198,11 @@ static void draw(size_t *vis, size_t nvis, size_t top, const char *filter)
     int h = LINES - 3, keyw = COLS >= 60 ? 22 : COLS / 3;
 
     erase();
-    attron(A_REVERSE);
+    attrset(ui_attr(UI_BAR));
     mvhline(0, 0, ' ', COLS);
     move(0, 1);
     put("Ajuda de Phileas: dreceres i ordres", COLS - 2);
-    attroff(A_REVERSE);
+    attrset(A_NORMAL);
 
     for (int y = 0; y < h && top + (size_t)y < nvis; y++) {
         const Row *r = &rows[vis[top + (size_t)y]];
@@ -249,11 +249,11 @@ static void draw(size_t *vis, size_t nvis, size_t top, const char *filter)
         }
     }
 
-    attron(A_REVERSE);
+    attrset(ui_attr(UI_BAR));
     mvhline(LINES - 2, 0, ' ', COLS);
     move(LINES - 2, 1);
     put("↑ ↓ RePàg AvPàg Inici Fi · escriu per filtrar · Esc o F1 tanca", COLS - 2);
-    attroff(A_REVERSE);
+    attrset(A_NORMAL);
     move(LINES - 1, 0);
     attron(A_BOLD);
     put("Filtre: ", COLS);

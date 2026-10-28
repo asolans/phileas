@@ -1,4 +1,5 @@
 #include "config.h"
+#include "theme.h"
 #include "util.h"
 
 #include <errno.h>
@@ -75,25 +76,17 @@ static int parse_bool(const char *v, int *out, char *err, size_t errsz)
     return -1;
 }
 
-static const char *const color_names[] = {
-    "negre", "vermell", "verd", "groc", "blau", "magenta", "cian", "blanc",
-};
-
 static int parse_color(const char *v, short *out, char *err, size_t errsz)
 {
-    if (!strcasecmp(v, "cap")) {
-        *out = PAL_DEFAULT;
-        return 0;
+    short c = theme_color_parse(v);
+
+    if (c == -2) {
+        snprintf(err, errsz, "color desconegut «%s» (negre, vermell, verd, groc, blau, magenta, "
+                 "cian, blanc, gris, les clares com verd-clar, o cap)", v);
+        return -1;
     }
-    for (short i = 0; i < 8; i++) {
-        if (!strcasecmp(v, color_names[i])) {
-            *out = i;
-            return 0;
-        }
-    }
-    snprintf(err, errsz, "color desconegut «%s» (negre, vermell, verd, groc, blau, magenta, "
-             "cian, blanc o cap)", v);
-    return -1;
+    *out = c;
+    return 0;
 }
 
 static const struct {
@@ -103,6 +96,11 @@ static const struct {
     { "color-capcalera-1", PAL_H1 }, { "color-capcalera-2", PAL_H2 },
     { "color-capcalera-3", PAL_H3 }, { "color-codi", PAL_CODE },
     { "color-cita", PAL_QUOTE },     { "color-error", PAL_ERROR },
+    { "color-marcadors", PAL_MARK },
+    { "color-text", PAL_TEXT },      { "color-fons", PAL_BG },
+    { "color-barra", PAL_BAR },      { "color-barra-fons", PAL_BAR_BG },
+    { "color-seleccio", PAL_SEL },   { "color-seleccio-fons", PAL_SEL_BG },
+    { "color-menu", PAL_MENU },      { "color-menu-fons", PAL_MENU_BG },
 };
 
 int config_set(Editor *e, const char *key, const char *v, char *err, size_t errsz)
@@ -140,6 +138,19 @@ int config_set(Editor *e, const char *key, const char *v, char *err, size_t errs
     for (size_t i = 0; i < sizeof color_keys / sizeof *color_keys; i++)
         if (!strcmp(key, color_keys[i].key))
             return parse_color(v, &e->palette[color_keys[i].pal], err, errsz);
+
+    if (!strcmp(key, "tema")) {
+        const Theme *t = theme_find(v);
+
+        if (!t) {
+            snprintf(err, errsz, "tema desconegut «%s» (terminal, fosc, clar, sepia o fosfor)", v);
+            return -1;
+        }
+        theme_apply(e, t);
+        return 0;
+    }
+    if (!strcmp(key, "paleta-consola"))
+        return parse_bool(v, &e->console_palette, err, errsz);
 
     if (!strcmp(key, "columnes")) {
         if (parse_int(v, 10, 1000, &n, err, errsz) < 0)
@@ -293,6 +304,8 @@ static void defaults(Editor *e)
     e->autosave_max = d.autosave_max;
     e->spell_start = d.spell_start;
     memcpy(e->palette, d.palette, sizeof e->palette);
+    e->theme = d.theme;
+    e->console_palette = d.console_palette;
     memcpy(e->langs, d.langs, sizeof e->langs);
     e->nlangs = d.nlangs;
     ed_free(&d);
@@ -360,13 +373,31 @@ void config_template(FILE *f)
           "idiomes = ca es                    # rotació de F8; el primer, en arrencar\n"
           "# diccionari = ca_ES-valencia      # un diccionari concret en arrencar\n"
           "\n"
-          "# Colors: negre, vermell, verd, groc, blau, magenta, cian, blanc o cap\n"
-          "color-capcalera-1 = magenta\n"
-          "color-capcalera-2 = cian\n"
-          "color-capcalera-3 = verd\n"
-          "color-codi = groc\n"
-          "color-cita = verd\n"
-          "color-error = vermell\n"
+          "# Tema de colors: terminal (els colors del terminal), fosc, clar, sepia\n"
+          "# o fosfor. També es canvia des del menú Vista o amb l'ordre «tema».\n"
+          "tema = terminal\n"
+          "paleta-consola = si    # a la consola de Linux, els colors propis del tema\n"
+          "\n"
+          "# Colors que canvien els del tema (van després de la línia «tema»):\n"
+          "# negre, vermell, verd, groc, blau, magenta, cian, blanc, gris,\n"
+          "# vermell-clar, verd-clar, groc-clar, blau-clar, magenta-clar, cian-clar,\n"
+          "# blanc-clar o cap (el del terminal). Sense colors, la barra i la\n"
+          "# selecció van en vídeo invers.\n"
+          "# color-capcalera-1 = magenta\n"
+          "# color-capcalera-2 = cian\n"
+          "# color-capcalera-3 = verd\n"
+          "# color-codi = groc\n"
+          "# color-cita = verd\n"
+          "# color-error = vermell\n"
+          "# color-marcadors = cap      # els signes de Markdown (cap: atenuats)\n"
+          "# color-text = cap\n"
+          "# color-fons = cap\n"
+          "# color-barra = cap\n"
+          "# color-barra-fons = cap\n"
+          "# color-seleccio = cap\n"
+          "# color-seleccio-fons = cap\n"
+          "# color-menu = cap\n"
+          "# color-menu-fons = cap\n"
           "\n"
           "# Dreceres: tecla.NOM = ordre, o tecla.NOM = (buit) per treure-la.\n"
           "# Noms: ctrl-a ... ctrl-z, alt-LLETRA, f1 ... f12, shift-f1 ... shift-f12,\n"
