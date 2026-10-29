@@ -74,7 +74,7 @@ paquet `.deb` per a x86-64 (per a la Raspberry Pi, vegeu
 [més avall](#raspberry-pi)):
 
 ```bash
-sudo apt install ./phileas_2.0.1_amd64.deb
+sudo apt install ./phileas_2.0.2_amd64.deb
 ```
 
 `apt` hi afegeix les dependències (ncurses) i, com a recomanacions, hunspell
@@ -149,8 +149,8 @@ compila des del codi font (uns quants minuts en una Pi 1).
    `git clone`. Després:
 
    ```bash
-   tar xzf phileas-2.0.1.tar.gz
-   cd phileas-2.0.1
+   tar xzf phileas-2.0.2.tar.gz
+   cd phileas-2.0.2
    make
    make test
    sudo make install
@@ -162,7 +162,7 @@ compila des del codi font (uns quants minuts en una Pi 1).
    ```bash
    sudo apt install fakeroot
    make deb
-   sudo apt install ./dist/phileas_2.0.1_armhf.deb
+   sudo apt install ./dist/phileas_2.0.2_armhf.deb
    ```
 
    El nom del paquet porta l'arquitectura de la Pi: `armhf` en 32 bits,
@@ -374,6 +374,10 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.0.2** (2026-10-29): recompte de paraules a la barra d'estat; temes de
+  colors (terminal, fosc, clar, sèpia, fòsfor), també a la consola de Linux;
+  les opcions de Vista (tema, centrar, colors, màquina d'escriure) es desen
+  soles; ordre `desar-configuracio`; `--config` amb els valors actuals.
 - **2.0.1** (2026-10-28): llançador per a l'escriptori (GNOME, KDE...) al
   paquet `.deb`.
 - **2.0** (2026-10-27): menús a l'estil WordGrinder amb Esc, amb un submenú
