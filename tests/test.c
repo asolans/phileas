@@ -6,6 +6,7 @@
 #include "dirlist.h"
 #include "editor.h"
 #include "md.h"
+#include "outline.h"
 #include "search.h"
 #include "spell.h"
 #include "theme.h"
@@ -506,6 +507,53 @@ static void test_words(void)
     CHECK(buf_words(&b) == 7);   /* «#», «-» i «—» no compten */
     buf_insert(&b, (Pos){ 0, 0 }, "Un ", 3);
     CHECK(buf_words(&b) == 8);   /* la línia modificada es torna a comptar */
+    buf_free(&b);
+}
+
+static void test_outline(void)
+{
+    Buffer b;
+    Outline o;
+    const char *t =
+        "Pròleg de dues paraules\n\n"
+        "# Capítol u #\n\nTres paraules aquí\n\n"
+        "## Escena  \n\nUna\n\n"
+        "```\n# no és capçalera\n```\n\n"
+        "Capítol dos\n===\n\nQuatre paraules més ara\n\n"
+        "Secció\n---\n\nCinc\n\n"
+        "#\n\n#hashtag\n\n### Final ###x";
+
+    buf_init(&b);
+    buf_insert(&b, (Pos){ 0, 0 }, t, strlen(t));
+    outline_build(&b, &o);
+    CHECK(o.n == 6);
+    CHECK(o.first_words == 4);
+    if (o.n == 6) {
+        CHECK(!strcmp(o.items[0].title, "Capítol u") && o.items[0].level == 1);
+        CHECK(!strcmp(o.items[1].title, "Escena") && o.items[1].level == 2);
+        CHECK(!strcmp(o.items[2].title, "Capítol dos") && o.items[2].level == 1);
+        CHECK(!strcmp(o.items[3].title, "Secció") && o.items[3].level == 2);
+        CHECK(!strcmp(o.items[4].title, "") && o.items[4].level == 1);
+        /* La tanca ha d'anar separada per un espai */
+        CHECK(!strcmp(o.items[5].title, "Final ###x") && o.items[5].level == 3);
+        /* Amb les subseccions; el codi de dins compta com a text de l'escena */
+        CHECK(o.items[1].words == 1 + 3);
+        CHECK(o.items[0].words == 3 + o.items[1].words);
+        CHECK(o.items[3].words == 1);
+        CHECK(o.items[2].words == 4 + 1);
+        CHECK(o.items[4].words == 1);   /* «#hashtag»; el títol «Final ###x» no compta */
+        CHECK(outline_at(&o, 0) == OUTLINE_NONE);
+        CHECK(outline_at(&o, o.items[0].line) == 0);
+        CHECK(outline_at(&o, o.items[1].line + 1) == 1);
+        CHECK(outline_at(&o, b.nlines - 1) == 5);
+    }
+    outline_free(&o);
+
+    /* Text pla: sense esquema */
+    b.plain = 1;
+    outline_build(&b, &o);
+    CHECK(o.n == 0 && o.items == NULL);
+    outline_free(&o);
     buf_free(&b);
 }
 
@@ -1328,6 +1376,7 @@ int main(void)
     test_buffer();
     test_pages();
     test_words();
+    test_outline();
     test_config_store();
     test_edit();
     test_md();

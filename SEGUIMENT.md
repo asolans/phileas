@@ -511,13 +511,39 @@ Llista oberta: l'usuari hi afegeix, en treu i n'ordena la prioritat.
 | C1 | Autocompleció a la paleta (Ctrl+P) | Tots dos | ✅ Fet (2026-10-26): Tab completa el nom de l'ordre; amb diverses opcions, les mostra atenuades. |
 | C2 | Recordar la posició del cursor per fitxer | Tots dos | En tornar a obrir un document, el cursor torna on era. Fitxer petit al directori de configuració. |
 | C3 | Fitxers recents | Tots dos | Llista dels últims documents, a la paleta o al navegador de fitxers. |
-| C4 | Comptador de paraules | Tots dos | A la barra d'estat (al costat de les pàgines) o com a ordre; amb la selecció, les de la selecció. |
+| C4 | Comptador de paraules | Tots dos | ✅ A la barra d'estat (2.0.2). Pendent: amb la selecció, les de la selecció. |
 | C5 | Ordre `reformatar` | Tots dos | Ja prevista com a opcional a «Decisió de wordwrap»: còpia amb salts durs a N columnes. |
 | C6 | Objectiu d'escriptura | Tots dos | Paraules per sessió o per document, amb el progrés a la barra d'estat. |
+| C7 | Esquema | Tots dos | ✅ Fet (2026-10-29): ordre `esquema`, F2 o Alt+E, menú Cerca → Esquema. Diàleg amb les capçaleres `#` i les paraules de cada secció; Retorn hi salta. Una passada pel document en obrir-lo. Base de C8, C9, C22 i C24. |
+| C8 | Moure seccions i paràgrafs | Tots dos | Des de l'esquema, Alt+↑/↓ mou una secció sencera; al text, el paràgraf actual. Entra al desfer. |
+| C9 | Projecte multifitxer | Tots dos | Carpeta amb `01-*.md`, `02-*.md`…: navegador de capítols, recompte total i ordre `compila` (concatena en un `.md` per a `exporta`/`envia`). Per a una 3.0. |
+| C10 | Instantànies | Tots dos | En desar a mà, i com a molt cada hora, còpia a `.versions/nom-AAAAMMDD-HHMM.md`; ordre per recuperar-les, sense diff; poda (p. ex. 20 per document). Per a una 3.0. |
+| C11 | Marcadors i pendents | Tots dos | `TODO`, `[?]`, `%%nota%%` ressaltats a les línies visibles; ordre `pendents` que els llista i hi salta. |
+| C12 | Mode enfocament | Tots dos | Atenua tot menys el paràgraf (o la frase) actual, amb un color del tema. Només afecta el pintat. |
+| C13 | Sprint amb temporitzador | Tots dos | `sprint 25`: compte enrere a la barra (el `timeout` de l'autodesat); en acabar, paraules escrites i ppm. Encaixa amb C6. |
+| C14 | Mode «endavant» | Tots dos | Opcional durant l'sprint: sense retrocés ni moviment enrere. Filtre de tecles. |
+| C15 | Diari d'escriptura | Tots dos | En sortir, `data;fitxer;paraules+` a un CSV del directori de configuració; ordre `estadistiques` amb ratxa de dies i mitjana. |
+| C16 | Ecos i paraules crossa | Tots dos | Ordre `repeticions`: repeticions en un radi de N paraules dins el paràgraf i llista configurable («molt», «doncs», «muy», adverbis -ment/-mente). A demanda. |
+| C17 | Tipografia de diàleg | Tots dos | Per idioma: `--` → «—», `<<`/`>>` → «», `...` → «…», apòstrof tipogràfic opcional; fora del codi Markdown. |
+| C18 | Calaix | Tots dos | Envia la selecció a `calaix.md` (retalls, idees descartades) i el mostra en un diàleg. |
+| C19 | Notes al peu | Tots dos | Insereix `[^n]` amb el número següent i la nota al final; una tecla va i torna de la crida a la nota; `renumera-notes`. Sintaxi de pandoc. |
+| C20 | Citacions | Tots dos | Llegeix un `.bib` o CSL-JSON (YAML o phileasrc); `cita` obre una llista filtrable i insereix `[@clau, p. 23]` amb la compleció de la paleta. La bibliografia la fa `pandoc --citeproc` a l'ordinador. |
+| C21 | Capçalera YAML | Tots dos | `lang: ca`/`es` fixa l'idioma del corrector per document; `title`/`author` a la barra; plantilles (article, capítol, ressenya, acta). |
+| C22 | Límits per secció | Tots dos | `<!-- max: 250 -->` sota una capçalera: «Resum 212/250» a la barra i avís en passar-se. Reaprofita C7. |
+| C23 | Llegibilitat a demanda | Tots dos | Longitud mitjana de frase i de paràgraf; marca les frases de més de N paraules. Sense índexs anglesos (Flesch). |
+| C24 | Referències internes | Tots dos | Autocompleta `[text](#ancora)` amb les capçaleres del document o del projecte. Reaprofita C7. |
+| C25 | Sinònims | Tots dos | Tesaurus de LibreOffice (`th_ca_ES_v3`, `th_es_ES`, `.dat` + `.idx`) amb cerca binària a l'índex, sense carregar-lo; es mostra com els suggeriments. Uns 5–10 MB a `/data`. Detectat: sense tesaurus, no hi és. |
+| C26 | Abreviatures | Tots dos | `abrev.qvq = que vol dir que` al phileasrc; s'expandeix en escriure l'espai. |
+
+**Criteris de C7–C26** (proposta del 2026-10-29, pensada per a la Pi 1B): l'anàlisi corre a demanda i no a cada tecla; el que es pinta només es calcula per a les línies visibles; cap dependència nova obligatòria. Descartat per pesat: corrector gramatical (LanguageTool, Java), previsualització renderitzada, plegament de seccions a la pantalla i diff entre versions.
+
+**Prioritat (decidida per l'usuari el 2026-10-29):** (1) C7 esquema; (2) C8 moure seccions i paràgrafs; (3) C12 mode enfocament; (4) C17 tipografia de diàleg. La resta, a valorar.
+
+**C17 i el Markdown.** Escriure «—», «», «…» o «’» deixa al fitxer el caràcter Unicode, que per a Markdown és text normal: el fitxer continua sent Markdown estàndard i, de fet, es veu igual a tot arreu, mentre que `--` només es converteix amb extensions com `smart` de pandoc (CommonMark el deixa com a `--`). A més, «—» a l'inici de paràgraf no és marca de llista, i «- » sí. Condicions de la implementació: (a) no substituir dins de codi (en línia i blocs), a les línies fetes només de guions (`---`: separador, subratllat de capçalera, YAML) ni a les taules; (b) Ctrl+Z just després torna a deixar el `--`; (c) opció al phileasrc, per idioma, desactivada per defecte; (d) cercar `'` ha de trobar `’` (i a l'inrevés), i cal comprovar que el corrector accepta `l’home` amb els diccionaris ca i es.
 
 ### Estat de la decisió
 
-Pendent de confirmar: el principi d'un sol programa, els requisits D1–D7 i l'ordre de les millores C1–C6.
+Pendent de confirmar: el principi d'un sol programa, els requisits D1–D7 i l'ordre de les millores C2–C26 (C7–C26 afegides el 2026-10-29; prioritat de l'usuari: C7, C8, C12, C17).
 
 ## Arquitectura
 
@@ -596,7 +622,7 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - l'executable a `/usr/libexec/phileas/phileas`; `/usr/bin/phileas` (i l'enllaç `ph`) és un script que posa `PHILEAS_CONFIG=/data/phileas` i en sortir fa `sync` i `clear`, com feia `wg`;
   - `/etc/phileas/phileasrc` de la imatge: `idiomes = es ca` i les ordres externes `lletra`, `gira`, `exporta` (breus) i `envia` (interactiva).
 
-- [ ] **F9** — Phileas a la Pi i a l'escriptori: requisits D1–D7 i millores del cor C1–C6 (vegeu «Phileas a la Pi i a l'escriptori»). Proposta del 2026-10-26, pendent de confirmar.
+- [ ] **F9** — Phileas a la Pi i a l'escriptori: requisits D1–D7 i millores del cor C1–C26 (vegeu «Phileas a la Pi i a l'escriptori»). Proposta del 2026-10-26, pendent de confirmar.
 
 ## Registre
 
@@ -995,3 +1021,6 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 - **2026-10-29** — **Cursor invisible amb els temes clar i sèpia a GNOME Terminal** (informat per l'usuari): el perfil té el cursor blanc fix i el color 7 (el fons d'aquests temes) també blanc. Ara, fora de la consola de Linux, el tema hi posa el seu color de text (`ESC ] 12`, p. ex. `#2A2A2A` al clar) i en sortir, suspendre o tornar al tema terminal es restaura el del terminal (`ESC ] 112`). La consola no ho rep (no ho entén i ja pinta el cursor amb el color de la cel·la). Proves: 1.790 comprovacions; seqüències comprovades en un pty (clar → sèpia → terminal, sortida, `TERM=linux` sense res); xterm amb cursor i color 7 blancs: abans invisible, ara fosc.
 - **2026-10-29** — Cursor amb els temes clar i sèpia provat per l'usuari a GNOME Terminal: **correcte**.
 - **2026-10-29** — **Versió 2.0.3** (etiqueta `v2.0.3`): Quant a Phileas, tema WordPerfect i color del cursor segons el tema.
+- **2026-10-29** — **Innovacions per a l'escriptura creativa i acadèmica:** afegides com a millores candidates C7–C26 (esquema, moure seccions, projecte multifitxer, instantànies, pendents, enfocament, sprint, diari, ecos, tipografia de diàleg, calaix, notes al peu, citacions, YAML, límits per secció, llegibilitat, referències internes, sinònims i abreviatures), amb criteris de cost per a la Pi i una prioritat proposada. C4 marcada com a feta (recompte a la barra des de la 2.0.2).
+- **2026-10-29** — **Prioritat de les innovacions** (decisió de l'usuari): C7 esquema, C8 moure seccions i paràgrafs, C12 mode enfocament, C17 tipografia de diàleg; la resta, a valorar. Anotades les implicacions de C17 per al Markdown desat i les condicions de la implementació.
+- **2026-10-29** — **C7, esquema** (`esquema`, F2 o Alt+E, Esc → Cerca → Esquema): pantalla completa amb les capçaleres (`#` 1-6 i subratllades amb `===`/`---`; no les de dins del codi ni de les metadades), sagnades pel nivell, i a la dreta les paraules de cada secció, comptant-hi les subseccions però no la capçalera mateixa; si hi ha text abans de la primera, una entrada «(inici del document)». Comença a la secció del cursor; Enter hi salta (la capçalera queda a dalt o, amb la màquina d'escriure, a l'ancoratge); escrivint es filtra pel títol, i Esc buida el filtre o surt. En text pla o sense capçaleres, un missatge. Mòdul nou `outline.c` (sense ncurses, provat) i `outlineview.c` (diàleg); `buf_line_words()` exposa el recompte per línia amb cache. Es calcula només en obrir el diàleg: una passada pel document. Proves: 1.808 comprovacions, també amb sanititzadors (ATX amb tanca, setext, codi, títol buit, `#hashtag`, subseccions, `outline_at`, text pla); interactiva en xterm 80×24: F2, filtre, salt, Alt+E a la secció del cursor i menú Cerca, sense errors d'ASan. Al README, la fila «F2 barra d'ajuda inferior» (que no existia) ara és l'esquema.

@@ -55,6 +55,8 @@ només serveix per escriure.
   (SIGHUP, SIGTERM), desa abans de sortir.
 - **Mode màquina d'escriure:** la línia on s'escriu es queda a una altura fixa
   de la pantalla.
+- **Esquema** (F2): les capçaleres del document, sagnades pel nivell, amb
+  les paraules de cada secció; Enter hi salta i, escrivint, es filtren.
 - **Navegador de fitxers** integrat (Ctrl+O) i **recompte de paraules** i
   **estimació de pàgines** a la barra d'estat.
 - **Ordres externes:** es poden afegir a la paleta ordres del sistema
@@ -258,7 +260,7 @@ de recordar tres tecles: **Esc** (menús), **F1** (ajuda) i **Ctrl+P**
 | F7 / F8 | activar l'ortografia / canviar d'idioma |
 | Maj+F7 / Alt+Retorn | revisar d'error en error / suggeriments |
 | Alt+C | centrar la columna |
-| F2 | barra d'ajuda inferior |
+| F2 / Alt+E | esquema del document |
 | Ctrl+L | redibuixar la pantalla |
 
 Les alternatives amb Alt existeixen perquè a la consola de Linux (sense

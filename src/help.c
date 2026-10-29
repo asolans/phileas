@@ -24,7 +24,7 @@ static const struct {
         "moure-amunt", "moure-avall", "moure-esquerra", "moure-dreta", "inici-linia",
         "fi-linia", "pagina-amunt", "pagina-avall", "paraula-anterior", "paraula-seguent",
         "paragraf-anterior", "paragraf-seguent", "inici-document", "fi-document",
-        "anar-a-linia", NULL } },
+        "anar-a-linia", "esquema", NULL } },
     { "Selecció i porta-retalls", (const char *const[]){
         "marca", "seleccionar-tot", "cancellar", "tallar", "copiar", "enganxar",
         "seleccio-esquerra", "seleccio-dreta", "seleccio-amunt", "seleccio-avall",
@@ -53,6 +53,7 @@ static const char *const intro[] = {
     "Ctrl+P (paleta): executa qualsevol ordre pel nom; Tab completa el nom.",
     "Les tecles es canvien al phileasrc: tecla.NOM = ordre.",
     "Navegador (Ctrl+O): Enter obre, ← puja, escriu per filtrar.",
+    "Esquema (F2): les capçaleres i les paraules de cada secció; Enter hi va, escriu per filtrar.",
     "Suggeriments (Alt+Enter): el número substitueix, a afegeix, i ignora.",
 };
 #define NINTRO (sizeof intro / sizeof intro[0])

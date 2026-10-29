@@ -5,6 +5,7 @@
 #include "help.h"
 #include "keys.h"
 #include "menu.h"
+#include "outlineview.h"
 #include "render.h"
 #include "search.h"
 #include "spell.h"
@@ -145,6 +146,23 @@ static void c_goto_line(Editor *e)
         return;
     }
     ed_goto_line(e, n);
+}
+
+/* La capçalera triada queda a dalt de la pantalla (o a l'ancoratge de la
+ * màquina d'escriure) */
+static void c_outline(Editor *e)
+{
+    size_t line;
+
+    if (!outline_view(e, &line))
+        return;
+    ed_sel_clear(e);
+    e->cy = line;
+    e->cx = 0;
+    e->want_x = -1;
+    e->top_line = line;
+    e->top_row = 0;
+    e->recenter = 1;
 }
 
 static void save_to(Editor *e, const char *path)
@@ -856,6 +874,7 @@ static const Command commands[] = {
     { "inici-document",    c_doc_start,  "Inici del document", ACT_NONE },
     { "fi-document",       c_doc_end,    "Final del document", ACT_NONE },
     { "anar-a-linia",      c_goto_line,  "Salta a una línia (paràgraf) pel número", ACT_NONE },
+    { "esquema",           c_outline,    "Capçaleres del document, amb les paraules de cada secció; Enter hi salta", ACT_NONE },
 
     { "seleccio-amunt",            c_sel_up,         "Amplia la selecció una línia amunt", ACT_NONE },
     { "seleccio-avall",            c_sel_down,       "Amplia la selecció una línia avall", ACT_NONE },
@@ -928,6 +947,7 @@ static const char *const default_bindings[][2] = {
     { "ctrl-home", "inici-document" },    { "alt-<", "inici-document" },
     { "ctrl-end", "fi-document" },        { "alt->", "fi-document" },
     { "alt-l", "anar-a-linia" },
+    { "f2", "esquema" },              { "alt-e", "esquema" },
 
     { "shift-up", "seleccio-amunt" },     { "shift-down", "seleccio-avall" },
     { "shift-left", "seleccio-esquerra" }, { "shift-right", "seleccio-dreta" },

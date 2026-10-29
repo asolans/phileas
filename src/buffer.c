@@ -712,6 +712,11 @@ static size_t line_words(Line *l)
     return l->words - 1;
 }
 
+size_t buf_line_words(Buffer *b, size_t i)
+{
+    return line_words(&b->lines[i]);
+}
+
 size_t buf_words(Buffer *b)
 {
     size_t n = 0;

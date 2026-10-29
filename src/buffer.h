@@ -111,4 +111,7 @@ size_t buf_pages(Buffer *b);
  * o xifra (els marcadors de Markdown sols, com «-» o «#», no compten). */
 size_t buf_words(Buffer *b);
 
+/* Paraules de la línia i, amb el mateix criteri (i amb cache). */
+size_t buf_line_words(Buffer *b, size_t i);
+
 #endif
