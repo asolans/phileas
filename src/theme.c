@@ -34,6 +34,12 @@ static const unsigned rgb_fosfor[16] = {
     0x1f5f2f, 0xff7777, 0x88ffaa, 0xffc840, 0x1a5a2a, 0x2f9a43, 0x88ffaa, 0x88ffaa,
 };
 
+/* WordPerfect 5.1 per a DOS: la paleta CGA, text gris sobre blau */
+static const unsigned rgb_wp[16] = {
+    0x000000, 0xaa0000, 0x00aa00, 0xaa5500, 0x0000aa, 0xaa00aa, 0x00aaaa, 0xaaaaaa,
+    0x555555, 0xff5555, 0x55ff55, 0xffff55, 0x5555ff, 0xff55ff, 0x55ffff, 0xffffff,
+};
+
 static const Theme themes[] = {
     /* El de sempre: els colors del terminal, barres en vídeo invers */
     { "terminal", "Terminal", {
@@ -61,6 +67,13 @@ static const Theme themes[] = {
         [PAL_ERROR] = 1, [PAL_MARK] = C, [PAL_TEXT] = 2, [PAL_BG] = 0,
         [PAL_BAR] = 0, [PAL_BAR_BG] = 2, [PAL_SEL] = 0, [PAL_SEL_BG] = 2,
         [PAL_MENU] = C, [PAL_MENU_BG] = C }, rgb_fosfor },
+    /* Capçaleres en negreta: blanc, groc i cian brillants. Marques en gris
+     * fosc; barra i menús grisos com els programes de DOS. */
+    { "wordperfect", "WordPerfect", {
+        [PAL_H1] = 7, [PAL_H2] = 3, [PAL_H3] = 6, [PAL_CODE] = 10, [PAL_QUOTE] = 6,
+        [PAL_ERROR] = 9, [PAL_MARK] = 8, [PAL_TEXT] = 7, [PAL_BG] = 4,
+        [PAL_BAR] = 0, [PAL_BAR_BG] = 7, [PAL_SEL] = 15, [PAL_SEL_BG] = 0,
+        [PAL_MENU] = 0, [PAL_MENU_BG] = 7 }, rgb_wp },
 };
 #define NTHEMES (sizeof themes / sizeof themes[0])
 

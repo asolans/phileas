@@ -570,7 +570,7 @@ static void c_theme(Editor *e)
 
     if (*name) {
         if (!(t = theme_find(name))) {
-            ed_msg(e, "Tema desconegut «%s» (terminal, fosc, clar, sepia o fosfor)", name);
+            ed_msg(e, "Tema desconegut «%s» (terminal, fosc, clar, sepia, fosfor o wordperfect)", name);
             return;
         }
     } else {
@@ -890,7 +890,7 @@ static const Command commands[] = {
     { "recarregar-configuracio", c_reload_config, "Torna a llegir el fitxer phileasrc", ACT_NONE },
     { "colors",            c_colors,     "Activa o desactiva els colors de Markdown", ACT_NONE },
     { "desar-configuracio", c_save_config, "Desa la configuració actual, amb totes les opcions, al phileasrc", ACT_NONE },
-    { "tema",              c_theme,      "Canvia el tema de colors (tema NOM: terminal, fosc, clar, sepia, fosfor)", ACT_NONE },
+    { "tema",              c_theme,      "Canvia el tema de colors (tema NOM: terminal, fosc, clar, sepia, fosfor, wordperfect)", ACT_NONE },
     { "obrir",             c_open,       "Obre un document amb el navegador de fitxers", ACT_NONE },
     { "nou",               c_new,        "Comença un document nou sense nom", ACT_NONE },
     { "desar",             c_save,       "Desa el document", ACT_NONE },

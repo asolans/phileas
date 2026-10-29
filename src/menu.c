@@ -67,6 +67,7 @@ static const Menu m_theme = { "Tema", (const MenuItem[]){
     { 'c', "Clar",                 "tema", "clar",     NULL },
     { 's', "Sèpia",                "tema", "sepia",    NULL },
     { 'o', "Fòsfor",               "tema", "fosfor",   NULL },
+    { 'w', "WordPerfect",          "tema", "wordperfect", NULL },
     { 'e', "El següent",           "tema", NULL,       NULL },
     { 0 } } };
 

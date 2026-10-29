@@ -28,10 +28,11 @@ només serveix per escriure.
   (capçaleres, negreta, cursiva, codi i cites) que funcionen fins i tot en
   terminals de 8 colors.
 - **Temes de colors:** terminal (els colors del terminal, per defecte), fosc,
-  clar, sèpia i fòsfor, des del menú Vista o amb l'ordre `tema`, que el deixen
-  desat al `phileasrc` de l'usuari per a la vegada següent. A la consola
-  de Linux (com a la imatge BYOK), cada tema hi posa els seus propis colors i,
-  en sortir, torna a deixar els de la consola.
+  clar, sèpia, fòsfor i WordPerfect (gris sobre blau, com el WordPerfect 5.1
+  per a DOS), des del menú Vista o amb l'ordre `tema`, que el deixen desat
+  al `phileasrc` de l'usuari per a la vegada següent. A la consola de Linux
+  (com a la imatge BYOK), cada tema hi posa els seus propis colors i, en
+  sortir, torna a deixar els de la consola.
 - **Ajust de línia suau** a un nombre de columnes configurable (72 per
   defecte), amb sagnat penjant a les llistes i a les cites, marges i columna
   centrada opcional.
@@ -287,7 +288,7 @@ maquina-escriure = salt        # salt, fixa o classic
 autodesat = 20
 ortografia = si
 idiomes = ca es                # F8 alterna; el primer és el de l'arrencada
-tema = sepia                   # terminal, fosc, clar, sepia o fosfor
+tema = sepia                   # terminal, fosc, clar, sepia, fosfor o wordperfect
 color-capcalera-1 = blau       # retoca un color del tema (després de «tema»)
 
 # Dreceres: tecla.NOM = ordre (buit = treure-la)

@@ -145,7 +145,7 @@ int config_set(Editor *e, const char *key, const char *v, char *err, size_t errs
         const Theme *t = theme_find(v);
 
         if (!t) {
-            snprintf(err, errsz, "tema desconegut «%s» (terminal, fosc, clar, sepia o fosfor)", v);
+            snprintf(err, errsz, "tema desconegut «%s» (terminal, fosc, clar, sepia, fosfor o wordperfect)", v);
             return -1;
         }
         theme_apply(e, t);
@@ -575,8 +575,8 @@ void config_template(FILE *f, const Editor *e)
     else
         fputs("# diccionari = ca_ES-valencia      # un diccionari concret en arrencar\n", f);
     fprintf(f, "\n"
-            "# Tema de colors: terminal (els colors del terminal), fosc, clar, sepia\n"
-            "# o fosfor. També es canvia des del menú Vista o amb l'ordre «tema»,\n"
+            "# Tema de colors: terminal (els colors del terminal), fosc, clar, sepia,\n"
+            "# fosfor o wordperfect. També es canvia des del menú Vista o amb l'ordre «tema»,\n"
             "# que el deixen desat en aquesta línia.\n"
             "tema = %s\n"
             "paleta-consola = %s    # a la consola de Linux, els colors propis del tema\n"
