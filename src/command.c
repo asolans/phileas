@@ -144,6 +144,29 @@ static void c_center(Editor *e)
     remember(e, "centrar", e->center ? "si" : "no");
 }
 
+/* No → paràgraf → frase → no */
+static void c_focus(Editor *e)
+{
+    static const char *const names[] = { "no", "paragraf", "frase" };
+
+    e->focus = (e->focus + 1) % 3;
+    ed_msg(e, e->focus == FOCUS_NO        ? "Enfocament desactivat" :
+              e->focus == FOCUS_PARAGRAPH ? "Enfocament: paràgraf (la resta s'atenua)" :
+                                            "Enfocament: frase (la resta s'atenua)");
+    remember(e, "enfocament", names[e->focus]);
+}
+
+static void c_typography(Editor *e)
+{
+    e->typo = !e->typo;
+    if (!e->typo)
+        ed_msg(e, "Tipografia automàtica desactivada");
+    else
+        ed_msg(e, "Tipografia automàtica: -- → —, << >> → « », ... → …%s (Ctrl+Z la desfà)",
+               e->typo_apos ? ", ' → ’" : "");
+    remember(e, "tipografia", e->typo ? "si" : "no");
+}
+
 static void c_goto_line(Editor *e)
 {
     char buf[32] = "";
@@ -922,6 +945,8 @@ static const Command commands[] = {
     { "maquina-escriure",  c_typewriter, "Desplaçament: salt, línia fixa o clàssic", ACT_NONE },
     { "recarregar-configuracio", c_reload_config, "Torna a llegir el fitxer phileasrc", ACT_NONE },
     { "colors",            c_colors,     "Activa o desactiva els colors de Markdown", ACT_NONE },
+    { "enfocament",        c_focus,      "Atenua el text fora del paràgraf o de la frase actual (no, paràgraf, frase)", ACT_NONE },
+    { "tipografia",        c_typography, "Tipografia en escriure: -- → —, << >> → « », ... → … (i ' → ’, amb l'opció)", ACT_NONE },
     { "desar-configuracio", c_save_config, "Desa la configuració actual, amb totes les opcions, al phileasrc", ACT_NONE },
     { "tema",              c_theme,      "Canvia el tema de colors (tema NOM: terminal, fosc, clar, sepia, fosfor, wordperfect)", ACT_NONE },
     { "obrir",             c_open,       "Obre un document amb el navegador de fitxers", ACT_NONE },
@@ -986,7 +1011,7 @@ static const char *const default_bindings[][2] = {
     { "alt-up", "pujar-paragraf" },            { "alt-down", "baixar-paragraf" },
     { "ctrl-x", "tallar" },  { "ctrl-c", "copiar" },  { "ctrl-v", "enganxar" },
 
-    { "alt-c", "centrar" },
+    { "alt-c", "centrar" },           { "f4", "enfocament" },
     { "ctrl-o", "obrir" },            { "ctrl-n", "nou" },
     { "ctrl-s", "desar" },            { "alt-s", "desar-com" },
     { "ctrl-q", "sortir" },

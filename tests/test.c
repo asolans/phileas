@@ -569,6 +569,132 @@ static void test_move(void)
     ed_free(&e);
 }
 
+/* Escriu s caràcter a caràcter com el bucle principal (amb la tipografia) */
+static void type_text(Editor *e, const char *s)
+{
+    size_t len = strlen(s), i = 0;
+
+    while (i < len) {
+        wchar_t wc;
+        size_t n = utf8_decode(s, len, i, &wc);
+
+        ed_begin(e, ACT_TYPE, wc);
+        ed_insert(e, s + i, n);
+        ed_typography(e, wc);
+        ed_end(e);
+        i += n;
+    }
+}
+
+/* Document nou amb una sola línia text, escrita, i el cursor al final */
+static int typed_is(int apos, const char *text, const char *expect)
+{
+    Editor e;
+    int ok;
+
+    ed_init(&e, 72);
+    e.typo = 1;
+    e.typo_apos = apos;
+    type_text(&e, text);
+    ok = dump_is(&e.buf, expect) && e.cx == e.buf.lines[e.cy].len;
+    ed_free(&e);
+    return ok;
+}
+
+static void test_focus_typo(void)
+{
+    const char *t = "Hola, món. Què? Sí!! «Ah.» 3.5 i el Sr. Fogg...  Fi";
+    size_t a, b, len = strlen(t);
+    Editor e;
+    Pos fa, fz;
+    int wrapped;
+
+    /* Frases */
+    text_sentence(t, len, 0, &a, &b);
+    CHECK(a == 0 && b == strlen("Hola, món. "));
+    text_sentence(t, len, strlen("Hola, món. Q"), &a, &b);
+    CHECK(a == strlen("Hola, món. ") && b == strlen("Hola, món. Què? "));
+    text_sentence(t, len, strlen("Hola, món. Què? Sí!! «"), &a, &b);
+    CHECK(a == strlen("Hola, món. Què? Sí!! ") && b == strlen("Hola, món. Què? Sí!! «Ah.» "));
+    /* «3.5» no acaba la frase; «Sr.» sí (sense diccionari d'abreviatures) */
+    text_sentence(t, len, strlen("Hola, món. Què? Sí!! «Ah.» 3"), &a, &b);
+    CHECK(b == strlen("Hola, món. Què? Sí!! «Ah.» 3.5 i el Sr. "));
+    text_sentence(t, len, len, &a, &b);
+    CHECK(a == strlen("Hola, món. Què? Sí!! «Ah.» 3.5 i el Sr. Fogg...  ") && b == len);
+    text_sentence("", 0, 0, &a, &b);
+    CHECK(a == 0 && b == 0);
+
+    /* Enfocament: en acabar una frase i escriure l'espai, en comença una de nova */
+    ed_init(&e, 72);
+    buf_insert(&e.buf, (Pos){ 0, 0 }, "Una. Dues", 9);
+    e.cy = 0, e.cx = 9;
+    e.focus = FOCUS_SENTENCE;
+    ed_focus_range(&e, &a, &b);
+    CHECK(a == 5 && b == 9);
+    buf_insert(&e.buf, (Pos){ 0, 9 }, ". ", 2);
+    e.cx = 11;
+    ed_focus_range(&e, &a, &b);
+    CHECK(a == 11 && b == 11);
+    e.cx = 2;
+    ed_focus_range(&e, &a, &b);
+    CHECK(a == 0 && b == 5);
+    e.focus = FOCUS_PARAGRAPH;
+    ed_focus_range(&e, &a, &b);
+    CHECK(a == 0 && b == 11);
+    ed_free(&e);
+
+    /* Tipografia */
+    CHECK(typed_is(0, "--Hola --va dir-- i prou", "—Hola —va dir— i prou"));
+    CHECK(typed_is(0, "<<Ah>>, va dir... i res", "«Ah», va dir… i res"));
+    CHECK(typed_is(0, "l'home", "l'home"));
+    CHECK(typed_is(1, "l'home i 'tal'", "l’home i 'tal’"));
+    CHECK(typed_is(0, "-- Hola", "— Hola"));     /* sembla un subratllat mentre s'escriu */
+    CHECK(typed_is(0, "--\tHola", "—\tHola"));
+    CHECK(typed_is(0, "---", "---"));            /* separador o YAML */
+    CHECK(typed_is(0, "--- x", "--- x"));
+    CHECK(typed_is(0, "a----b", "a----b"));
+    CHECK(typed_is(0, "<!-- nota -->", "<!-- nota -->"));
+    CHECK(typed_is(0, ">> cita niada", ">> cita niada"));
+    CHECK(typed_is(0, "> text >> més", "> text » més"));
+    CHECK(typed_is(0, "`a--b` i a--b", "`a--b` i a—b"));
+    CHECK(typed_is(0, "| a--b |", "| a--b |"));  /* taula */
+    CHECK(typed_is(0, "....", "…."));
+
+    /* Ctrl+Z just després torna a deixar el que s'havia escrit; el que ve
+     * després va en un altre pas */
+    ed_init(&e, 72);
+    e.typo = 1;
+    type_text(&e, "a --b");
+    CHECK(dump_is(&e.buf, "a —b"));
+    CHECK(ed_undo(&e) && dump_is(&e.buf, "a --b"));
+    CHECK(ed_redo(&e) && dump_is(&e.buf, "a —b"));
+    type_text(&e, "cd");
+    CHECK(ed_undo(&e) && dump_is(&e.buf, "a —b"));
+    ed_free(&e);
+
+    /* Sense l'opció, res; en un bloc de codi, tampoc */
+    ed_init(&e, 72);
+    type_text(&e, "a--b <<c");
+    CHECK(dump_is(&e.buf, "a--b <<c"));
+    ed_free(&e);
+    ed_init(&e, 72);
+    e.typo = 1;
+    buf_insert(&e.buf, (Pos){ 0, 0 }, "```\n\n```", 8);
+    e.cy = 1, e.cx = 0;
+    type_text(&e, "a--b");
+    CHECK(dump_is(&e.buf, "```\na--b\n```"));
+    ed_free(&e);
+
+    /* La cerca no distingeix l'apòstrof recte del tipogràfic */
+    ed_init(&e, 72);
+    buf_insert(&e.buf, (Pos){ 0, 0 }, "És l’home i l'altre", strlen("És l’home i l'altre"));
+    CHECK(search_find(&e.buf, (Pos){ 0, 0 }, "l'home", 1, &fa, &fz, &wrapped) &&
+          fa.col == strlen("És ") && fz.col == strlen("És l’home"));
+    CHECK(search_find(&e.buf, (Pos){ 0, 0 }, "l’altre", 1, &fa, &fz, &wrapped) &&
+          fa.col == strlen("És l’home i "));
+    ed_free(&e);
+}
+
 static void test_outline(void)
 {
     Buffer b;
@@ -618,7 +744,7 @@ static void test_outline(void)
 
 static char *slurp(const char *path)
 {
-    static char buf[4096];
+    static char buf[16384];
     FILE *f = fopen(path, "r");
     size_t n = f ? fread(buf, 1, sizeof buf - 1, f) : 0;
 
@@ -1269,6 +1395,9 @@ static void test_config(void)
     SET("maquina-escriure", "fixa");
     SET("autodesat", "45");
     SET("diccionari", "ca_ES-valencia");
+    SET("enfocament", "frase");
+    SET("tipografia", "si");
+    SET("apostrof-tipografic", "sí");
     f = fopen(user, "w");
     fputs("centrar = no\ntecla.f9 = colors\nexterna-breu.dia = date\n", f);
     fclose(f);
@@ -1279,6 +1408,7 @@ static void test_config(void)
     CHECK(e.center == 1 && e.theme == 3 && e.palette[PAL_CODE] == 4 &&
           e.palette[PAL_BG] == 7 && !strcmp(e.langs[0], "es") && e.tw_mode == TW_FIXA &&
           e.autosave == 45 && !strcmp(e.dict, "ca_ES-valencia"));
+    CHECK(e.focus == FOCUS_SENTENCE && e.typo == 1 && e.typo_apos == 1);
     CHECK(strstr(slurp(user), "\ntecla.f9 = colors\nexterna-breu.dia = date\n") != NULL);
     snprintf(sys, sizeof sys, "%.500s.anterior", user);
     CHECK(!strcmp(slurp(sys), "centrar = no\ntecla.f9 = colors\nexterna-breu.dia = date\n"));
@@ -1289,6 +1419,19 @@ static void test_config(void)
     unlink(user);
     config_bind_hook = NULL;
     config_extern_hook = NULL;
+}
+
+static void test_focus_config(void)
+{
+    Editor e;
+    char err[128];
+
+    ed_init(&e, 72);
+    CHECK(e.focus == FOCUS_NO && !e.typo && !e.typo_apos);
+    CHECK(config_set(&e, "enfocament", "paràgraf", err, sizeof err) == 0 && e.focus == FOCUS_PARAGRAPH);
+    CHECK(config_set(&e, "enfocament", "no", err, sizeof err) == 0 && e.focus == FOCUS_NO);
+    CHECK(config_set(&e, "enfocament", "capítol", err, sizeof err) < 0 && strstr(err, "paragraf"));
+    ed_free(&e);
 }
 
 static void test_plain(void)
@@ -1437,6 +1580,8 @@ int main(void)
     test_words();
     test_outline();
     test_move();
+    test_focus_typo();
+    test_focus_config();
     test_config_store();
     test_edit();
     test_md();

@@ -697,6 +697,178 @@ size_t ed_paste(Editor *e)
 
 /* ---- Desfer/refer ---- */
 
+/* ---- Enfocament ---- */
+
+static int sentence_end(wchar_t c)
+{
+    return c == L'.' || c == L'!' || c == L'?' || c == L'…';
+}
+
+static int sentence_close(wchar_t c)
+{
+    return c == L')' || c == L'»' || c == L'"' || c == L'”' || c == L'’' || c == L'\'' ||
+           c == L'*' || c == L'_';
+}
+
+void text_sentence(const char *s, size_t len, size_t pos, size_t *a, size_t *b)
+{
+    size_t start = 0, i = 0;
+
+    while (i < len) {
+        wchar_t c;
+        size_t j;
+
+        i += utf8_decode(s, len, i, &c);
+        if (!sentence_end(c))
+            continue;
+        /* Més signes i tancaments: «...», «?!», «.»», «.)» */
+        for (j = i; j < len;) {
+            size_t n = utf8_decode(s, len, j, &c);
+
+            if (!sentence_end(c) && !sentence_close(c))
+                break;
+            j += n;
+        }
+        if (j < len && s[j] != ' ' && s[j] != '\t') {
+            i = j;
+            continue;   /* «3.5», «Sr.Fogg»: no acaba */
+        }
+        while (j < len && (s[j] == ' ' || s[j] == '\t'))
+            j++;
+        if (pos < j || j == len) {
+            *a = start;
+            *b = j;
+            return;
+        }
+        start = i = j;
+    }
+    *a = start;
+    *b = len;
+}
+
+void ed_focus_range(Editor *e, size_t *a, size_t *b)
+{
+    Line *l = &e->buf.lines[e->cy];
+
+    if (e->focus == FOCUS_SENTENCE) {
+        text_sentence(l->text, l->len, e->cx, a, b);
+        /* Escrivint després del final d'una frase, en comença una de nova */
+        if (e->cx == l->len && *b == l->len && *a < *b && l->len > 0) {
+            wchar_t c;
+
+            utf8_decode(l->text, l->len, utf8_prev(l->text, l->len), &c);
+            if (c == L' ' || c == L'\t') {
+                size_t k = l->len;
+
+                while (k > 0 && (l->text[k - 1] == ' ' || l->text[k - 1] == '\t'))
+                    k--;
+                if (k > 0) {
+                    utf8_decode(l->text, l->len, utf8_prev(l->text, k), &c);
+                    if (sentence_end(c) || sentence_close(c))
+                        *a = *b = l->len;
+                }
+            }
+        }
+    } else {
+        *a = 0;
+        *b = l->len;
+    }
+}
+
+/* ---- Tipografia ---- */
+
+/* La línia permet substitucions a la posició q? */
+static int typo_allowed(Editor *e, size_t q)
+{
+    Line *l = &e->buf.lines[e->cy];
+    size_t ticks = 0, i = 0;
+    int k;
+
+    if (e->buf.plain)
+        return 0;
+    buf_scan(&e->buf);
+    k = MD_BASE(l->kind);
+    while (i < l->len && (l->text[i] == ' ' || l->text[i] == '\t'))
+        i++;
+    /* Un paràgraf que comença amb «<<» encara és HTML per al Markdown */
+    if (k == MD_HTML && !(i + 1 < l->len && l->text[i] == '<' && l->text[i + 1] == '<'))
+        return 0;
+    /* Les línies de guions no hi són: «-- » a l'inici d'un paràgraf encara
+     * sembla un subratllat mentre s'escriu, i «---» ja el protegeix la regla
+     * del tercer guió */
+    if (k == MD_CODE || k == MD_FENCE_OPEN || k == MD_FENCE_CLOSE || k == MD_META ||
+        k == MD_TABLE)
+        return 0;
+    /* Codi en línia: abans de q hi ha un accent greu sense tancar (mentre
+     * s'escriu, encara no hi ha el de tancament) */
+    for (i = 0; i < q && i < l->len; i++)
+        ticks += l->text[i] == '`';
+    return ticks % 2 == 0;
+}
+
+/* Substitueix [a, z) de la línia del cursor per rep, en un pas de desfer
+ * propi; el cursor es queda darrere del mateix text. */
+static void typo_replace(Editor *e, size_t a, size_t z, const char *rep)
+{
+    size_t n = strlen(rep);
+
+    buf_undo_mark(&e->buf);
+    buf_delete(&e->buf, (Pos){ e->cy, a }, (Pos){ e->cy, z });
+    buf_insert(&e->buf, (Pos){ e->cy, a }, rep, n);
+    e->cx = e->cx - (z - a) + n;
+    e->want_x = -1;
+    e->last_act = ACT_NONE;   /* el que s'escrigui després va en un altre pas */
+}
+
+int ed_typography(Editor *e, wchar_t ch)
+{
+    Line *l = &e->buf.lines[e->cy];
+    const char *s = l->text;
+    char enc[4];
+    size_t n = utf8_encode(ch, enc), q;
+
+    if (!e->typo || e->cx < n || memcmp(s + e->cx - n, enc, n))
+        return 0;
+    q = e->cx - n;   /* on és el caràcter escrit */
+
+    /* «--» i un altre caràcter: guió llarg. Ni «---» ni el final d'un
+     * comentari HTML («-->»). */
+    if (ch != L'-' && ch != L'>' && q >= 2 && s[q - 1] == '-' && s[q - 2] == '-' &&
+        (q < 3 || s[q - 3] != '-') && typo_allowed(e, q - 2)) {
+        typo_replace(e, q - 2, q, "—");
+        return 1;
+    }
+    if ((ch == L'<' || ch == L'>') && q >= 1 && s[q - 1] == (char)ch &&
+        (q < 2 || s[q - 2] != (char)ch) && typo_allowed(e, q - 1)) {
+        /* «>>» al principi de la línia és una cita niada */
+        if (ch == L'>') {
+            size_t k = 0;
+
+            while (k < q - 1 && (s[k] == '>' || s[k] == ' ' || s[k] == '\t'))
+                k++;
+            if (k == q - 1)
+                return 0;
+        }
+        typo_replace(e, q - 1, q + 1, ch == L'<' ? "«" : "»");
+        return 1;
+    }
+    if (ch == L'.' && q >= 2 && s[q - 1] == '.' && s[q - 2] == '.' &&
+        (q < 3 || s[q - 3] != '.') && typo_allowed(e, q - 2)) {
+        typo_replace(e, q - 2, q + 1, "…");
+        return 1;
+    }
+    if (ch == L'\'' && e->typo_apos && q >= 1) {
+        wchar_t prev;
+
+        utf8_decode(s, l->len, utf8_prev(s, q), &prev);
+        if (prev != UTF8_INVALID && iswalpha((wint_t)prev) && typo_allowed(e, q)) {
+            typo_replace(e, q, q + 1, "’");
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* ---- Moure paràgrafs i seccions ---- */
 
 void ed_swap_lines(Editor *e, size_t a, size_t b, size_t c)

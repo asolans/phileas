@@ -35,13 +35,13 @@ static const struct {
     { "Edició", (const char *const[]){
         "nova-linia", "tabulador", "esborrar-enrere", "esborrar-endavant",
         "esborrar-paraula-anterior", "esborrar-paraula-seguent", "pujar-paragraf",
-        "baixar-paragraf", "desfer", "refer", NULL } },
+        "baixar-paragraf", "tipografia", "desfer", "refer", NULL } },
     { "Cerca", (const char *const[]){
         "cercar", "cercar-seguent", "cercar-anterior", "substituir", NULL } },
     { "Ortografia", (const char *const[]){
         "ortografia", "alternar-idioma", "revisar-ortografia", "suggeriments", "idioma", NULL } },
     { "Vista", (const char *const[]){
-        "maquina-escriure", "centrar", "colors", "tema", "redibuixar", NULL } },
+        "maquina-escriure", "centrar", "colors", "enfocament", "tema", "redibuixar", NULL } },
     { "Configuració i ajuda", (const char *const[]){
         "menu", "ajuda", "paleta", "recarregar-configuracio", "desar-configuracio", "autodesat",
         "quant-a", NULL } },

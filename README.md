@@ -58,6 +58,12 @@ només serveix per escriure.
 - **Esquema** (F2): les capçaleres del document, sagnades pel nivell, amb
   les paraules de cada secció; Enter hi salta, escrivint es filtren i
   Alt+↑/↓ mou una secció sencera, amb les subseccions.
+- **Enfocament** (F4): atenua tot el text menys el paràgraf o la frase on
+  s'escriu.
+- **Tipografia en escriure** (opcional): `--` → —, `<<` `>>` → « », `...` → …
+  i, amb una altra opció, l'apòstrof ' → ’. Ctrl+Z la desfà just després.
+  No actua dins del codi ni a les línies de guions (`---`). Al fitxer queden
+  els caràcters Unicode, que són Markdown normal.
 - **Moure paràgrafs:** Alt+↑/↓ puja o baixa el paràgraf del cursor (o les
   línies seleccionades).
 - **Navegador de fitxers** integrat (Ctrl+O) i **recompte de paraules** i
@@ -262,6 +268,7 @@ de recordar tres tecles: **Esc** (menús), **F1** (ajuda) i **Ctrl+P**
 | F7 / F8 | activar l'ortografia / canviar d'idioma |
 | Maj+F7 / Alt+Retorn | revisar d'error en error / suggeriments |
 | Alt+C | centrar la columna |
+| F4 | enfocament: paràgraf, frase o cap |
 | F2 / Alt+E | esquema del document |
 | Ctrl+L | redibuixar la pantalla |
 
@@ -275,8 +282,9 @@ l'usuari: `$PHILEAS_CONFIG/phileasrc` si hi ha aquesta variable, si no
 `$XDG_CONFIG_HOME/phileas/phileasrc` o `~/.config/phileas/phileasrc`. Les
 opcions de la línia d'ordres manen sobre tots dos.
 
-Les opcions del menú Vista (columna centrada, colors, màquina d'escriure i
-tema) es desen soles al fitxer de l'usuari. Per tenir-lo complet, amb totes les
+Les opcions que es canvien des dels menús (columna centrada, colors,
+enfocament, màquina d'escriure, tema i tipografia) es desen soles al fitxer
+de l'usuari. Per tenir-lo complet, amb totes les
 opcions i els valors actuals, dins Phileas: Ctrl+P `desar-configuracio` (o
 Esc → Ajuda i configuració → Desa la configuració). Conserva les línies
 `tecla.` i `externa` que hi hagués, i deixa l'anterior a `phileasrc.anterior`.
@@ -293,6 +301,9 @@ autodesat = 20
 ortografia = si
 idiomes = ca es                # F8 alterna; el primer és el de l'arrencada
 tema = sepia                   # terminal, fosc, clar, sepia, fosfor o wordperfect
+enfocament = frase             # no, paragraf o frase
+tipografia = si                # -- → —, << >> → « », ... → …
+apostrof-tipografic = si       # ' entre lletres → ’
 color-capcalera-1 = blau       # retoca un color del tema (després de «tema»)
 
 # Dreceres: tecla.NOM = ordre (buit = treure-la)
@@ -382,7 +393,9 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 - **En desenvolupament** (després de la 2.0.3): esquema del document (F2 o
   Alt+E), amb les capçaleres i les paraules de cada secció; moure paràgrafs
-  i, des de l'esquema, seccions senceres (Alt+↑/↓).
+  i, des de l'esquema, seccions senceres (Alt+↑/↓); enfocament de paràgraf o
+  de frase (F4); tipografia en escriure (— « » … ’); la cerca no distingeix
+  ' de ’.
 - **2.0.3** (2026-10-29): «Quant a Phileas» al menú Ajuda i configuració
   (versió de Phileas i, a la BYOK, de la imatge); tema WordPerfect (gris
   sobre blau, com el WordPerfect 5.1 per a DOS); fora de la consola, el

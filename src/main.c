@@ -208,6 +208,7 @@ int main(int argc, char **argv)
         } else if (!(key & (KEY_FLAG_FN | KEY_FLAG_ALT)) && utf8_printable((wchar_t)key)) {
             char s[4];
             ed_insert(&e, s, utf8_encode((wchar_t)key, s));
+            ed_typography(&e, (wchar_t)key);
         }
         ed_end(&e);
         /* L'avís de sortida només val per a la pulsació següent */

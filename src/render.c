@@ -16,7 +16,7 @@
 
 /* Parelles de colors */
 enum { PAIR_H1 = 1, PAIR_H2, PAIR_H3, PAIR_CODE, PAIR_QUOTE, PAIR_MARK, PAIR_ERROR,
-       PAIR_TEXT, PAIR_BAR, PAIR_SEL, PAIR_MENU, PAIR_N };
+       PAIR_TEXT, PAIR_BAR, PAIR_SEL, PAIR_MENU, PAIR_DIM, PAIR_N };
 
 static attr_t italic_attr = A_UNDERLINE;  /* si el terminal no té cursiva */
 static attr_t mark_attr;
@@ -27,6 +27,7 @@ static attr_t pair_bold[PAIR_N];  /* A_BOLD on el color clar no existeix (8 colo
 static int    mark_colored;       /* els marcadors tenen color propi (si no, atenuats) */
 static int    role_on[UI_N];      /* la barra, la selecció o els menús tenen color */
 static const unsigned *console_rgb;  /* paleta del tema aplicada a la consola */
+static attr_t focus_attr;            /* text atenuat de l'enfocament */
 static long cursor_rgb = -1;         /* color del cursor posat pel tema, o -1 */
 
 /* Estils de la línia que s'està dibuixant */
@@ -218,6 +219,17 @@ void render_colors(Editor *e)
         clearok(curscr, TRUE);
     }
 
+    /* Enfocament: l'atenuat del terminal si el pot combinar amb el color del
+     * text; a la consola, el color atenuat del tema; si no, el dels marcadors */
+    if (console_rgb && theme_at((size_t)e->theme)->dim >= 0) {
+        set_pair(PAIR_DIM, theme_at((size_t)e->theme)->dim, PAL_DEFAULT, text_fg, text_bg);
+        focus_attr = pair_attr(PAIR_DIM);
+    } else if ((mark_attr & A_DIM) && (!(no_color & A_DIM) || !themed)) {
+        focus_attr = A_DIM;
+    } else {
+        focus_attr = style_attr(MS_MARK);
+    }
+
     cur = -1;
     rgb = theme_at((size_t)e->theme)->rgb;
     if (!linux_console() && rgb && pal[PAL_TEXT] >= 0 && pal[PAL_TEXT] < 16)
@@ -326,8 +338,10 @@ void ui_sync_size(void)
         resize_term(ws.ws_row, ws.ws_col);
 }
 
-/* Dibuixa la fila r de la línia y. [s0, s1) és la part seleccionada. */
-static void draw_row(Editor *e, Line *l, size_t r, int y, size_t s0, size_t s1)
+/* Dibuixa la fila r de la línia y. [s0, s1) és la part seleccionada i, amb
+ * l'enfocament, [f0, f1) la que no s'atenua. */
+static void draw_row(Editor *e, Line *l, size_t r, int y, size_t s0, size_t s1,
+                     size_t f0, size_t f1)
 {
     size_t i = l->rows[r], end = wrap_row_end(l, r);
     int indent = wrap_row_indent(l, r);
@@ -342,7 +356,11 @@ static void draw_row(Editor *e, Line *l, size_t r, int y, size_t s0, size_t s1)
 
         if (col + w > e->width - indent)
             break;
-        if (styles_cap) {
+        if (e->focus && (i < f0 || i >= f1)) {
+            attr_t a = have_colors ? focus_attr : A_DIM;
+
+            attrset(sel ? over_role(a, UI_SEL) : a);
+        } else if (styles_cap) {
             attr_t a = e->colors ? style_attr(styles[i]) : 0;
 
             if (errors[i])
@@ -410,7 +428,7 @@ static void draw_status(Editor *e)
 
 void render(Editor *e)
 {
-    size_t tl, tr, crow, styled = (size_t)-1;
+    size_t tl, tr, crow, styled = (size_t)-1, fa = 0, fb = 0;
     int cur_y = -1, cur_x = 0, has_sel;
     Pos sa, sz;
 
@@ -422,6 +440,8 @@ void render(Editor *e)
     tr = e->top_row;
     crow = ed_cursor_row(e);
     has_sel = ed_selection(e, &sa, &sz);
+    if (e->focus)
+        ed_focus_range(e, &fa, &fb);
     for (int y = e->top_blank; y < e->height; y++) {
         size_t s0 = 0, s1 = 0;
 
@@ -432,7 +452,8 @@ void render(Editor *e)
         if (tr < ed_line(e, tl)->nrows) {  /* si no, és la fila de separació */
             if (styled != tl)
                 line_styles(e, styled = tl);
-            draw_row(e, ed_line(e, tl), tr, y, s0, s1);
+            draw_row(e, ed_line(e, tl), tr, y, s0, s1,
+                     tl == e->cy ? fa : 0, tl == e->cy ? fb : 0);
         }
         if (tl == e->cy && tr == crow) {
             cur_y = y;

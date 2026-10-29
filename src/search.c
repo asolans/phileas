@@ -34,6 +34,11 @@ static size_t match_at(const char *s, size_t len, size_t i,
             a = (wchar_t)towlower((wint_t)a);
             b = (wchar_t)towlower((wint_t)b);
         }
+        /* L'apòstrof recte i el tipogràfic són el mateix */
+        if (a == L'’')
+            a = L'\'';
+        if (b == L'’')
+            b = L'\'';
         if (a != b)
             return (size_t)-1;
     }

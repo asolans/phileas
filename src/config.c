@@ -166,6 +166,21 @@ int config_set(Editor *e, const char *key, const char *v, char *err, size_t errs
         return parse_bool(v, &e->center, err, errsz);
     } else if (!strcmp(key, "colors")) {
         return parse_bool(v, &e->colors, err, errsz);
+    } else if (!strcmp(key, "enfocament")) {
+        if (!strcmp(v, "no"))
+            e->focus = FOCUS_NO;
+        else if (!strcmp(v, "paragraf") || !strcmp(v, "paràgraf"))
+            e->focus = FOCUS_PARAGRAPH;
+        else if (!strcmp(v, "frase"))
+            e->focus = FOCUS_SENTENCE;
+        else {
+            snprintf(err, errsz, "«%s» ha de ser no, paragraf o frase", v);
+            return -1;
+        }
+    } else if (!strcmp(key, "tipografia")) {
+        return parse_bool(v, &e->typo, err, errsz);
+    } else if (!strcmp(key, "apostrof-tipografic")) {
+        return parse_bool(v, &e->typo_apos, err, errsz);
     } else if (!strcmp(key, "maquina-escriure")) {
         if (!strcmp(v, "salt"))
             e->tw_mode = TW_SALT;
@@ -299,6 +314,9 @@ static void defaults(Editor *e)
     e->margin_left = d.margin_left;
     e->margin_right = d.margin_right;
     e->colors = d.colors;
+    e->focus = d.focus;
+    e->typo = d.typo;
+    e->typo_apos = d.typo_apos;
     e->tw_mode = d.tw_mode;
     e->tw_limit = d.tw_limit;
     e->tw_anchor = d.tw_anchor;
@@ -542,8 +560,8 @@ void config_template(FILE *f, const Editor *e)
             "# Es llegeix /etc/phileas/phileasrc i després el de l'usuari:\n"
             "# $PHILEAS_CONFIG/phileasrc, o bé ~/.config/phileas/phileasrc.\n"
             "# Les opcions de la línia d'ordres (-c, -a, -d) manen sobre tots dos.\n"
-            "# Les opcions del menú Vista (centrar, colors, màquina d'escriure i tema)\n"
-            "# es desen soles en aquest fitxer.\n"
+            "# Les opcions que es canvien des dels menús (centrar, colors, enfocament,\n"
+            "# màquina d'escriure, tema i tipografia) es desen soles en aquest fitxer.\n"
             "\n"
             "# Text\n"
             "columnes = %-24d# amplada de la columna de text\n"
@@ -551,6 +569,13 @@ void config_template(FILE *f, const Editor *e)
             "marge-dret = %-22d# i a la dreta (si el terminal és estret)\n"
             "centrar = %-25s# centrar la columna entre els marges\n"
             "colors = %-26s# colors de Markdown\n"
+            "enfocament = %-22s# no, paragraf o frase: atenua la resta del text\n"
+            "\n"
+            "# Tipografia en escriure: -- i un altre caràcter → —, << → «, >> → »,\n"
+            "# ... → …; amb apostrof-tipografic, ' entre lletres → ’. No actua dins\n"
+            "# del codi ni a les línies de guions (---). Ctrl+Z la desfà.\n"
+            "tipografia = %s\n"
+            "apostrof-tipografic = %s\n"
             "\n"
             "# Màquina d'escriure: salt, fixa o classic\n"
             "maquina-escriure = %s\n"
@@ -566,6 +591,8 @@ void config_template(FILE *f, const Editor *e)
             "idiomes = %-25s# rotació de F8; el primer, en arrencar\n",
             e->columns, e->margin_left, e->margin_right, e->center ? "si" : "no",
             e->colors ? "si" : "no",
+            e->focus == FOCUS_SENTENCE ? "frase" : e->focus == FOCUS_PARAGRAPH ? "paragraf" : "no",
+            e->typo ? "si" : "no", e->typo_apos ? "si" : "no",
             e->tw_mode == TW_SALT ? "salt" : e->tw_mode == TW_FIXA ? "fixa" : "classic",
             e->tw_limit, e->tw_anchor, e->autosave, e->autosave_max,
             e->spell_start ? "si" : "no", langs);

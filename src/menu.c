@@ -43,6 +43,7 @@ static const Menu m_edit = { "Edita", (const MenuItem[]){
     { 'm', "Comença una selecció", "marca",           NULL, NULL },
     { 'p', "Puja el paràgraf",     "pujar-paragraf",  NULL, NULL },
     { 'b', "Baixa el paràgraf",    "baixar-paragraf", NULL, NULL },
+    { 'i', "Tipografia automàtica", "tipografia",     NULL, NULL },
     { 0 } } };
 
 static const Menu m_find = { "Cerca", (const MenuItem[]){
@@ -78,6 +79,7 @@ static const Menu m_view = { "Vista", (const MenuItem[]){
     { 'm', "Màquina d'escriure",   "maquina-escriure", NULL, NULL },
     { 'c', "Centra la columna",    "centrar",          NULL, NULL },
     { 'o', "Colors de Markdown",   "colors",           NULL, NULL },
+    { 'e', "Enfocament",           "enfocament",       NULL, NULL },
     { 't', "Tema",                 NULL,               NULL, &m_theme },
     { 'r', "Redibuixa",            "redibuixar",       NULL, NULL },
     { 0 } } };

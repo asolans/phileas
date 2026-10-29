@@ -18,6 +18,13 @@ enum {
     TW_CLASSIC, /* el cursor pot arribar a dalt i a baix de tot */
 };
 
+/* Mode enfocament: la resta del text s'atenua */
+enum {
+    FOCUS_NO,
+    FOCUS_PARAGRAPH,
+    FOCUS_SENTENCE,
+};
+
 enum {
     SEL_NONE,   /* sense selecció */
     SEL_SHIFT,  /* Maj+fletxes: un moviment sense Maj la cancel·la */
@@ -58,6 +65,9 @@ typedef struct {
     int     tw_limit;          /* % de l'alçada que el cursor no passa en baixar (salt) */
     int     tw_anchor;         /* % de l'alçada on queda el cursor després d'un salt */
     int     colors;            /* colors de Markdown */
+    int     focus;             /* FOCUS_* */
+    int     typo;              /* tipografia en escriure: -- « » … */
+    int     typo_apos;         /* i l'apòstrof tipogràfic */
     short   palette[PAL_N];    /* colors 0-15 (els 8 de ncurses i els clars) o PAL_DEFAULT */
     int     theme;             /* índex del tema (theme_at) */
     int     console_palette;   /* a la consola de Linux, aplicar els colors rgb del tema */
@@ -147,6 +157,22 @@ void  ed_swap_lines(Editor *e, size_t a, size_t b, size_t c);
 /* Mou el paràgraf del cursor (o les línies de la selecció) per sobre de
  * l'anterior (dir < 0) o per sota del següent. Retorna 0 a l'extrem. */
 int   ed_move_par(Editor *e, int dir);
+
+/* Frase de s on és pos: [*a, *b). Acaba darrere de . ! ? o … (i les
+ * cometes o parèntesis que els segueixin) quan ve un espai o el final; els
+ * espais de darrere hi pertanyen. */
+void  text_sentence(const char *s, size_t len, size_t pos, size_t *a, size_t *b);
+
+/* Part de la línia del cursor que no s'atenua amb l'enfocament. */
+void  ed_focus_range(Editor *e, size_t *a, size_t *b);
+
+/* Tipografia: es crida just després d'escriure el caràcter ch. Si en
+ * completa un («--» seguit d'un altre caràcter, «<<», «>>», «...» o, amb
+ * l'opció, l'apòstrof entre lletres), el substitueix en un pas de desfer
+ * propi: Ctrl+Z torna a deixar el que s'havia escrit. No actua dins del
+ * codi, les metadades, l'HTML, les taules ni les línies de guions.
+ * Retorna 1 si ha substituït. */
+int   ed_typography(Editor *e, wchar_t ch);
 
 /* Desfer/refer. ed_begin s'ha de cridar abans de cada acció: decideix si
  * comença un grup nou de desfer o continua l'anterior (escriure seguit,

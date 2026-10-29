@@ -13,6 +13,9 @@ typedef struct {
     const char   *label;    /* per als menús i els missatges */
     short         pal[PAL_N];
     const unsigned *rgb;    /* 16 colors 0xRRGGBB, o NULL */
+    short         dim;      /* amb rgb, a la consola: color del text atenuat
+                             * de l'enfocament (la consola no combina
+                             * l'atenuat amb els colors); -1 = cap */
 } Theme;
 
 size_t       theme_count(void);
