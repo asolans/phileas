@@ -8,6 +8,7 @@
 #include "tui.h"
 #include "utf8.h"
 #include "util.h"
+#include "version.h"
 
 #include <errno.h>
 #include <langinfo.h>
@@ -17,7 +18,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#define PHILEAS_VERSION  "2.0.2"
 #define DEFAULT_COLUMNS  72
 
 static Editor *editor;   /* per al desat d'emergència */

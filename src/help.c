@@ -2,10 +2,13 @@
 #include "command.h"
 #include "config.h"
 #include "keys.h"
+#include "render.h"
 #include "tui.h"
 #include "utf8.h"
 #include "util.h"
+#include "version.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wctype.h>
@@ -40,7 +43,7 @@ static const struct {
         "maquina-escriure", "centrar", "colors", "tema", "redibuixar", NULL } },
     { "Configuració i ajuda", (const char *const[]){
         "menu", "ajuda", "paleta", "recarregar-configuracio", "desar-configuracio", "autodesat",
-        NULL } },
+        "quant-a", NULL } },
 };
 #define NSECTIONS (sizeof sections / sizeof sections[0])
 
@@ -354,4 +357,71 @@ void help_show(Editor *e)
         }
     }
     free(vis);
+}
+
+void about_show(Editor *e)
+{
+    char sys[128] = "";
+    const char *lines[8];
+    int n = 0, w = 0, h, x, y;
+    FILE *f = fopen("/etc/byok-version", "r");
+
+    if (f) {
+        if (fgets(sys, sizeof sys, f))
+            sys[strcspn(sys, "\n")] = '\0';
+        fclose(f);
+    }
+    lines[n++] = "Phileas " PHILEAS_VERSION;
+    lines[n++] = "Editor de text amb Markdown";
+    if (sys[0])
+        lines[n++] = sys;
+    lines[n++] = "";
+    lines[n++] = "Llicència GPL-3.0-or-later";
+    lines[n++] = "github.com/asolans/phileas";
+    for (int i = 0; i < n; i++) {
+        int lw = (int)utf8_count(lines[i], strlen(lines[i]));
+        if (lw > w)
+            w = lw;
+    }
+    w += 6;
+    h = n + 4;
+    if (w > COLS)
+        w = COLS;
+    if (h > LINES)
+        h = LINES;
+    x = (COLS - w) / 2;
+    y = (LINES - h) / 2;
+
+    render(e);   /* sense els menús d'on s'ha cridat */
+    attrset(ui_attr(UI_MENU));
+    mvaddch(y, x, ACS_ULCORNER);
+    hline(ACS_HLINE, w - 2);
+    mvaddch(y, x + w - 1, ACS_URCORNER);
+    for (int i = 1; i < h - 1; i++) {
+        mvaddch(y + i, x, ACS_VLINE);
+        mvhline(y + i, x + 1, ' ', w - 2);
+        mvaddch(y + i, x + w - 1, ACS_VLINE);
+    }
+    mvaddch(y + h - 1, x, ACS_LLCORNER);
+    hline(ACS_HLINE, w - 2);
+    mvaddch(y + h - 1, x + w - 1, ACS_LRCORNER);
+    if (w > 14) {
+        move(y, x + 2);
+        attron(A_BOLD);
+        put(" Quant a ", w - 4);
+        attroff(A_BOLD);
+    }
+    for (int i = 0; i < n && 2 + i < h - 1; i++) {
+        move(y + 2 + i, x + 3);
+        if (i == 0)
+            attron(A_BOLD);
+        put(lines[i], w - 6);
+        attroff(A_BOLD);
+    }
+    attrset(A_NORMAL);
+    refresh();
+
+    key_set_timeout(-1);
+    while (key_read() < 0)
+        ;
 }

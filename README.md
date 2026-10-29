@@ -229,7 +229,7 @@ phileas [-c COLUMNES] [-a SEGONS] [-d IDIOMA] [FITXER]
 | `-a N` | autodesat després de N segons sense escriure; `0` el desactiva |
 | `-d ID` | activa l'ortografia amb aquest diccionari (`ca`, `es`, `en_US`…) |
 | `--config` | escriu una configuració amb tots els valors per defecte |
-| `-h`, `-v` | ajuda i versió |
+| `-h`, `-v` | ajuda i versió (dins Phileas, Esc → Ajuda i configuració → Quant a Phileas) |
 
 Sense fitxer, Phileas comença un document nou. Per començar, n'hi ha prou
 de recordar tres tecles: **Esc** (menús), **F1** (ajuda) i **Ctrl+P**

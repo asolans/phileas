@@ -7,4 +7,8 @@
  * les tecles que hi ha assignades ara mateix. Es pot filtrar escrivint. */
 void help_show(Editor *e);
 
+/* Quant a: la versió de Phileas i, si n'hi ha, la del sistema
+ * (/etc/byok-version a la imatge BYOK). Es tanca amb qualsevol tecla. */
+void about_show(Editor *e);
+
 #endif

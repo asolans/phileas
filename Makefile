@@ -49,7 +49,7 @@ install-desktop:
 	install -D -m 0644 packaging/phileas.svg $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps/phileas.svg
 
 # Paquets a dist/: .deb (Debian, Ubuntu) i codi font de HEAD en .tar.gz
-VERSION = $(shell sed -n 's/^\#define PHILEAS_VERSION *"\(.*\)"/\1/p' src/main.c)
+VERSION = $(shell sed -n 's/^\#define PHILEAS_VERSION *"\(.*\)"/\1/p' src/version.h)
 deb: phileas
 	sh packaging/mkdeb.sh $(VERSION) dist
 

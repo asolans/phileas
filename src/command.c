@@ -550,6 +550,11 @@ static void c_help(Editor *e)
     help_show(e);
 }
 
+static void c_about(Editor *e)
+{
+    about_show(e);
+}
+
 static void c_colors(Editor *e)
 {
     e->colors = !e->colors;
@@ -895,6 +900,7 @@ static const Command commands[] = {
     { "paleta",            c_palette,    "Executa una ordre pel nom", ACT_NONE },
     { "menu",              c_menu,       "Obre el menú (si hi ha selecció, primer la cancel·la)", ACT_NONE },
     { "ajuda",             c_help,       "Mostra aquesta ajuda", ACT_NONE },
+    { "quant-a",           c_about,      "Mostra la versió de Phileas (i la del sistema, a la BYOK)", ACT_NONE },
 
     { "desfer",            c_undo,       "Desfà l'últim canvi", ACT_NONE },
     { "refer",             c_redo,       "Refà el que s'ha desfet", ACT_NONE },
