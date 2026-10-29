@@ -27,6 +27,7 @@ struct Menu {
 
 static const Menu m_file = { "Fitxer", (const MenuItem[]){
     { 'o', "Obre…",                "obrir",     NULL, NULL },
+    { 'r', "Recents…",             "recents",   NULL, NULL },
     { 'n', "Nou",                  "nou",       NULL, NULL },
     { 'd', "Desa",                 "desar",     NULL, NULL },
     { 'c', "Desa com…",            "desar-com", NULL, NULL },

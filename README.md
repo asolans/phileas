@@ -68,6 +68,10 @@ només serveix per escriure.
   línies seleccionades).
 - **Navegador de fitxers** integrat (Ctrl+O) i **recompte de paraules** i
   **estimació de pàgines** a la barra d'estat.
+- **Documents recents** (Alt+O, o Esc → Fitxer → Recents) i **posició del
+  cursor**: en tornar a obrir un document, el cursor és on era. Tot es desa
+  al fitxer `historial` del directori de configuració, fora dels documents,
+  que no es modifiquen.
 - **Ordres externes:** es poden afegir a la paleta ordres del sistema
   (exportar amb pandoc, comptar paraules, enviar el text…).
 - **UTF-8 complet:** accents, ç, l·l, cometes tipogràfiques i caràcters
@@ -253,6 +257,7 @@ de recordar tres tecles: **Esc** (menús), **F1** (ajuda) i **Ctrl+P**
 |-------|-------|
 | Ctrl+S / Alt+S | desar / desar com |
 | Ctrl+O / Ctrl+N | obrir (navegador de fitxers) / document nou |
+| Alt+O | documents recents (Supr en treu un de la llista) |
 | Ctrl+Q | sortir (demana confirmació si hi ha canvis) |
 | Ctrl+Z / Ctrl+Y | desfer / refer |
 | Ctrl+X / Ctrl+C / Ctrl+V | tallar / copiar / enganxar |
@@ -291,6 +296,11 @@ Esc → Ajuda i configuració → Desa la configuració). Conserva les línies
 `phileas --config` escriu el mateix a la sortida; no el redirigiu al mateix
 `phileasrc`, que el shell buida abans que Phileas el llegeixi.
 
+Al mateix directori hi ha `historial`: una línia per document obert (`LÍNIA
+BYTE CAMÍ`, el més recent primer, fins a 100), que es desa en canviar de
+document, en sortir i en rebre SIGTERM o SIGHUP. D'aquí surten la llista de
+recents i la posició del cursor en obrir un document.
+
 Només cal deixar-hi les opcions que es volen canviar. Un exemple:
 
 ```ini
@@ -298,6 +308,7 @@ columnes = 66
 marge-esquerre = 6
 maquina-escriure = salt        # salt, fixa o classic
 autodesat = 20
+recordar-posicio = no          # en obrir un document, el cursor va al final
 ortografia = si
 idiomes = ca es                # F8 alterna; el primer és el de l'arrencada
 tema = sepia                   # terminal, fosc, clar, sepia, fosfor o wordperfect
@@ -378,6 +389,7 @@ cadena musl de Buildroot.
 | `spell.c` | ortografia amb hunspell, carregat amb `dlopen` |
 | `filebrowser.c`, `dirlist.c` | navegador de fitxers |
 | `outline.c`, `outlineview.c` | esquema: capçaleres i paraules per secció, i el seu diàleg |
+| `history.c`, `recentview.c` | historial: posició del cursor per document i documents recents |
 | `config.c` | fitxers de configuració |
 | `utf8.c`, `util.c` | UTF-8 i utilitats |
 

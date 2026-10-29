@@ -179,6 +179,8 @@ int config_set(Editor *e, const char *key, const char *v, char *err, size_t errs
         }
     } else if (!strcmp(key, "tipografia")) {
         return parse_bool(v, &e->typo, err, errsz);
+    } else if (!strcmp(key, "recordar-posicio")) {
+        return parse_bool(v, &e->remember_pos, err, errsz);
     } else if (!strcmp(key, "apostrof-tipografic")) {
         return parse_bool(v, &e->typo_apos, err, errsz);
     } else if (!strcmp(key, "maquina-escriure")) {
@@ -322,6 +324,7 @@ static void defaults(Editor *e)
     e->tw_anchor = d.tw_anchor;
     e->autosave = e->autosave_last = d.autosave;
     e->autosave_max = d.autosave_max;
+    e->remember_pos = d.remember_pos;
     e->spell_start = d.spell_start;
     memcpy(e->palette, d.palette, sizeof e->palette);
     e->theme = d.theme;
@@ -585,6 +588,7 @@ void config_template(FILE *f, const Editor *e)
             "# Desat\n"
             "autodesat = %-23d# segons sense escriure; 0 = desactivat\n"
             "autodesat-maxim = %-17d# segons com a molt amb canvis sense desar\n"
+            "recordar-posicio = %-16s# en obrir un document, el cursor torna on era\n"
             "\n"
             "# Ortografia\n"
             "ortografia = %-22s# activa en arrencar (si no, F7)\n"
@@ -595,6 +599,7 @@ void config_template(FILE *f, const Editor *e)
             e->typo ? "si" : "no", e->typo_apos ? "si" : "no",
             e->tw_mode == TW_SALT ? "salt" : e->tw_mode == TW_FIXA ? "fixa" : "classic",
             e->tw_limit, e->tw_anchor, e->autosave, e->autosave_max,
+            e->remember_pos ? "si" : "no",
             e->spell_start ? "si" : "no", langs);
     /* Sense «diccionari», config_load hi posa el primer idioma */
     if (e->dict[0] && strcmp(e->dict, e->langs[0]))

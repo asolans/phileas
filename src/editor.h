@@ -92,6 +92,7 @@ typedef struct {
     double  last_input;        /* moment de l'última tecla */
     double  dirty_since;       /* primer canvi sense desar; 0 = cap */
     int     autosave_warned;   /* ja s'ha avisat que el document no té nom */
+    int     remember_pos;      /* en obrir un document, tornar on era el cursor */
 
     char    msg[256];          /* missatge de la línia inferior */
     int     quit;

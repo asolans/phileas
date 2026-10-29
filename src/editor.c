@@ -33,6 +33,7 @@ void ed_init(Editor *e, int columns)
     e->tw_anchor = 50;
     theme_apply(e, theme_at(0));
     e->console_palette = 1;
+    e->remember_pos = 1;
     /* Rotació de F8: català i castellà, començant pel de la configuració
      * regional si és un d'aquests dos */
     spell_code(NULL, code, sizeof code);

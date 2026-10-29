@@ -5,6 +5,7 @@
 #include "config.h"
 #include "dirlist.h"
 #include "editor.h"
+#include "history.h"
 #include "md.h"
 #include "outline.h"
 #include "search.h"
@@ -14,6 +15,7 @@
 #include "util.h"
 #include "wrap.h"
 
+#include <limits.h>
 #include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1561,6 +1563,147 @@ static void test_emergency(void)
     CHECK(chdir(old_cwd) == 0);
 }
 
+static void test_history(void)
+{
+    Editor e;
+    History h;
+    Buffer b;
+    char conf[600], a[600], c[600], hist[700], abs_a[PATH_MAX], abs_c[PATH_MAX], name[64];
+    FILE *f;
+
+    snprintf(conf, sizeof conf, "%s/hconf", tmpdir);
+    snprintf(a, sizeof a, "%s/a.md", tmpdir);
+    snprintf(c, sizeof c, "%s/c.md", tmpdir);
+    setenv("PHILEAS_CONFIG", conf, 1);
+    history_path(hist, sizeof hist);
+    buf_init(&b);
+
+    /* Sense fitxer: buit; desar crea el directori */
+    history_load(&h);
+    CHECK(h.n == 0);
+    history_touch(&h, "/x/u.md", 1, 2);
+    history_touch(&h, "/x/dos.md", 3, 4);
+    history_touch(&h, "/x/u.md", 5, 6);      /* torna al principi, sense duplicar */
+    CHECK(h.n == 2 && !strcmp(h.items[0].path, "/x/u.md") && h.items[0].line == 5 &&
+          h.items[0].col == 6 && !strcmp(h.items[1].path, "/x/dos.md"));
+    CHECK(history_save(&h) == 0);
+    history_free(&h);
+    history_load(&h);
+    CHECK(h.n == 2 && h.items[1].line == 3 && h.items[1].col == 4);
+    history_remove(&h, 0);
+    CHECK(h.n == 1 && !strcmp(h.items[0].path, "/x/dos.md"));
+    history_free(&h);
+
+    /* Camins amb espais; línies mal formades, relatives i repetides, fora */
+    f = fopen(hist, "w");
+    fputs("7 2 /x/amb espais.md\nbrossa\n1 1 relatiu.md\n9 9 /x/amb espais.md\n\n", f);
+    fclose(f);
+    history_load(&h);
+    CHECK(h.n == 1 && !strcmp(h.items[0].path, "/x/amb espais.md") && h.items[0].line == 7);
+    /* Els que no existeixen se'n van */
+    CHECK(history_prune_missing(&h) == 1 && h.n == 0);
+    history_free(&h);
+
+    /* Límit */
+    history_load(&h);
+    for (int i = 0; i < HISTORY_MAX + 5; i++) {
+        snprintf(name, sizeof name, "/x/%d.md", i);
+        history_touch(&h, name, 0, 0);
+    }
+    CHECK(h.n == HISTORY_MAX && !strcmp(h.items[0].path, "/x/104.md") &&
+          !strcmp(h.items[HISTORY_MAX - 1].path, "/x/5.md"));
+    history_free(&h);
+    unlink(hist);
+
+    /* Editor: un document sense nom o que no existeix no s'anota */
+    f = fopen(a, "w");
+    fputs("Primer paràgraf.\n\nSegon, amb accents: àèò.\n\nTercer.\n", f);
+    fclose(f);
+    CHECK(realpath(a, abs_a) != NULL);
+    ed_init(&e, 72);
+    CHECK(history_remember(&e) == 0);
+    ed_open(&e, c);
+    CHECK(history_remember(&e) == 0);
+    history_load(&h);
+    CHECK(h.n == 0);
+    history_free(&h);
+
+    /* Obrir sense historial: al final, com sempre */
+    ed_open(&e, a);
+    CHECK(history_restore(&e) == 0 && e.cy == e.buf.nlines - 1);
+    e.cy = 1;
+    e.cx = 9;
+    CHECK(history_remember(&e) == 0);
+    history_load(&h);
+    CHECK(h.n == 1 && !strcmp(h.items[0].path, abs_a) && h.items[0].line == 1 &&
+          h.items[0].col == 9);
+    history_free(&h);
+    /* El document no es toca */
+    CHECK(buf_load(&b, a) == 0 && b.nlines == 3 && !strcmp(b.lines[1].text, "Segon, amb accents: àèò."));
+
+    /* Tornar-lo a obrir: el cursor on era */
+    ed_open(&e, a);
+    CHECK(history_restore(&e) == 1 && e.cy == 1 && e.cx == 9);
+
+    /* L'opció desactivada: al final */
+    e.remember_pos = 0;
+    ed_open(&e, a);
+    CHECK(history_restore(&e) == 0 && e.cy == e.buf.nlines - 1);
+    e.remember_pos = 1;
+
+    /* Posició dins d'un caràcter de dos bytes: a l'inici del caràcter */
+    e.cy = 1;
+    e.cx = (size_t)(strstr(e.buf.lines[1].text, "è") - e.buf.lines[1].text) + 1;
+    history_remember(&e);
+    ed_open(&e, a);
+    CHECK(history_restore(&e) == 1 && e.cy == 1 &&
+          !strncmp(e.buf.lines[1].text + e.cx, "è", strlen("è")));
+
+    /* El fitxer s'ha escurçat fora de Phileas: al final del text */
+    e.cy = 2;
+    e.cx = 3;
+    history_remember(&e);
+    f = fopen(a, "w");
+    fputs("Només una línia.\n", f);
+    fclose(f);
+    ed_open(&e, a);
+    CHECK(history_restore(&e) == 1 && e.cy == 0 && e.cx == strlen("Només una línia."));
+
+    /* Un altre document passa al davant */
+    f = fopen(c, "w");
+    fputs("C\n", f);
+    fclose(f);
+    CHECK(realpath(c, abs_c) != NULL);
+    ed_open(&e, c);
+    history_remember(&e);
+    history_load(&h);
+    CHECK(h.n == 2 && !strcmp(h.items[0].path, abs_c) && !strcmp(h.items[1].path, abs_a));
+    history_free(&h);
+
+    /* Recordar-posicio al phileasrc i a la plantilla */
+    {
+        char err[256], *out = NULL;
+        size_t outlen;
+        FILE *mf;
+
+        CHECK(config_set(&e, "recordar-posicio", "no", err, sizeof err) == 0 && !e.remember_pos);
+        CHECK(config_set(&e, "recordar-posicio", "potser", err, sizeof err) < 0);
+        mf = open_memstream(&out, &outlen);
+        config_template(mf, &e);
+        fclose(mf);
+        CHECK(strstr(out, "recordar-posicio = no ") != NULL);
+        free(out);
+    }
+
+    ed_free(&e);
+    buf_free(&b);
+    unlink(a);
+    unlink(c);
+    unlink(hist);
+    rmdir(conf);
+    unsetenv("PHILEAS_CONFIG");
+}
+
 int main(void)
 {
     /* Qualsevol configuració UTF-8 (una Raspberry amb buildroot pot no tenir C.UTF-8) */
@@ -1596,6 +1739,7 @@ int main(void)
     test_plain();
     test_config();
     test_emergency();
+    test_history();
     test_complete();
     rmdir(tmpdir);
 

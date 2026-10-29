@@ -3,9 +3,11 @@
 #include "config.h"
 #include "filebrowser.h"
 #include "help.h"
+#include "history.h"
 #include "keys.h"
 #include "menu.h"
 #include "outlineview.h"
+#include "recentview.h"
 #include "render.h"
 #include "search.h"
 #include "spell.h"
@@ -274,12 +276,10 @@ static int looks_binary(const char *path)
     return memchr(data, '\0', n) != NULL;
 }
 
-static void c_open(Editor *e)
+/* Obre path en lloc del document actual: abans en desa la posició a
+ * l'historial i, en obrir-lo, hi torna el cursor si hi era. */
+static void open_path(Editor *e, const char *path)
 {
-    char path[PATH_MAX];
-
-    if (!file_browser(e, path, sizeof path))
-        return;
     if (e->filename && !strcmp(path, e->filename)) {
         ed_msg(e, "Ja és el document obert");
         return;
@@ -290,20 +290,40 @@ static void c_open(Editor *e)
     }
     if (!confirm_discard(e))
         return;
+    history_remember(e);
     e->msg[0] = '\0';
     if (ed_open(e, path) < 0) {
         ed_msg(e, "No s'ha pogut obrir %s: %s", path, strerror(errno));
         return;
     }
+    history_restore(e);
+    history_remember(e);
     if (!e->msg[0])
         ed_msg(e, "Obert: %s (%zu %s)", path, e->buf.nlines,
                e->buf.nlines == 1 ? "línia" : "línies");
+}
+
+static void c_open(Editor *e)
+{
+    char path[PATH_MAX];
+
+    if (file_browser(e, path, sizeof path))
+        open_path(e, path);
+}
+
+static void c_recent(Editor *e)
+{
+    char path[PATH_MAX];
+
+    if (recent_view(e, path, sizeof path))
+        open_path(e, path);
 }
 
 static void c_new(Editor *e)
 {
     if (!confirm_discard(e))
         return;
+    history_remember(e);
     ed_open(e, NULL);
     ed_msg(e, "Document nou");
 }
@@ -950,6 +970,7 @@ static const Command commands[] = {
     { "desar-configuracio", c_save_config, "Desa la configuració actual, amb totes les opcions, al phileasrc", ACT_NONE },
     { "tema",              c_theme,      "Canvia el tema de colors (tema NOM: terminal, fosc, clar, sepia, fosfor, wordperfect)", ACT_NONE },
     { "obrir",             c_open,       "Obre un document amb el navegador de fitxers", ACT_NONE },
+    { "recents",           c_recent,     "Documents oberts fa poc; Enter n'obre un amb el cursor on era", ACT_NONE },
     { "nou",               c_new,        "Comença un document nou sense nom", ACT_NONE },
     { "desar",             c_save,       "Desa el document", ACT_NONE },
     { "desar-com",         c_save_as,    "Desa el document amb un altre nom", ACT_NONE },
@@ -1013,6 +1034,7 @@ static const char *const default_bindings[][2] = {
 
     { "alt-c", "centrar" },           { "f4", "enfocament" },
     { "ctrl-o", "obrir" },            { "ctrl-n", "nou" },
+    { "alt-o", "recents" },
     { "ctrl-s", "desar" },            { "alt-s", "desar-com" },
     { "ctrl-q", "sortir" },
     { "ctrl-l", "redibuixar" },

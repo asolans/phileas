@@ -2,6 +2,7 @@
 #include "command.h"
 #include "config.h"
 #include "editor.h"
+#include "history.h"
 #include "keys.h"
 #include "render.h"
 #include "spell.h"
@@ -32,7 +33,9 @@ static void quit_on_signal(int sig)
     ui_end();
     if (r < 0)
         fprintf(stderr, "phileas: %s: no s'ha pogut desar el document\n", strsignal(sig));
-    else if (path[0])
+    else
+        history_remember(editor);
+    if (r >= 0 && path[0])
         fprintf(stderr, "phileas: %s: document desat a %s\n", strsignal(sig), path);
     _exit(128 + sig);
 }
@@ -54,7 +57,10 @@ static void usage(FILE *f)
           "  -v        mostra la versió\n"
           "\n"
           "Configuració: /etc/phileas/phileasrc i després $PHILEAS_CONFIG/phileasrc\n"
-          "(o ~/.config/phileas/phileasrc). Les opcions -c, -a i -d manen sobre tots dos.\n",
+          "(o ~/.config/phileas/phileasrc). Les opcions -c, -a i -d manen sobre tots dos.\n"
+          "Al mateix directori, «historial»: els documents recents (Alt+O) i on era el\n"
+          "cursor, que hi torna en obrir-los (recordar-posicio = no ho desactiva). Els\n"
+          "documents no es modifiquen.\n",
           f);
 }
 
@@ -139,6 +145,8 @@ int main(int argc, char **argv)
             ed_free(&e);
             return 1;
         }
+        history_restore(&e);
+        history_remember(&e);
     }
     if (strcmp(nl_langinfo(CODESET), "UTF-8") != 0)
         ed_msg(&e, "Avís: la configuració regional no és UTF-8; els accents no es veuran bé");
@@ -216,6 +224,7 @@ int main(int argc, char **argv)
             e.quit_confirm = 0;
     }
 
+    history_remember(&e);
     ui_end();
     spell_close();
     cmd_extern_clear();

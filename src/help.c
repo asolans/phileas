@@ -19,7 +19,7 @@ static const struct {
     const char *title;
     const char *const *names;
 } sections[] = {
-    { "Fitxer", (const char *const[]){ "obrir", "nou", "desar", "desar-com", "sortir", NULL } },
+    { "Fitxer", (const char *const[]){ "obrir", "recents", "nou", "desar", "desar-com", "sortir", NULL } },
     { "Moviment", (const char *const[]){
         "moure-amunt", "moure-avall", "moure-esquerra", "moure-dreta", "inici-linia",
         "fi-linia", "pagina-amunt", "pagina-avall", "paraula-anterior", "paraula-seguent",
@@ -54,6 +54,7 @@ static const char *const intro[] = {
     "Ctrl+P (paleta): executa qualsevol ordre pel nom; Tab completa el nom.",
     "Les tecles es canvien al phileasrc: tecla.NOM = ordre.",
     "Navegador (Ctrl+O): Enter obre, ← puja, escriu per filtrar.",
+    "Recents (Alt+O): Enter obre, Supr treu de la llista; el cursor torna on era.",
     "Esquema (F2): capçaleres i paraules de cada secció; Enter hi va, Alt+↑/↓ mou la secció.",
     "Suggeriments (Alt+Enter): el número substitueix, a afegeix, i ignora.",
 };

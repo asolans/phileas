@@ -509,8 +509,8 @@ Llista oberta: l'usuari hi afegeix, en treu i n'ordena la prioritat.
 | # | Millora | Àmbit | Notes |
 |---|---------|-------|-------|
 | C1 | Autocompleció a la paleta (Ctrl+P) | Tots dos | ✅ Fet (2026-10-26): Tab completa el nom de l'ordre; amb diverses opcions, les mostra atenuades. |
-| C2 | Recordar la posició del cursor per fitxer | Tots dos | En tornar a obrir un document, el cursor torna on era. Fitxer petit al directori de configuració. |
-| C3 | Fitxers recents | Tots dos | Llista dels últims documents, a la paleta o al navegador de fitxers. |
+| C2 | Recordar la posició del cursor per fitxer | Tots dos | ✅ Fet (2026-10-29): fitxer `historial` del directori de configuració (`LÍNIA BYTE CAMÍ`), mai dins del document; opció `recordar-posicio`. |
+| C3 | Fitxers recents | Tots dos | ✅ Fet (2026-10-29): ordre `recents`, Alt+O, Esc → Fitxer → Recents. Llista filtrable de l'`historial`; Supr en treu un. |
 | C4 | Comptador de paraules | Tots dos | ✅ A la barra d'estat (2.0.2). Pendent: amb la selecció, les de la selecció. |
 | C5 | Ordre `reformatar` | Tots dos | Ja prevista com a opcional a «Decisió de wordwrap»: còpia amb salts durs a N columnes. |
 | C6 | Objectiu d'escriptura | Tots dos | Paraules per sessió o per document, amb el progrés a la barra d'estat. |
@@ -520,8 +520,8 @@ Llista oberta: l'usuari hi afegeix, en treu i n'ordena la prioritat.
 | C10 | Instantànies | Tots dos | En desar a mà, i com a molt cada hora, còpia a `.versions/nom-AAAAMMDD-HHMM.md`; ordre per recuperar-les, sense diff; poda (p. ex. 20 per document). Per a una 3.0. |
 | C11 | Marcadors i pendents | Tots dos | `TODO`, `[?]`, `%%nota%%` ressaltats a les línies visibles; ordre `pendents` que els llista i hi salta. |
 | C12 | Mode enfocament | Tots dos | ✅ Fet (2026-10-29): `enfocament`, F4, Vista. Atenua tot menys el paràgraf (o la frase) actual, amb un color del tema. Només afecta el pintat. |
-| C13 | Sprint amb temporitzador | Tots dos | `sprint 25`: compte enrere a la barra (el `timeout` de l'autodesat); en acabar, paraules escrites i ppm. Encaixa amb C6. |
-| C14 | Mode «endavant» | Tots dos | Opcional durant l'sprint: sense retrocés ni moviment enrere. Filtre de tecles. |
+| C13 | ~~Sprint amb temporitzador~~ | Tots dos | ❌ Abandonada (decisió de l'usuari, 2026-10-29). Era: `sprint 25`: compte enrere a la barra (el `timeout` de l'autodesat); en acabar, paraules escrites i ppm. Encaixa amb C6. |
+| C14 | ~~Mode «endavant»~~ | Tots dos | ❌ Abandonada (decisió de l'usuari, 2026-10-29). Era: opcional durant l'sprint: sense retrocés ni moviment enrere. Filtre de tecles. |
 | C15 | Diari d'escriptura | Tots dos | En sortir, `data;fitxer;paraules+` a un CSV del directori de configuració; ordre `estadistiques` amb ratxa de dies i mitjana. |
 | C16 | Ecos i paraules crossa | Tots dos | Ordre `repeticions`: repeticions en un radi de N paraules dins el paràgraf i llista configurable («molt», «doncs», «muy», adverbis -ment/-mente). A demanda. |
 | C17 | Tipografia de diàleg | Tots dos | ✅ Fet (2026-10-29): `tipografia`, Edita; `apostrof-tipografic`. Per idioma: `--` → «—», `<<`/`>>` → «», `...` → «…», apòstrof tipogràfic opcional; fora del codi Markdown. |
@@ -567,6 +567,8 @@ src/
   filebrowser.c ✅ navegador de fitxers a pantalla completa
   help.c        ✅ ajuda (F1): ordres per temes amb les tecles assignades, filtrable
   config.c      ✅ configuració: phileasrc del sistema i de l'usuari, línia d'ordres, plantilla (sense ncurses)
+  history.c     ✅ historial de documents: posició del cursor i recents (sense ncurses)
+  recentview.c  ✅ diàleg de documents recents
 tests/
   test.c        ✅ proves de utf8, wrap, buffer, edició, md, estils i dirlist (sense ncurses)
 ```
@@ -1036,3 +1038,11 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 - **2026-10-29** — Provat per l'usuari a la Pi (imatge `5aa42044…`): esquema amb moviment de seccions, moure paràgrafs, enfocament amb tots els temes i tipografia: **tot correcte**.
 - **2026-10-29** — **Versió 2.1** (etiqueta `v2.1`, `PHILEAS_VERSION` 2.1.0): esquema (C7), moure paràgrafs i seccions (C8), enfocament (C12) i tipografia en escriure (C17), provats a la Pi.
 - **2026-10-29** — Release «Phileas 2.1» publicada a GitHub (Latest) amb el `.deb` i el `.tar.gz`; sha256 verificats a la pàgina de la release.
+- **2026-10-29** — C13 (sprint) i C14 (mode «endavant»): **abandonades** per decisió de l'usuari.
+- **2026-10-29** — **C2, posició del cursor, i C3, documents recents.**
+  - **Sense rastres al document** (condició de l'usuari): la posició no s'escriu al fitxer que s'edita (ni comentaris, ni YAML, ni atributs estesos), sinó a `historial`, al directori de configuració (a la BYOK, `/data/phileas/historial`). Una línia per document, `LÍNIA BYTE CAMÍ-ABSOLUT`, el més recent primer, com a molt 100 (`HISTORY_MAX`). Es desa sencer en un `.nou` i es reanomena, amb `fsync`.
+  - **Quan s'escriu:** en obrir un document (perquè passi al davant), en deixar-lo (obrir-ne un altre, `nou`, sortir) i en rebre SIGTERM/SIGHUP, després del desat d'emergència. No a cada tecla ni amb l'autodesat: poques escriptures a la SD. Només s'hi anoten els documents que existeixen al disc (el camí amb `realpath`); un fitxer nou sense desar no hi entra.
+  - **C2:** en obrir un document que hi és, el cursor hi torna (l'ancoratge de la màquina d'escriure); si no hi és, al final, com abans. Si el fitxer s'ha escurçat fora de Phileas, la posició es retalla, i mai queda al mig d'un caràcter UTF-8. `recordar-posicio = no` torna al comportament anterior (la llista de recents continua).
+  - **C3:** ordre `recents` (Alt+O, Esc → Fitxer → Recents…): pantalla completa amb el nom en negreta i el directori atenuat (amb `~`), sense el document obert ni els fitxers que ja no hi són (que també se'n van del disc). Escrivint es filtra pel camí; Enter l'obre (amb la confirmació de canvis sense desar de sempre); Supr el treu de la llista sense esborrar el fitxer; Esc buida el filtre o surt.
+  - Mòdul nou `history.c` (sense ncurses, provat) i `recentview.c`; `open_path()` a `command.c` agrupa el que feia `c_open`. Ajuda F1, `--help`, plantilla del phileasrc i README al dia.
+  - **Proves:** 1.889 comprovacions, també amb sanititzadors (touch sense duplicats, límit de 100, camins amb espais, línies mal formades o relatives, fitxers desapareguts, document sense nom o inexistent, restaurar, opció desactivada, posició dins d'un caràcter de dos bytes, fitxer escurçat, ordre de recents, `recordar-posicio` a la plantilla; el document no es modifica). Interactives en un pseudoterminal: obrir, moure's, sortir i tornar-hi (el text escrit va a la posició recordada), Alt+O amb la llista, Enter, filtre sense resultats, Supr, menú Fitxer, i SIGTERM (desa el document i l'historial, codi 143). **Pendent:** a la Pi.
