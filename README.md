@@ -231,7 +231,7 @@ phileas [-c COLUMNES] [-a SEGONS] [-d IDIOMA] [FITXER]
 | `-c N` | amplada del text en columnes (per defecte 72) |
 | `-a N` | autodesat després de N segons sense escriure; `0` el desactiva |
 | `-d ID` | activa l'ortografia amb aquest diccionari (`ca`, `es`, `en_US`…) |
-| `--config` | escriu una configuració amb tots els valors per defecte |
+| `--config` | escriu la configuració completa amb els valors actuals |
 | `-h`, `-v` | ajuda i versió (dins Phileas, Esc → Ajuda i configuració → Quant a Phileas) |
 
 Sense fitxer, Phileas comença un document nou. Per començar, n'hi ha prou
@@ -251,8 +251,6 @@ de recordar tres tecles: **Esc** (menús), **F1** (ajuda) i **Ctrl+P**
 | Ctrl+W / Alt+D | esborrar la paraula anterior / la següent |
 | Ctrl+F, Ctrl+G, Alt+G | cercar, següent, anterior |
 | Ctrl+R | substituir |
-| Ctrl+B / Alt+I | negreta / cursiva |
-| Alt+1 … Alt+6, Alt+0 | capçalera de nivell 1 a 6, treure-la |
 | Alt+B / Alt+F | paraula anterior / següent (també Ctrl+fletxes) |
 | Alt+P / Alt+N | paràgraf anterior / següent (també Ctrl+fletxes) |
 | Alt+< / Alt+> | inici / fi del document |
@@ -364,6 +362,7 @@ cadena musl de Buildroot.
 | `search.c`, `undo.c`, `autosave.c` | cerca, desfer/refer i autodesat |
 | `spell.c` | ortografia amb hunspell, carregat amb `dlopen` |
 | `filebrowser.c`, `dirlist.c` | navegador de fitxers |
+| `outline.c`, `outlineview.c` | esquema: capçaleres i paraules per secció, i el seu diàleg |
 | `config.c` | fitxers de configuració |
 | `utf8.c`, `util.c` | UTF-8 i utilitats |
 
@@ -377,6 +376,8 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **En desenvolupament** (després de la 2.0.3): esquema del document (F2 o
+  Alt+E), amb les capçaleres i les paraules de cada secció.
 - **2.0.3** (2026-10-29): «Quant a Phileas» al menú Ajuda i configuració
   (versió de Phileas i, a la BYOK, de la imatge); tema WordPerfect (gris
   sobre blau, com el WordPerfect 5.1 per a DOS); fora de la consola, el
