@@ -27,6 +27,7 @@ static attr_t pair_bold[PAIR_N];  /* A_BOLD on el color clar no existeix (8 colo
 static int    mark_colored;       /* els marcadors tenen color propi (si no, atenuats) */
 static int    role_on[UI_N];      /* la barra, la selecció o els menús tenen color */
 static const unsigned *console_rgb;  /* paleta del tema aplicada a la consola */
+static long cursor_rgb = -1;         /* color del cursor posat pel tema, o -1 */
 
 /* Estils de la línia que s'està dibuixant */
 static unsigned char *styles, *errors;
@@ -135,6 +136,24 @@ static void console_palette(const unsigned *rgb)
     }
 }
 
+/* Fora de la consola, molts terminals (GNOME Terminal) pinten el cursor
+ * amb un color fix del perfil, que pot ser el del fons d'un tema clar: el
+ * tema hi posa el seu color de text (ESC ] 12) i en sortir es torna al del
+ * terminal (ESC ] 112). La consola de Linux no ho entén ni ho necessita. */
+static void cursor_color(long rgb)
+{
+    char seq[24];
+    int n;
+
+    if (rgb >= 0)
+        n = snprintf(seq, sizeof seq, "\033]12;#%06lX\007", (unsigned long)rgb & 0xFFFFFF);
+    else
+        n = snprintf(seq, sizeof seq, "\033]112\007");
+    if (write(STDOUT_FILENO, seq, (size_t)n) < 0) {
+        /* sense color propi: el cursor del terminal */
+    }
+}
+
 /* Parella amb els colors c (primer pla) i b (fons) de la paleta; PAL_DEFAULT
  * vol dir el del text. Els colors clars, si el terminal només en té 8, són
  * el normal amb negreta (a la consola de Linux, la negreta els aclareix). */
@@ -167,6 +186,7 @@ void render_colors(Editor *e)
     const short *pal = e->palette;
     const unsigned *rgb;
     short text_fg, text_bg;
+    long cur;
     int themed;
 
     if (!have_colors)
@@ -196,6 +216,15 @@ void render_colors(Editor *e)
         console_palette(rgb);
         console_rgb = rgb;
         clearok(curscr, TRUE);
+    }
+
+    cur = -1;
+    rgb = theme_at((size_t)e->theme)->rgb;
+    if (!linux_console() && rgb && pal[PAL_TEXT] >= 0 && pal[PAL_TEXT] < 16)
+        cur = (long)rgb[pal[PAL_TEXT]];
+    if (cur != cursor_rgb) {
+        cursor_color(cur);
+        cursor_rgb = cur;
     }
 }
 
@@ -265,6 +294,8 @@ void ui_end(void)
         key_end();
         if (console_rgb)
             console_palette(NULL);
+        if (cursor_rgb >= 0)
+            cursor_color(-1);
     }
 }
 
@@ -279,6 +310,8 @@ void ui_resume(void)
     key_init();
     if (console_rgb)
         console_palette(console_rgb);
+    if (cursor_rgb >= 0)
+        cursor_color(cursor_rgb);
     ui_sync_size();
     clearok(curscr, TRUE);
     refresh();
