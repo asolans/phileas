@@ -75,7 +75,7 @@ paquet `.deb` per a x86-64 (per a la Raspberry Pi, vegeu
 [més avall](#raspberry-pi)):
 
 ```bash
-sudo apt install ./phileas_2.0.2_amd64.deb
+sudo apt install ./phileas_2.0.3_amd64.deb
 ```
 
 `apt` hi afegeix les dependències (ncurses) i, com a recomanacions, hunspell
@@ -150,8 +150,8 @@ compila des del codi font (uns quants minuts en una Pi 1).
    `git clone`. Després:
 
    ```bash
-   tar xzf phileas-2.0.2.tar.gz
-   cd phileas-2.0.2
+   tar xzf phileas-2.0.3.tar.gz
+   cd phileas-2.0.3
    make
    make test
    sudo make install
@@ -163,7 +163,7 @@ compila des del codi font (uns quants minuts en una Pi 1).
    ```bash
    sudo apt install fakeroot
    make deb
-   sudo apt install ./dist/phileas_2.0.2_armhf.deb
+   sudo apt install ./dist/phileas_2.0.3_armhf.deb
    ```
 
    El nom del paquet porta l'arquitectura de la Pi: `armhf` en 32 bits,
@@ -375,6 +375,10 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.0.3** (2026-10-29): «Quant a Phileas» al menú Ajuda i configuració
+  (versió de Phileas i, a la BYOK, de la imatge); tema WordPerfect (gris
+  sobre blau, com el WordPerfect 5.1 per a DOS); fora de la consola, el
+  cursor pren el color del tema (es veu amb els temes clar i sèpia).
 - **2.0.2** (2026-10-29): recompte de paraules a la barra d'estat; temes de
   colors (terminal, fosc, clar, sèpia, fòsfor), també a la consola de Linux;
   les opcions de Vista (tema, centrar, colors, màquina d'escriure) es desen
