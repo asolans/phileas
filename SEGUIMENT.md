@@ -1034,3 +1034,4 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - **`--` no feia el guió llarg** a l'inici d'un paràgraf seguit d'un espai («-- Hola»): mentre s'escriu, «-- » és un subratllat de capçalera per al Markdown (`MD_UNDERLINE`), on la tipografia no actuava. Ara hi actua: la regla del tercer guió ja protegeix `---`, i un subratllat `--` acaba amb Retorn, que no és un caràcter escrit. La lletra de la consola (Uni2-Terminus) té —, –, «, », … i ’.
   - Proves: 1.864 comprovacions, també amb sanititzadors (`-- Hola`, `--` i tabulador).
 - **2026-10-29** — Provat per l'usuari a la Pi (imatge `5aa42044…`): esquema amb moviment de seccions, moure paràgrafs, enfocament amb tots els temes i tipografia: **tot correcte**.
+- **2026-10-29** — **Versió 2.1** (etiqueta `v2.1`, `PHILEAS_VERSION` 2.1.0): esquema (C7), moure paràgrafs i seccions (C8), enfocament (C12) i tipografia en escriure (C17), provats a la Pi.
