@@ -697,6 +697,59 @@ size_t ed_paste(Editor *e)
 
 /* ---- Desfer/refer ---- */
 
+/* ---- Moure paràgrafs i seccions ---- */
+
+void ed_swap_lines(Editor *e, size_t a, size_t b, size_t c)
+{
+    Buffer *bf = &e->buf;
+    size_t na, nb;
+    char *ta = buf_extract(bf, (Pos){ a, 0 }, (Pos){ b - 1, bf->lines[b - 1].len }, &na);
+    char *tb = buf_extract(bf, (Pos){ b, 0 }, (Pos){ c - 1, bf->lines[c - 1].len }, &nb);
+    char *t = xmalloc(na + nb + 2);
+
+    memcpy(t, tb, nb);
+    t[nb] = '\n';
+    memcpy(t + nb + 1, ta, na);
+    buf_delete(bf, (Pos){ a, 0 }, (Pos){ c - 1, bf->lines[c - 1].len });
+    buf_insert(bf, (Pos){ a, 0 }, t, na + nb + 1);
+    free(ta);
+    free(tb);
+    free(t);
+}
+
+int ed_move_par(Editor *e, int dir)
+{
+    Pos a, z;
+    size_t s = e->cy, t = e->cy;
+    int sel = ed_selection(e, &a, &z);
+
+    if (sel) {
+        s = a.line;
+        /* Una selecció de línies senceres acaba a l'inici de la següent */
+        t = z.col == 0 && z.line > a.line ? z.line - 1 : z.line;
+    }
+    if (dir < 0 ? s == 0 : t + 1 >= e->buf.nlines)
+        return 0;
+    if (dir < 0)
+        ed_swap_lines(e, s - 1, s, t + 1);
+    else
+        ed_swap_lines(e, s, t + 1, t + 2);
+    if (dir < 0)
+        s--, t--;
+    else
+        s++, t++;
+    if (sel) {
+        /* La selecció passa a ser el bloc sencer, que es pot tornar a moure */
+        e->anchor = (Pos){ s, 0 };
+        e->cy = t;
+        e->cx = e->buf.lines[t].len;
+    } else {
+        e->cy = s;   /* la columna no canvia: la línia és la mateixa */
+    }
+    e->want_x = -1;
+    return 1;
+}
+
 void ed_begin(Editor *e, int act, wchar_t ch)
 {
     int same = act != ACT_NONE && act == e->last_act && e->sel_mode == SEL_NONE &&

@@ -31,4 +31,16 @@ void   outline_free(Outline *o);
 #define OUTLINE_NONE ((size_t)-1)
 size_t outline_at(const Outline *o, size_t line);
 
+/* Línia on acaba la secció k (exclusiva): la de la capçalera següent del
+ * mateix nivell o superior, o nlines. */
+size_t outline_end(const Outline *o, size_t k, size_t nlines);
+
+/* Per moure la secció k per sobre de l'anterior (dir < 0) o per sota de la
+ * següent del mateix nivell, dins de la mateixa secció pare: deixa a a, b,
+ * c els blocs [a, b) i [b, c) que s'han d'intercanviar, i a *head la línia
+ * on quedarà la capçalera. Retorna 0 si no n'hi ha cap (és la primera o
+ * l'última del seu nivell). */
+int    outline_move(const Outline *o, size_t k, int dir, size_t nlines,
+                    size_t *a, size_t *b, size_t *c, size_t *head);
+
 #endif

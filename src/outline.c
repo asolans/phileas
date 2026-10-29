@@ -132,3 +132,40 @@ size_t outline_at(const Outline *o, size_t line)
     }
     return lo ? lo - 1 : OUTLINE_NONE;
 }
+
+size_t outline_end(const Outline *o, size_t k, size_t nlines)
+{
+    for (size_t j = k + 1; j < o->n; j++)
+        if (o->items[j].level <= o->items[k].level)
+            return o->items[j].line;
+    return nlines;
+}
+
+int outline_move(const Outline *o, size_t k, int dir, size_t nlines,
+                 size_t *a, size_t *b, size_t *c, size_t *head)
+{
+    int level = o->items[k].level;
+    size_t j;
+
+    if (dir < 0) {
+        /* L'anterior del mateix nivell, sense sortir de la secció pare */
+        for (j = k; j > 0 && o->items[j - 1].level > level; j--)
+            ;
+        if (j == 0 || o->items[j - 1].level != level)
+            return 0;
+        *a = o->items[j - 1].line;
+        *b = o->items[k].line;
+        *c = outline_end(o, k, nlines);
+        *head = *a;
+        return 1;
+    }
+    *b = outline_end(o, k, nlines);
+    for (j = k + 1; j < o->n && o->items[j].line != *b; j++)
+        ;
+    if (j == o->n || o->items[j].level != level)
+        return 0;
+    *a = o->items[k].line;
+    *c = outline_end(o, j, nlines);
+    *head = *a + (*c - *b);
+    return 1;
+}

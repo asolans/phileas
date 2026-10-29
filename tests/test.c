@@ -510,6 +510,65 @@ static void test_words(void)
     buf_free(&b);
 }
 
+static void test_move(void)
+{
+    Editor e;
+    Outline o;
+    size_t a, b, c, head, end;
+    const char *t = "# A\na1\n## A1\nx\n## A2\ny\n# B\nb1\nb2\n# C\n\n";
+
+    ed_init(&e, 72);
+    buf_insert(&e.buf, (Pos){ 0, 0 }, "u\ndos\ntres\nquatre", 17);
+
+    /* Un paràgraf: el cursor el segueix */
+    e.cy = 1, e.cx = 2;
+    buf_undo_mark(&e.buf);
+    CHECK(ed_move_par(&e, -1) && dump_is(&e.buf, "dos\nu\ntres\nquatre") && e.cy == 0 && e.cx == 2);
+    CHECK(!ed_move_par(&e, -1));
+    CHECK(ed_undo(&e) && dump_is(&e.buf, "u\ndos\ntres\nquatre"));
+
+    /* Línies seleccionades: la selecció acaba a l'inici de la línia següent */
+    e.cy = 1, e.cx = 0;
+    ed_sel_start(&e, SEL_SHIFT);
+    e.cy = 3, e.cx = 0;
+    buf_undo_mark(&e.buf);
+    CHECK(ed_move_par(&e, 1) && dump_is(&e.buf, "u\nquatre\ndos\ntres"));
+    /* Ara la selecció és el bloc sencer, i es pot tornar a moure */
+    CHECK(e.anchor.line == 2 && e.anchor.col == 0 && e.cy == 3 && e.cx == 4 && e.sel_mode == SEL_SHIFT);
+    CHECK(ed_move_par(&e, -1) && dump_is(&e.buf, "u\ndos\ntres\nquatre") && e.anchor.line == 1 && e.cy == 2);
+    CHECK(ed_move_par(&e, 1) && !ed_move_par(&e, 1));
+    ed_sel_clear(&e);
+    ed_free(&e);
+
+    /* Seccions: només entre germanes, dins de la mateixa secció pare */
+    ed_init(&e, 72);
+    buf_insert(&e.buf, (Pos){ 0, 0 }, t, strlen(t));
+    outline_build(&e.buf, &o);
+    end = e.buf.nlines;
+    while (end > 1 && e.buf.lines[end - 1].len == 0)
+        end--;
+    CHECK(o.n == 5);
+    CHECK(outline_end(&o, 0, end) == 6 && outline_end(&o, 1, end) == 4 && outline_end(&o, 4, end) == 10);
+    CHECK(!outline_move(&o, 0, -1, end, &a, &b, &c, &head));     /* A és la primera */
+    CHECK(!outline_move(&o, 1, -1, end, &a, &b, &c, &head));     /* A1, primera dins A */
+    CHECK(!outline_move(&o, 2, 1, end, &a, &b, &c, &head));      /* A2, última dins A */
+    CHECK(!outline_move(&o, 4, 1, end, &a, &b, &c, &head));      /* C, l'última */
+    CHECK(outline_move(&o, 2, -1, end, &a, &b, &c, &head) && a == 2 && b == 4 && c == 6 && head == 2);
+    /* B amunt: passa per sobre de tota la secció A, amb les subseccions */
+    CHECK(outline_move(&o, 3, -1, end, &a, &b, &c, &head) && a == 0 && b == 6 && c == 9 && head == 0);
+    ed_swap_lines(&e, a, b, c);
+    CHECK(dump_is(&e.buf, "# B\nb1\nb2\n# A\na1\n## A1\nx\n## A2\ny\n# C\n\n"));
+    outline_free(&o);
+
+    /* A avall, per sota de C (l'última): les línies buides del final no es mouen */
+    outline_build(&e.buf, &o);
+    CHECK(outline_move(&o, 1, 1, end, &a, &b, &c, &head) && a == 3 && b == 9 && c == 10 && head == 4);
+    ed_swap_lines(&e, a, b, c);
+    CHECK(dump_is(&e.buf, "# B\nb1\nb2\n# C\n# A\na1\n## A1\nx\n## A2\ny\n\n"));
+    outline_free(&o);
+    ed_free(&e);
+}
+
 static void test_outline(void)
 {
     Buffer b;
@@ -1377,6 +1436,7 @@ int main(void)
     test_pages();
     test_words();
     test_outline();
+    test_move();
     test_config_store();
     test_edit();
     test_md();

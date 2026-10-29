@@ -140,6 +140,14 @@ void  ed_delete(Editor *e);
 void  ed_delete_word_prev(Editor *e);
 void  ed_delete_word_next(Editor *e);
 
+/* Intercanvia els blocs de línies [a, b) i [b, c) (a < b < c <= nlines),
+ * dins del mateix pas de desfer. */
+void  ed_swap_lines(Editor *e, size_t a, size_t b, size_t c);
+
+/* Mou el paràgraf del cursor (o les línies de la selecció) per sobre de
+ * l'anterior (dir < 0) o per sota del següent. Retorna 0 a l'extrem. */
+int   ed_move_par(Editor *e, int dir);
+
 /* Desfer/refer. ed_begin s'ha de cridar abans de cada acció: decideix si
  * comença un grup nou de desfer o continua l'anterior (escriure seguit,
  * esborrar seguit). ed_end recorda on ha quedat el cursor. */

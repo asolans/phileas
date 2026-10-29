@@ -34,7 +34,8 @@ static const struct {
         "seleccio-fi-document", NULL } },
     { "Edició", (const char *const[]){
         "nova-linia", "tabulador", "esborrar-enrere", "esborrar-endavant",
-        "esborrar-paraula-anterior", "esborrar-paraula-seguent", "desfer", "refer", NULL } },
+        "esborrar-paraula-anterior", "esborrar-paraula-seguent", "pujar-paragraf",
+        "baixar-paragraf", "desfer", "refer", NULL } },
     { "Cerca", (const char *const[]){
         "cercar", "cercar-seguent", "cercar-anterior", "substituir", NULL } },
     { "Ortografia", (const char *const[]){
@@ -53,7 +54,7 @@ static const char *const intro[] = {
     "Ctrl+P (paleta): executa qualsevol ordre pel nom; Tab completa el nom.",
     "Les tecles es canvien al phileasrc: tecla.NOM = ordre.",
     "Navegador (Ctrl+O): Enter obre, ← puja, escriu per filtrar.",
-    "Esquema (F2): les capçaleres i les paraules de cada secció; Enter hi va, escriu per filtrar.",
+    "Esquema (F2): capçaleres i paraules de cada secció; Enter hi va, Alt+↑/↓ mou la secció.",
     "Suggeriments (Alt+Enter): el número substitueix, a afegeix, i ignora.",
 };
 #define NINTRO (sizeof intro / sizeof intro[0])

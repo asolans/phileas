@@ -56,7 +56,10 @@ només serveix per escriure.
 - **Mode màquina d'escriure:** la línia on s'escriu es queda a una altura fixa
   de la pantalla.
 - **Esquema** (F2): les capçaleres del document, sagnades pel nivell, amb
-  les paraules de cada secció; Enter hi salta i, escrivint, es filtren.
+  les paraules de cada secció; Enter hi salta, escrivint es filtren i
+  Alt+↑/↓ mou una secció sencera, amb les subseccions.
+- **Moure paràgrafs:** Alt+↑/↓ puja o baixa el paràgraf del cursor (o les
+  línies seleccionades).
 - **Navegador de fitxers** integrat (Ctrl+O) i **recompte de paraules** i
   **estimació de pàgines** a la barra d'estat.
 - **Ordres externes:** es poden afegir a la paleta ordres del sistema
@@ -249,6 +252,7 @@ de recordar tres tecles: **Esc** (menús), **F1** (ajuda) i **Ctrl+P**
 | Ctrl+X / Ctrl+C / Ctrl+V | tallar / copiar / enganxar |
 | Ctrl+A, Ctrl+Espai, Maj+fletxes | seleccionar tot / començar la selecció / ampliar-la |
 | Ctrl+W / Alt+D | esborrar la paraula anterior / la següent |
+| Alt+↑ / Alt+↓ | pujar / baixar el paràgraf (a l'esquema, la secció) |
 | Ctrl+F, Ctrl+G, Alt+G | cercar, següent, anterior |
 | Ctrl+R | substituir |
 | Alt+B / Alt+F | paraula anterior / següent (també Ctrl+fletxes) |
@@ -377,7 +381,8 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 ## Versions
 
 - **En desenvolupament** (després de la 2.0.3): esquema del document (F2 o
-  Alt+E), amb les capçaleres i les paraules de cada secció.
+  Alt+E), amb les capçaleres i les paraules de cada secció; moure paràgrafs
+  i, des de l'esquema, seccions senceres (Alt+↑/↓).
 - **2.0.3** (2026-10-29): «Quant a Phileas» al menú Ajuda i configuració
   (versió de Phileas i, a la BYOK, de la imatge); tema WordPerfect (gris
   sobre blau, com el WordPerfect 5.1 per a DOS); fora de la consola, el

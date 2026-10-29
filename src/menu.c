@@ -41,6 +41,8 @@ static const Menu m_edit = { "Edita", (const MenuItem[]){
     { 'e', "Enganxa",              "enganxar",        NULL, NULL },
     { 's', "Selecciona-ho tot",    "seleccionar-tot", NULL, NULL },
     { 'm', "Comença una selecció", "marca",           NULL, NULL },
+    { 'p', "Puja el paràgraf",     "pujar-paragraf",  NULL, NULL },
+    { 'b', "Baixa el paràgraf",    "baixar-paragraf", NULL, NULL },
     { 0 } } };
 
 static const Menu m_find = { "Cerca", (const MenuItem[]){

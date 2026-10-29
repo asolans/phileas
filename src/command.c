@@ -61,6 +61,18 @@ static void c_delete(Editor *e)           { ed_delete(e); }
 static void c_delete_word_prev(Editor *e) { ed_delete_word_prev(e); }
 static void c_delete_word_next(Editor *e) { ed_delete_word_next(e); }
 
+static void c_par_up(Editor *e)
+{
+    if (!ed_move_par(e, -1))
+        ed_msg(e, "Ja és al principi del document");
+}
+
+static void c_par_down(Editor *e)
+{
+    if (!ed_move_par(e, 1))
+        ed_msg(e, "Ja és al final del document");
+}
+
 static void c_mark(Editor *e)
 {
     if (e->sel_mode != SEL_NONE) {
@@ -900,6 +912,8 @@ static const Command commands[] = {
     { "esborrar-endavant",         c_delete,         "Esborra el caràcter següent", ACT_DELETE },
     { "esborrar-paraula-anterior", c_delete_word_prev, "Esborra fins a l'inici de la paraula", ACT_NONE },
     { "esborrar-paraula-seguent",  c_delete_word_next, "Esborra fins a la paraula següent", ACT_NONE },
+    { "pujar-paragraf",            c_par_up,         "Puja el paràgraf (o les línies seleccionades) per sobre de l'anterior; a l'esquema, la secció", ACT_NONE },
+    { "baixar-paragraf",           c_par_down,       "Baixa el paràgraf (o les línies seleccionades) per sota del següent; a l'esquema, la secció", ACT_NONE },
     { "tallar",                    c_cut,            "Talla la selecció", ACT_NONE },
     { "copiar",                    c_copy,           "Copia la selecció", ACT_NONE },
     { "enganxar",                  c_paste,          "Enganxa el porta-retalls", ACT_NONE },
@@ -969,6 +983,7 @@ static const char *const default_bindings[][2] = {
     { "delete", "esborrar-endavant" },
     { "ctrl-w", "esborrar-paraula-anterior" }, { "ctrl-h", "esborrar-paraula-anterior" },
     { "alt-d", "esborrar-paraula-seguent" },   { "ctrl-delete", "esborrar-paraula-seguent" },
+    { "alt-up", "pujar-paragraf" },            { "alt-down", "baixar-paragraf" },
     { "ctrl-x", "tallar" },  { "ctrl-c", "copiar" },  { "ctrl-v", "enganxar" },
 
     { "alt-c", "centrar" },
