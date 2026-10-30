@@ -13,6 +13,7 @@
 
 #include <errno.h>
 #include <langinfo.h>
+#include <limits.h>
 #include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,6 +45,8 @@ static void usage(FILE *f)
 {
     fputs("Ús: phileas [-c COLUMNES] [-a SEGONS] [-d IDIOMA] [FITXER]\n"
           "     phileas --config\n"
+          "\n"
+          "Si FITXER no existeix i no té extensió, es crea amb .md (nota → nota.md).\n"
           "\n"
           "  -c N      amplada del text en columnes (per defecte 72)\n"
           "  -a N      desa sol després de N segons sense escriure (per defecte 30;\n"
@@ -138,7 +141,9 @@ int main(int argc, char **argv)
     cfg_errors = config_load(&e, CONFIG_SYSTEM, NULL, cfg_msg, sizeof cfg_msg);
 
     if (optind < argc) {
-        const char *path = argv[optind];
+        char path[PATH_MAX];
+
+        buf_new_path(argv[optind], path, sizeof path);
 
         if (ed_open(&e, path) < 0) {
             fprintf(stderr, "phileas: %s: %s\n", path, strerror(errno));

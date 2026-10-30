@@ -39,7 +39,8 @@ només serveix per escriure.
 - **Model de paràgrafs:** Retorn separa paràgrafs; al fitxer s'escriu una
   línia en blanc entre blocs. Els textos tallats a mà s'ajunten en obrir-los.
   Els fitxers que no són `.md`, `.markdown` o `.txt` s'obren en mode text pla
-  i no es modifiquen.
+  i no es modifiquen. Un fitxer nou sense extensió (en desar com, al
+  navegador o a la línia d'ordres) es crea amb `.md`: `nota` → `nota.md`.
 - **Dreceres a l'estil dels processadors de text** (Ctrl+S, Ctrl+Z, Ctrl+C,
   Ctrl+V, Ctrl+F…), amb alternatives Alt+lletra per a la consola de Linux,
   on moltes combinacions no arriben.
@@ -262,7 +263,7 @@ de recordar tres tecles: **Esc** (menús), **F1** (ajuda) i **Ctrl+P**
 | Tecla | Ordre |
 |-------|-------|
 | Ctrl+S / Alt+S | desar / desar com |
-| Ctrl+O / Ctrl+N | obrir (navegador de fitxers) / document nou |
+| Ctrl+O / Ctrl+N | obrir (navegador de fitxers; un nom nou sense extensió pren `.md`) / document nou |
 | Alt+O | documents recents (Supr en treu un de la llista) |
 | Ctrl+Q | sortir (demana confirmació si hi ha canvis) |
 | Ctrl+Z / Ctrl+Y | desfer / refer |

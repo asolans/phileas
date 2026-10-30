@@ -256,14 +256,15 @@ static void save_to(Editor *e, const char *path)
 
 static void c_save_as(Editor *e)
 {
-    char path[PATH_MAX];
+    char name[PATH_MAX], path[PATH_MAX];
     struct stat st;
 
-    snprintf(path, sizeof path, "%s", e->filename ? e->filename : "");
-    if (!prompt(e, "Desa com: ", path, sizeof path, NULL) || !path[0]) {
+    snprintf(name, sizeof name, "%s", e->filename ? e->filename : "");
+    if (!prompt(e, "Desa com: ", name, sizeof name, NULL) || !name[0]) {
         ed_msg(e, "No s'ha desat");
         return;
     }
+    buf_new_path(name, path, sizeof path);
     if ((!e->filename || strcmp(path, e->filename)) && stat(path, &st) == 0 &&
         !prompt_yesno(e, "El fitxer ja existeix. El vols sobreescriure?")) {
         ed_msg(e, "No s'ha desat");
@@ -315,8 +316,11 @@ static int looks_binary(const char *path)
 
 /* Obre path en lloc del document actual: abans en desa la posició a
  * l'historial i, en obrir-lo, hi torna el cursor si hi era. */
-static void open_path(Editor *e, const char *path)
+static void open_path(Editor *e, const char *name)
 {
+    char path[PATH_MAX];
+
+    buf_new_path(name, path, sizeof path);
     if (e->filename && !strcmp(path, e->filename)) {
         ed_msg(e, "Ja és el document obert");
         return;

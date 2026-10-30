@@ -1450,7 +1450,7 @@ static void test_focus_config(void)
 static void test_plain(void)
 {
     static const char data[] = "columnes = 72\ncentrar = no\n\n\n- llista\n    sagnat\n\n";
-    char path[512], *out;
+    char path[512], path2[520], *out;
     Buffer b;
     size_t n;
 
@@ -1458,6 +1458,15 @@ static void test_plain(void)
           buf_is_markdown_path("x.txt"));
     CHECK(!buf_is_markdown_path("phileasrc") && !buf_is_markdown_path("a.c") &&
           !buf_is_markdown_path(".md") && !buf_is_markdown_path("dir.md/fitxer"));
+
+    /* Fitxer nou sense extensió: .md; els que existeixen, tal qual */
+    snprintf(path, sizeof path, "%s/nota", tmpdir);
+    CHECK(!strcmp(buf_new_path(path, path2, sizeof path2) + strlen(tmpdir), "/nota.md"));
+    snprintf(path, sizeof path, "%s/nota.txt", tmpdir);
+    CHECK(!strcmp(buf_new_path(path, path2, sizeof path2), path));
+    snprintf(path, sizeof path, "%s/phileasrc", tmpdir);
+    CHECK(!strcmp(buf_new_path(path, path2, sizeof path2), path));
+    CHECK(!strcmp(buf_new_path(tmpdir, path2, sizeof path2), tmpdir));
 
     snprintf(path, sizeof path, "%s/phileasrc", tmpdir);
     write_file(path, data, sizeof data - 1);

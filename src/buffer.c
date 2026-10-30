@@ -522,6 +522,21 @@ int buf_is_markdown_path(const char *path)
     return 0;
 }
 
+char *buf_new_path(const char *path, char *out, size_t size)
+{
+    const char *base = strrchr(path, '/');
+    struct stat st;
+
+    base = base ? base + 1 : path;
+    snprintf(out, size, "%s", path);
+    if (!*base || strchr(base + 1, '.') || !strcmp(base, "phileasrc") ||
+        stat(path, &st) == 0 || errno != ENOENT)
+        return out;
+    if (strlen(path) + 3 < size)
+        strcat(out, ".md");
+    return out;
+}
+
 int buf_load(Buffer *b, const char *path)
 {
     Buffer nb;

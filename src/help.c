@@ -54,6 +54,7 @@ static const char *const intro[] = {
     "Ctrl+P (paleta): executa qualsevol ordre pel nom; Tab completa el nom.",
     "Les tecles es canvien al phileasrc: tecla.NOM = ordre.",
     "Navegador (Ctrl+O): Enter obre, ← puja, escriu per filtrar.",
+    "Fitxer nou sense extensió (navegador, Desa com): es crea amb .md.",
     "Recents (Alt+O): Enter obre, Supr treu de la llista; el cursor torna on era.",
     "Esquema (F2): capçaleres i paraules de cada secció; Enter hi va, Alt+↑/↓ mou la secció.",
     "Suggeriments (Alt+Enter): el número substitueix, a afegeix, i ignora.",

@@ -99,6 +99,11 @@ int  buf_gap_after(Buffer *b, size_t i);
  * .txt): els altres s'obren com a text pla. */
 int  buf_is_markdown_path(const char *path);
 
+/* Nom per a un fitxer que es crea: si path no existeix i el nom no té
+ * extensió, hi afegeix .md (si no, el copia tal qual). Retorna out. El
+ * phileasrc queda fora: és la configuració, no un document. */
+char *buf_new_path(const char *path, char *out, size_t size);
+
 /* Retornen 0 si va bé, o -1 amb errno. Si buf_load falla, b no canvia.
  * El mode (b->plain) s'ha de triar abans de carregar.
  * En carregar, cada línia en blanc entre blocs es converteix en una
