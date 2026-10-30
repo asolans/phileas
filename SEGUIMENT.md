@@ -5,7 +5,7 @@ Editor de text per a consola (Linux), orientat a escriure prosa en Markdown.
 ## Estat
 
 - **Fase actual:** 8 — Integració al projecte BYOK (F0–F7 completades). Proposta de la F9 (Pi i escriptori), pendent de confirmar
-- **Última actualització:** 2026-10-27
+- **Última actualització:** 2026-10-30
 
 ## Requeriments (versió inicial)
 
@@ -1047,3 +1047,5 @@ make clean && make debug   # amb AddressSanitizer i UBSan
   - Mòdul nou `history.c` (sense ncurses, provat) i `recentview.c`; `open_path()` a `command.c` agrupa el que feia `c_open`. Ajuda F1, `--help`, plantilla del phileasrc i README al dia.
   - **Proves:** 1.889 comprovacions, també amb sanititzadors (touch sense duplicats, límit de 100, camins amb espais, línies mal formades o relatives, fitxers desapareguts, document sense nom o inexistent, restaurar, opció desactivada, posició dins d'un caràcter de dos bytes, fitxer escurçat, ordre de recents, `recordar-posicio` a la plantilla; el document no es modifica). Interactives en un pseudoterminal: obrir, moure's, sortir i tornar-hi (el text escrit va a la posició recordada), Alt+O amb la llista, Enter, filtre sense resultats, Supr, menú Fitxer, i SIGTERM (desa el document i l'historial, codi 143).
 - **2026-10-29** — C2 i C3 provats per l'usuari a la Pi (imatge amb squashfs `a090f506…`): **tot correcte**.
+- **2026-10-30** — Porta-retalls del sistema (D3, `694e42b`), fitxer nou sense extensió amb `.md` (`74bab18`) i notes al peu (C19, `91fc0bb`).
+- **2026-10-30** — **Versió 2.1.1** (etiqueta `v2.1.1`, `PHILEAS_VERSION` 2.1.1): C2, C3, D3, `.md` per defecte i C19. C19, D3 i el `.md` encara no provats a la Pi.

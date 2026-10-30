@@ -102,7 +102,7 @@ paquet `.deb` per a x86-64 (per a la Raspberry Pi, vegeu
 [més avall](#raspberry-pi)):
 
 ```bash
-sudo apt install ./phileas_2.1.0_amd64.deb
+sudo apt install ./phileas_2.1.1_amd64.deb
 ```
 
 `apt` hi afegeix les dependències (ncurses) i, com a recomanacions, hunspell,
@@ -178,8 +178,8 @@ compila des del codi font (uns quants minuts en una Pi 1).
    `git clone`. Després:
 
    ```bash
-   tar xzf phileas-2.1.0.tar.gz
-   cd phileas-2.1.0
+   tar xzf phileas-2.1.1.tar.gz
+   cd phileas-2.1.1
    make
    make test
    sudo make install
@@ -191,7 +191,7 @@ compila des del codi font (uns quants minuts en una Pi 1).
    ```bash
    sudo apt install fakeroot
    make deb
-   sudo apt install ./dist/phileas_2.1.0_armhf.deb
+   sudo apt install ./dist/phileas_2.1.1_armhf.deb
    ```
 
    El nom del paquet porta l'arquitectura de la Pi: `armhf` en 32 bits,
@@ -419,6 +419,11 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.1.1** (2026-10-30): notes al peu (F5 nova, F6 va i torna,
+  `renumerar-notes`); documents recents (Alt+O) i posició del cursor per
+  document, a l'`historial` del directori de configuració; porta-retalls
+  compartit amb les altres aplicacions de l'escriptori; un fitxer nou sense
+  extensió es crea amb `.md`.
 - **2.1** (2026-10-29): esquema del document (F2 o Alt+E), amb les
   capçaleres i les paraules de cada secció; moure paràgrafs i, des de
   l'esquema, seccions senceres (Alt+↑/↓); enfocament de paràgraf o de frase
