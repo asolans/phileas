@@ -571,6 +571,33 @@ int buf_load(Buffer *b, const char *path)
 
 /* Desa en un fitxer temporal del mateix directori i el reanomena: si alguna
  * cosa falla a mig camí, el fitxer original queda intacte. */
+char *buf_export(Buffer *b, Pos a, Pos z, size_t *n)
+{
+    size_t len = 0, k = 0;
+    char *out;
+
+    for (size_t i = a.line; i <= z.line; i++) {
+        size_t from = i == a.line ? a.col : 0;
+        size_t to = i == z.line ? z.col : b->lines[i].len;
+        len += to - from + 2 * (i < z.line);
+    }
+    out = xmalloc(len + 1);
+    for (size_t i = a.line; i <= z.line; i++) {
+        size_t from = i == a.line ? a.col : 0;
+        size_t to = i == z.line ? z.col : b->lines[i].len;
+        memcpy(out + k, b->lines[i].text + from, to - from);
+        k += to - from;
+        if (i < z.line) {
+            out[k++] = '\n';
+            if (buf_gap_after(b, i))
+                out[k++] = '\n';
+        }
+    }
+    out[k] = '\0';
+    *n = k;
+    return out;
+}
+
 int buf_save(Buffer *b, const char *path)
 {
     char *real = realpath(path, NULL);  /* segueix els enllaços simbòlics */

@@ -883,6 +883,8 @@ static void test_blocks(void)
 {
     int k[16];
     Buffer b;
+    char *s;
+    size_t n;
 
     CHECK(kinds("text\n# Cap\n- l\n> c\n| t |\n<p>\n    codi\n===\n", k, 16) == 9);
     CHECK(k[0] == MD_TEXT && k[1] == MD_HEADING && k[2] == MD_LIST && k[3] == MD_QUOTE);
@@ -920,6 +922,15 @@ static void test_blocks(void)
     buf_insert(&b, (Pos){ 0, 0 }, "- ", 2);
     buf_insert(&b, (Pos){ 1, 0 }, "- ", 2);
     CHECK(!buf_gap_after(&b, 0));                 /* ara són una llista */
+    /* Per al porta-retalls del sistema: amb les separacions del fitxer */
+    buf_insert(&b, (Pos){ 1, 5 }, "\nfi", 3);
+    s = buf_export(&b, (Pos){ 0, 0 }, (Pos){ 2, 2 }, &n);
+    CHECK(strcmp(s, "- u\n- dos\n\nfi") == 0 && n == 13);
+    free(s);
+    s = buf_export(&b, (Pos){ 1, 2 }, (Pos){ 1, 5 }, &n);
+    CHECK(strcmp(s, "dos") == 0 && n == 3);
+    free(s);
+    buf_delete(&b, (Pos){ 1, 5 }, (Pos){ 2, 2 });
     buf_insert(&b, (Pos){ 0, 0 }, "```\n", 4);   /* obre un bloc de codi */
     CHECK(MD_BASE(b.lines[1].kind) == MD_CODE || (buf_scan(&b), MD_BASE(b.lines[1].kind) == MD_CODE));
     CHECK(!buf_gap_after(&b, 0) && !buf_gap_after(&b, 1));

@@ -1,3 +1,4 @@
+#include "clipboard.h"
 #include "command.h"
 #include "complete.h"
 #include "config.h"
@@ -96,30 +97,66 @@ static void c_cancel(Editor *e)
     ed_sel_clear(e);
 }
 
+/* Darrer text que Phileas ha posat al porta-retalls del sistema */
+static char  *exported;
+static size_t exported_len;
+
+/* El text seleccionat va també al porta-retalls del sistema, si n'hi ha, en
+ * el format del fitxer. S'ha de cridar abans de copiar o tallar. */
+static int export_selection(Editor *e)
+{
+    Pos a, z;
+
+    if (!sysclip_tool() || !ed_selection(e, &a, &z))
+        return 0;
+    free(exported);
+    exported = buf_export(&e->buf, a, z, &exported_len);
+    return sysclip_set(exported, exported_len);
+}
+
+static void copied(Editor *e, const char *what, int sys, size_t n)
+{
+    if (!n)
+        ed_msg(e, "No hi ha res seleccionat");
+    else if (sys < 0)
+        ed_msg(e, "%s (%zu caràcters), però no al porta-retalls del sistema (%s)", what, n,
+               sysclip_tool());
+    else
+        ed_msg(e, "%s (%zu caràcters)", what, n);
+}
+
 static void c_copy(Editor *e)
 {
-    size_t n = ed_copy(e);
+    int sys = export_selection(e);
 
-    if (n)
-        ed_msg(e, "Copiat (%zu caràcters)", n);
-    else
-        ed_msg(e, "No hi ha res seleccionat");
+    copied(e, "Copiat", sys, ed_copy(e));
 }
 
 static void c_cut(Editor *e)
 {
-    size_t n = ed_cut(e);
+    int sys = export_selection(e);
 
-    if (n)
-        ed_msg(e, "Tallat (%zu caràcters)", n);
-    else
-        ed_msg(e, "No hi ha res seleccionat");
+    copied(e, "Tallat", sys, ed_cut(e));
 }
 
 static void c_paste(Editor *e)
 {
-    if (!ed_paste(e))
+    size_t n, i, j;
+    char *s = sysclip_get(&n), *conv;
+
+    if (s && !(n == exported_len && memcmp(s, exported, n) == 0)) {
+        for (i = j = 0; i < n; i++) {
+            if (s[i] == '\r' && i + 1 < n && s[i + 1] == '\n')
+                continue;
+            s[j++] = s[i] == '\r' ? '\n' : s[i];
+        }
+        conv = buf_paste_text(&e->buf, e->cy, s, j, &n);
+        ed_insert(e, conv, n);
+        free(conv);
+    } else if (!ed_paste(e)) {
         ed_msg(e, "El porta-retalls és buit");
+    }
+    free(s);
 }
 
 /* Les opcions de vista (centrar, colors, màquina d'escriure i tema) es
@@ -959,7 +996,7 @@ static const Command commands[] = {
     { "baixar-paragraf",           c_par_down,       "Baixa el paràgraf (o les línies seleccionades) per sota del següent; a l'esquema, la secció", ACT_NONE },
     { "tallar",                    c_cut,            "Talla la selecció", ACT_NONE },
     { "copiar",                    c_copy,           "Copia la selecció", ACT_NONE },
-    { "enganxar",                  c_paste,          "Enganxa el porta-retalls", ACT_NONE },
+    { "enganxar",                  c_paste,          "Enganxa el porta-retalls (el del sistema, si n'hi ha)", ACT_NONE },
 
     { "centrar",           c_center,     "Centra o no la columna de text", ACT_NONE },
     { "maquina-escriure",  c_typewriter, "Desplaçament: salt, línia fixa o clàssic", ACT_NONE },

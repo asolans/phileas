@@ -32,7 +32,7 @@ Architecture: $ARQ
 Maintainer: Àngel Solans <asolans@xtec.cat>
 Installed-Size: $MIDA
 Depends: libc6 (>= 2.34), libncursesw6 (>= 6), libtinfo6 (>= 6)
-Recommends: libhunspell-1.7-0, hunspell-ca, hunspell-es
+Recommends: libhunspell-1.7-0, hunspell-ca, hunspell-es, wl-clipboard | xclip | xsel
 Section: editors
 Priority: optional
 Homepage: https://github.com/asolans/phileas

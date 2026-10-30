@@ -43,6 +43,11 @@ només serveix per escriure.
 - **Dreceres a l'estil dels processadors de text** (Ctrl+S, Ctrl+Z, Ctrl+C,
   Ctrl+V, Ctrl+F…), amb alternatives Alt+lletra per a la consola de Linux,
   on moltes combinacions no arriben.
+- **Porta-retalls compartit** a l'escriptori: Ctrl+C i Ctrl+X hi envien el
+  text (amb la línia en blanc entre paràgrafs, com al fitxer) i Ctrl+V porta
+  el que s'hi hagi copiat en una altra aplicació. Fa servir `wl-copy` i
+  `wl-paste` (Wayland), `xclip` o `xsel` (X11); sense cap d'aquestes eines, o
+  a la consola, Phileas fa servir el seu porta-retalls intern.
 - **Menús** a l'estil de WordGrinder (Esc) i **paleta d'ordres** amb
   autocompleció (Ctrl+P): tota ordre té un nom i s'hi pot arribar encara que
   no tingui tecla.
@@ -93,8 +98,9 @@ paquet `.deb` per a x86-64 (per a la Raspberry Pi, vegeu
 sudo apt install ./phileas_2.1.0_amd64.deb
 ```
 
-`apt` hi afegeix les dependències (ncurses) i, com a recomanacions, hunspell
-i els diccionaris de català i castellà. El paquet també instal·la un
+`apt` hi afegeix les dependències (ncurses) i, com a recomanacions, hunspell,
+els diccionaris de català i castellà i `wl-clipboard` (per compartir el
+porta-retalls amb les altres aplicacions). El paquet també instal·la un
 llançador per a l'escriptori (GNOME, KDE...): Phileas apareix entre les
 aplicacions i s'obre en un terminal; també es pot triar a «Obre amb» per als
 fitxers `.md` i `.txt`.
@@ -260,7 +266,7 @@ de recordar tres tecles: **Esc** (menús), **F1** (ajuda) i **Ctrl+P**
 | Alt+O | documents recents (Supr en treu un de la llista) |
 | Ctrl+Q | sortir (demana confirmació si hi ha canvis) |
 | Ctrl+Z / Ctrl+Y | desfer / refer |
-| Ctrl+X / Ctrl+C / Ctrl+V | tallar / copiar / enganxar |
+| Ctrl+X / Ctrl+C / Ctrl+V | tallar / copiar / enganxar (a l'escriptori, amb el porta-retalls del sistema) |
 | Ctrl+A, Ctrl+Espai, Maj+fletxes | seleccionar tot / començar la selecció / ampliar-la |
 | Ctrl+W / Alt+D | esborrar la paraula anterior / la següent |
 | Alt+↑ / Alt+↓ | pujar / baixar el paràgraf (a l'esquema, la secció) |
@@ -380,6 +386,7 @@ cadena musl de Buildroot.
 | `main.c` | arrencada, arguments i bucle principal |
 | `buffer.c` | vector de línies (una línia = un paràgraf), càrrega i desat atòmic |
 | `editor.c` | cursor, moviment, edició, selecció i porta-retalls |
+| `clipboard.c` | porta-retalls del sistema amb `wl-copy`/`wl-paste`, `xclip` o `xsel` |
 | `wrap.c` | ajust de línia suau amb sagnat penjant |
 | `md.c` | tipus de bloc Markdown i estils |
 | `render.c` | dibuix amb ncursesw, barra d'estat i diàlegs |

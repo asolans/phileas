@@ -74,6 +74,9 @@ int  buf_redo(Buffer *b, Pos *cursor);
 
 /* Còpia del text entre a i z, amb '\n' entre línies (cal alliberar-la). */
 char *buf_extract(const Buffer *b, Pos a, Pos z, size_t *n);
+/* Com buf_extract, però tal com es desaria al fitxer: amb la línia en
+ * blanc entre blocs separats. És el text que reben les altres aplicacions. */
+char *buf_export(Buffer *b, Pos a, Pos z, size_t *n);
 
 /* Adapta un text enganxat des de fora per inserir-lo a la línia line: com en
  * carregar un fitxer, cada línia en blanc entre blocs és una separació de
