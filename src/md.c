@@ -318,6 +318,47 @@ static int link_end(const char *s, size_t b, size_t from, size_t *text_end, size
     return 1;
 }
 
+size_t md_footnote(const char *s, size_t len, size_t i)
+{
+    size_t j = i + 2;
+
+    if (i + 3 >= len || s[i] != '[' || s[i + 1] != '^')
+        return 0;
+    while (j < len && s[j] != ']' && s[j] != '[' && !is_blank(s[j]))
+        j++;
+    return j < len && s[j] == ']' && j > i + 2 ? j + 1 : 0;
+}
+
+size_t md_footnote_def(const char *s, size_t len)
+{
+    size_t i = 0, e;
+
+    while (i < len && i < 3 && s[i] == ' ')
+        i++;
+    e = md_footnote(s, len, i);
+    return e && e < len && s[e] == ':' ? i : NONE;
+}
+
+size_t md_next_footnote(const char *s, size_t len, size_t from)
+{
+    for (size_t j = from; j < len;) {
+        size_t r, k;
+
+        if (s[j] == '\\') {
+            j += 2;
+        } else if (s[j] == '`') {
+            r = run(s, len, j);
+            k = code_close(s, len, j + r, r);
+            j = k == NONE ? j + r : k + r;
+        } else if (md_footnote(s, len, j)) {
+            return j;
+        } else {
+            j++;
+        }
+    }
+    return NONE;
+}
+
 /* Adreça automàtica <http://...>: retorna la posició de '>' o NONE. */
 static size_t autolink_end(const char *s, size_t b, size_t i)
 {
@@ -378,6 +419,12 @@ static void inline_style(const char *s, size_t a, size_t b, unsigned char st,
                 n = k + n - i;
             }
             i += n;
+        } else if (c == '[' && (k = md_footnote(s, b, i))) {
+            /* Crida de nota [^1]: l'etiqueta com un enllaç */
+            fill(out, i, i + 2, st | MS_MARK);
+            fill(out, i + 2, k - 1, st | MS_LINK);
+            out[k - 1] = st | MS_MARK;
+            i = k;
         } else if ((c == '[' || (c == '!' && i + 1 < b && s[i + 1] == '[')) &&
                    link_end(s, b, i + (c == '!') + 1, &te, &ue)) {
             fill(out, i, i + (c == '!') + 1, st | MS_MARK);

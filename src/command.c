@@ -3,6 +3,7 @@
 #include "complete.h"
 #include "config.h"
 #include "filebrowser.h"
+#include "footnote.h"
 #include "help.h"
 #include "history.h"
 #include "keys.h"
@@ -237,6 +238,98 @@ static void c_outline(Editor *e)
     e->top_line = line;
     e->top_row = 0;
     e->recenter = 1;
+}
+
+/* Porta el cursor a p i el posa a l'ancoratge de la pantalla */
+static void jump_to(Editor *e, Pos p)
+{
+    ed_sel_clear(e);
+    e->cy = p.line;
+    e->cx = p.col;
+    e->want_x = -1;
+    e->recenter = 1;
+}
+
+static int notes_allowed(Editor *e)
+{
+    if (e->buf.plain) {
+        ed_msg(e, "Les notes al peu són de Markdown: aquest document és text pla");
+        return 0;
+    }
+    buf_scan(&e->buf);
+    return 1;
+}
+
+static void c_footnote(Editor *e)
+{
+    size_t def;
+    unsigned long n;
+
+    if (!notes_allowed(e))
+        return;
+    if (!fn_line_ok(&e->buf, e->cy)) {
+        ed_msg(e, "Aquí no hi pot anar una nota (codi, metadades o HTML)");
+        return;
+    }
+    if (fn_in_def(&e->buf, e->cy, &def)) {
+        ed_msg(e, "Dins d'una nota no se'n pot posar una altra");
+        return;
+    }
+    ed_sel_clear(e);
+    n = fn_next_number(&e->buf);
+    jump_to(e, fn_insert(&e->buf, (Pos){ e->cy, e->cx }, n));
+    ed_msg(e, "Nota %lu: escriu-la aquí; F6 torna al text", n);
+}
+
+static void c_goto_note(Editor *e)
+{
+    Pos p;
+    size_t a, z, def;
+    const char *s = e->buf.lines[e->cy].text;
+
+    if (!notes_allowed(e))
+        return;
+    if (fn_ref_near(&e->buf, (Pos){ e->cy, e->cx }, &a, &z)) {
+        if (!fn_find_def(&e->buf, s + a + 2, z - a - 3, &def)) {
+            ed_msg(e, "La nota %.*s no té definició", (int)(z - a), s + a);
+            return;
+        }
+        jump_to(e, (Pos){ def, e->buf.lines[def].len });
+        ed_msg(e, "F6 torna a la crida");
+    } else if (fn_in_def(&e->buf, e->cy, &def)) {
+        const Line *l = &e->buf.lines[def];
+
+        a = md_footnote_def(l->text, l->len);
+        z = md_footnote(l->text, l->len, a);
+        if (!fn_find_ref(&e->buf, l->text + a + 2, z - a - 3, &p)) {
+            ed_msg(e, "Cap crida del text porta a la nota %.*s", (int)(z - a), l->text + a);
+            return;
+        }
+        jump_to(e, p);
+    } else {
+        ed_msg(e, "No hi ha cap nota en aquesta línia");
+    }
+}
+
+static void c_renumber_notes(Editor *e)
+{
+    size_t n;
+    Line *l;
+
+    if (!notes_allowed(e))
+        return;
+    if (!fn_renumber(&e->buf, &n)) {
+        ed_msg(e, n ? "Les notes ja estan numerades en ordre (%zu)" : "El document no té notes", n);
+        return;
+    }
+    /* El nombre de línies no canvia; el cursor es queda a la seva línia */
+    l = &e->buf.lines[e->cy];
+    if (e->cx > l->len)
+        e->cx = l->len;
+    while (e->cx > 0 && ((unsigned char)l->text[e->cx] & 0xC0) == 0x80)
+        e->cx--;
+    ed_sel_clear(e);
+    ed_msg(e, "Notes renumerades: %zu", n);
 }
 
 static void save_to(Editor *e, const char *path)
@@ -998,6 +1091,9 @@ static const Command commands[] = {
     { "esborrar-paraula-seguent",  c_delete_word_next, "Esborra fins a la paraula següent", ACT_NONE },
     { "pujar-paragraf",            c_par_up,         "Puja el paràgraf (o les línies seleccionades) per sobre de l'anterior; a l'esquema, la secció", ACT_NONE },
     { "baixar-paragraf",           c_par_down,       "Baixa el paràgraf (o les línies seleccionades) per sota del següent; a l'esquema, la secció", ACT_NONE },
+    { "nota-peu",                  c_footnote,       "Insereix una nota al peu [^n] i la seva definició al final, on queda el cursor", ACT_NONE },
+    { "anar-a-nota",               c_goto_note,      "De la crida [^n] a la nota, o de la nota a la crida", ACT_NONE },
+    { "renumerar-notes",           c_renumber_notes, "Numera les notes 1, 2, 3… en l'ordre del text i n'ordena les definicions", ACT_NONE },
     { "tallar",                    c_cut,            "Talla la selecció", ACT_NONE },
     { "copiar",                    c_copy,           "Copia la selecció", ACT_NONE },
     { "enganxar",                  c_paste,          "Enganxa el porta-retalls (el del sistema, si n'hi ha)", ACT_NONE },
@@ -1071,6 +1167,7 @@ static const char *const default_bindings[][2] = {
     { "ctrl-w", "esborrar-paraula-anterior" }, { "ctrl-h", "esborrar-paraula-anterior" },
     { "alt-d", "esborrar-paraula-seguent" },   { "ctrl-delete", "esborrar-paraula-seguent" },
     { "alt-up", "pujar-paragraf" },            { "alt-down", "baixar-paragraf" },
+    { "f5", "nota-peu" },                      { "f6", "anar-a-nota" },
     { "ctrl-x", "tallar" },  { "ctrl-c", "copiar" },  { "ctrl-v", "enganxar" },
 
     { "alt-c", "centrar" },           { "f4", "enfocament" },

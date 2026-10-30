@@ -59,6 +59,20 @@ int md_tight(int k1, int k2);
  * blanc és la continuació del mateix paràgraf (text tallat a mà). */
 int md_joinable(int k1, int k2);
 
+/* ---- Notes al peu (sintaxi de pandoc) ----
+ * Crida [^etiqueta] (sense espais ni claudàtors dins l'etiqueta) i
+ * definició "[^etiqueta]: text" al principi d'un paràgraf. */
+
+/* Si a s[i] comença una crida, la posició just després de ']'; si no, 0. */
+size_t md_footnote(const char *s, size_t len, size_t i);
+
+/* Si la línia és una definició, la posició del seu '['; si no, (size_t)-1. */
+size_t md_footnote_def(const char *s, size_t len);
+
+/* Primera crida a partir de from (el '['), saltant els fragments de codi i
+ * els escapaments; (size_t)-1 si no n'hi ha. */
+size_t md_next_footnote(const char *s, size_t len, size_t from);
+
 /* ---- Estils per als colors ----
  * Cada byte d'una línia rep una combinació d'aquests bits, que render.c
  * converteix en atributs del terminal. */

@@ -72,6 +72,12 @@ només serveix per escriure.
   els caràcters Unicode, que són Markdown normal.
 - **Moure paràgrafs:** Alt+↑/↓ puja o baixa el paràgraf del cursor (o les
   línies seleccionades).
+- **Notes al peu** amb la sintaxi de pandoc: F5 posa la crida `[^1]` al
+  cursor (amb el número següent) i la definició `[^1]: ` al final del
+  document, on es queda el cursor per escriure-la; F6 va de la crida a la
+  nota i de la nota a la crida. L'ordre `renumerar-notes` torna a numerar-les
+  1, 2, 3… en l'ordre del text i n'ordena les definicions (les etiquetes amb
+  nom, com `[^font]`, es queden). Les del codi no compten.
 - **Navegador de fitxers** integrat (Ctrl+O) i **recompte de paraules** i
   **estimació de pàgines** a la barra d'estat.
 - **Documents recents** (Alt+O, o Esc → Fitxer → Recents) i **posició del
@@ -282,6 +288,7 @@ de recordar tres tecles: **Esc** (menús), **F1** (ajuda) i **Ctrl+P**
 | Alt+C | centrar la columna |
 | F4 | enfocament: paràgraf, frase o cap |
 | F2 / Alt+E | esquema del document |
+| F5 / F6 | nota al peu nova / anar de la crida a la nota i tornar |
 | Ctrl+L | redibuixar la pantalla |
 
 Les alternatives amb Alt existeixen perquè a la consola de Linux (sense
@@ -397,6 +404,7 @@ cadena musl de Buildroot.
 | `spell.c` | ortografia amb hunspell, carregat amb `dlopen` |
 | `filebrowser.c`, `dirlist.c` | navegador de fitxers |
 | `outline.c`, `outlineview.c` | esquema: capçaleres i paraules per secció, i el seu diàleg |
+| `footnote.c` | notes al peu: inserir, anar i tornar, renumerar |
 | `history.c`, `recentview.c` | historial: posició del cursor per document i documents recents |
 | `config.c` | fitxers de configuració |
 | `utf8.c`, `util.c` | UTF-8 i utilitats |

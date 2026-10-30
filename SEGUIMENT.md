@@ -526,7 +526,7 @@ Llista oberta: l'usuari hi afegeix, en treu i n'ordena la prioritat.
 | C16 | Ecos i paraules crossa | Tots dos | Ordre `repeticions`: repeticions en un radi de N paraules dins el paràgraf i llista configurable («molt», «doncs», «muy», adverbis -ment/-mente). A demanda. |
 | C17 | Tipografia de diàleg | Tots dos | ✅ Fet (2026-10-29): `tipografia`, Edita; `apostrof-tipografic`. Per idioma: `--` → «—», `<<`/`>>` → «», `...` → «…», apòstrof tipogràfic opcional; fora del codi Markdown. |
 | C18 | Calaix | Tots dos | Envia la selecció a `calaix.md` (retalls, idees descartades) i el mostra en un diàleg. |
-| C19 | Notes al peu | Tots dos | Insereix `[^n]` amb el número següent i la nota al final; una tecla va i torna de la crida a la nota; `renumera-notes`. Sintaxi de pandoc. |
+| C19 | Notes al peu | Tots dos | ✅ Fet (2026-10-30): `nota-peu` (F5) insereix `[^n]` amb el número següent i la definició al final, on queda el cursor; `anar-a-nota` (F6) va i torna; `renumerar-notes` numera en l'ordre de les crides i ordena les definicions als llocs on eren (les etiquetes amb nom es queden). Menú Edita. Sintaxi de pandoc; les del codi no compten. `src/footnote.c`. |
 | C20 | Citacions | Tots dos | Llegeix un `.bib` o CSL-JSON (YAML o phileasrc); `cita` obre una llista filtrable i insereix `[@clau, p. 23]` amb la compleció de la paleta. La bibliografia la fa `pandoc --citeproc` a l'ordinador. |
 | C21 | Capçalera YAML | Tots dos | `lang: ca`/`es` fixa l'idioma del corrector per document; `title`/`author` a la barra; plantilles (article, capítol, ressenya, acta). |
 | C22 | Límits per secció | Tots dos | `<!-- max: 250 -->` sota una capçalera: «Resum 212/250» a la barra i avís en passar-se. Reaprofita C7. |

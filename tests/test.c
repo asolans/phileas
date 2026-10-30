@@ -5,6 +5,7 @@
 #include "config.h"
 #include "dirlist.h"
 #include "editor.h"
+#include "footnote.h"
 #include "history.h"
 #include "md.h"
 #include "outline.h"
@@ -464,6 +465,8 @@ static void test_style(void)
     STYLE("[t](u)", "mlmmmm");
     STYLE("![i](u)", "mmlmmmm");
     STYLE("[t] sol", ".......");
+    STYLE("a[^1] b", ".mmlm..");
+    STYLE("`[^1]`", "mccccm");
     STYLE("a <http://b>", "..mllllllllm");
     STYLE("<b>", "mmm");                   /* HTML */
     STYLE("- *a*", "m.mim");
@@ -1447,6 +1450,77 @@ static void test_focus_config(void)
     ed_free(&e);
 }
 
+static char *whole(Buffer *b)
+{
+    size_t n;
+
+    return buf_extract(b, (Pos){ 0, 0 }, (Pos){ b->nlines - 1, b->lines[b->nlines - 1].len }, &n);
+}
+
+static void test_footnotes(void)
+{
+    static const char doc[] =
+        "Text u[^2] i `[^9]` codi.\n```\n[^7]\n```\nDos[^nom] i tres[^1].\n"
+        "[^1]: Primera.\n[^nom]: Amb nom.\n    Continua.\n[^2]: Segona.";
+    static const char renum[] =
+        "Text u[^1] i `[^9]` codi.\n```\n[^7]\n```\nDos[^nom] i tres[^2].\n"
+        "[^1]: Segona.\n[^nom]: Amb nom.\n    Continua.\n[^2]: Primera.";
+    Buffer b;
+    Pos p;
+    size_t a, z, line, n;
+    char *t;
+
+    CHECK(md_footnote("[^1]", 4, 0) == 4 && !md_footnote("[^]", 3, 0) && !md_footnote("[^a b]", 6, 0));
+    CHECK(md_footnote_def("[^x]: t", 7) == 0 && md_footnote_def("a [^x]: t", 9) == (size_t)-1);
+
+    buf_init(&b);
+    buf_insert(&b, (Pos){ 0, 0 }, doc, sizeof doc - 1);
+    buf_scan(&b);
+    CHECK(b.nlines == 9);
+    /* Les del codi no compten */
+    CHECK(fn_next_number(&b) == 3);
+    CHECK(fn_ref_near(&b, (Pos){ 0, 10 }, &a, &z) && a == 6 && z == 10);
+    CHECK(fn_ref_near(&b, (Pos){ 0, 0 }, &a, &z) && a == 6);
+    CHECK(!fn_ref_near(&b, (Pos){ 2, 0 }, &a, &z));
+    CHECK(fn_find_def(&b, "2", 1, &line) && line == 8);
+    CHECK(fn_find_def(&b, "nom", 3, &line) && line == 6);
+    CHECK(!fn_find_def(&b, "7", 1, &line));
+    CHECK(fn_in_def(&b, 7, &line) && line == 6 && fn_in_def(&b, 5, &line) && line == 5);
+    CHECK(!fn_in_def(&b, 4, &line));
+    CHECK(fn_find_ref(&b, "1", 1, &p) && p.line == 4 && p.col == 20);
+
+    /* Renumerar: en l'ordre de les crides, i les definicions també */
+    buf_undo_mark(&b);
+    CHECK(fn_renumber(&b, &n) && n == 3);
+    t = whole(&b);
+    CHECK(!strcmp(t, renum));
+    free(t);
+    buf_undo_mark(&b);
+    CHECK(!fn_renumber(&b, &n) && n == 3);
+    /* Un sol pas de desfer */
+    CHECK(buf_undo(&b, &p));
+    t = whole(&b);
+    CHECK(!strcmp(t, doc));
+    free(t);
+    buf_free(&b);
+
+    /* Inserir: la crida al cursor i la definició al final */
+    buf_init(&b);
+    buf_insert(&b, (Pos){ 0, 0 }, "Hola món", 9);
+    p = fn_insert(&b, (Pos){ 0, 4 }, 1);
+    t = whole(&b);
+    CHECK(!strcmp(t, "Hola[^1] món\n[^1]: ") && p.line == 1 && p.col == 6);
+    free(t);
+    buf_free(&b);
+    buf_init(&b);
+    buf_insert(&b, (Pos){ 0, 0 }, "a\n", 2);
+    p = fn_insert(&b, (Pos){ 0, 1 }, 4);
+    t = whole(&b);
+    CHECK(!strcmp(t, "a[^4]\n[^4]: ") && p.line == 1 && p.col == 6);
+    free(t);
+    buf_free(&b);
+}
+
 static void test_plain(void)
 {
     static const char data[] = "columnes = 72\ncentrar = no\n\n\n- llista\n    sagnat\n\n";
@@ -1742,6 +1816,7 @@ int main(void)
     test_pages();
     test_words();
     test_outline();
+    test_footnotes();
     test_move();
     test_focus_typo();
     test_focus_config();

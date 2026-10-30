@@ -45,6 +45,9 @@ static const Menu m_edit = { "Edita", (const MenuItem[]){
     { 'p', "Puja el paràgraf",     "pujar-paragraf",  NULL, NULL },
     { 'b', "Baixa el paràgraf",    "baixar-paragraf", NULL, NULL },
     { 'i', "Tipografia automàtica", "tipografia",     NULL, NULL },
+    { 'n', "Nota al peu",          "nota-peu",        NULL, NULL },
+    { 'v', "Ves a la nota o torna", "anar-a-nota",    NULL, NULL },
+    { 'u', "Renumera les notes",   "renumerar-notes", NULL, NULL },
     { 0 } } };
 
 static const Menu m_find = { "Cerca", (const MenuItem[]){

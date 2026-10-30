@@ -35,7 +35,8 @@ static const struct {
     { "Edició", (const char *const[]){
         "nova-linia", "tabulador", "esborrar-enrere", "esborrar-endavant",
         "esborrar-paraula-anterior", "esborrar-paraula-seguent", "pujar-paragraf",
-        "baixar-paragraf", "tipografia", "desfer", "refer", NULL } },
+        "baixar-paragraf", "tipografia", "nota-peu", "anar-a-nota", "renumerar-notes",
+        "desfer", "refer", NULL } },
     { "Cerca", (const char *const[]){
         "cercar", "cercar-seguent", "cercar-anterior", "substituir", NULL } },
     { "Ortografia", (const char *const[]){
@@ -55,6 +56,7 @@ static const char *const intro[] = {
     "Les tecles es canvien al phileasrc: tecla.NOM = ordre.",
     "Navegador (Ctrl+O): Enter obre, ← puja, escriu per filtrar.",
     "Fitxer nou sense extensió (navegador, Desa com): es crea amb .md.",
+    "Notes al peu (F5): [^1] al text i «[^1]: text» al final; F6 va i torna.",
     "Recents (Alt+O): Enter obre, Supr treu de la llista; el cursor torna on era.",
     "Esquema (F2): capçaleres i paraules de cada secció; Enter hi va, Alt+↑/↓ mou la secció.",
     "Suggeriments (Alt+Enter): el número substitueix, a afegeix, i ignora.",
