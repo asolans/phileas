@@ -1049,3 +1049,4 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 - **2026-10-29** — C2 i C3 provats per l'usuari a la Pi (imatge amb squashfs `a090f506…`): **tot correcte**.
 - **2026-10-30** — Porta-retalls del sistema (D3, `694e42b`), fitxer nou sense extensió amb `.md` (`74bab18`) i notes al peu (C19, `91fc0bb`).
 - **2026-10-30** — **Versió 2.1.1** (etiqueta `v2.1.1`, `PHILEAS_VERSION` 2.1.1): C2, C3, D3, `.md` per defecte i C19. C19, D3 i el `.md` encara no provats a la Pi.
+- **2026-10-30** — Release «Phileas 2.1.1» publicada a GitHub (Latest) amb el `.deb` i el `.tar.gz`; sha256 verificats a la pàgina de la release.
