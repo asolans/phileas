@@ -401,6 +401,11 @@ int buf_gap_after(Buffer *b, size_t i)
      * prémer Enter), s'hi espera un paràgraf nou: la separació ja es mostra */
     if (j == b->nlines)
         return i + 1 < b->nlines;
+    /* Una nota al peu sempre comença paràgraf nou, també després d'un salt
+     * dur (dos espais): si no, la nota pujaria i baixaria mentre s'escriu */
+    if ((b->lines[i].kind & MD_HARDBREAK) && MD_BASE(b->lines[j].kind) == MD_TEXT &&
+        md_footnote_def(b->lines[j].text, b->lines[j].len) != (size_t)-1)
+        return 1;
     return !md_tight(b->lines[i].kind, b->lines[j].kind);
 }
 

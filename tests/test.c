@@ -1473,6 +1473,13 @@ static void test_footnotes(void)
     CHECK(md_footnote("[^1]", 4, 0) == 4 && !md_footnote("[^]", 3, 0) && !md_footnote("[^a b]", 6, 0));
     CHECK(md_footnote_def("[^x]: t", 7) == 0 && md_footnote_def("a [^x]: t", 9) == (size_t)-1);
 
+    /* La nota no puja si el paràgraf anterior acaba en dos espais */
+    buf_init(&b);
+    buf_insert(&b, (Pos){ 0, 0 }, "Text  \n[^1]: nota", 17);
+    buf_scan(&b);
+    CHECK(buf_gap_after(&b, 0) && md_tight(MD_TEXT | MD_HARDBREAK, MD_TEXT));
+    buf_free(&b);
+
     buf_init(&b);
     buf_insert(&b, (Pos){ 0, 0 }, doc, sizeof doc - 1);
     buf_scan(&b);
