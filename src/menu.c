@@ -23,28 +23,39 @@ struct Menu {
 };
 
 /* Les opcions amb una ordre que no existeix no es mostren, ni els submenús
- * que es queden buits (el de BYOK, sense ordres externes). */
+ * que es queden buits (el de BYOK, sense ordres externes). SEP separa els
+ * grups amb una línia; si un grup es queda buit, la línia tampoc surt. */
+
+#define SEP { 0, "", NULL, NULL, NULL }
+#define IS_SEP(it) (!(it)->cmd && !(it)->sub)
 
 static const Menu m_file = { "Fitxer", (const MenuItem[]){
     { 'o', "Obre…",                "obrir",     NULL, NULL },
     { 'r', "Recents…",             "recents",   NULL, NULL },
     { 'n', "Nou",                  "nou",       NULL, NULL },
+    SEP,
     { 'd', "Desa",                 "desar",     NULL, NULL },
     { 'c', "Desa com…",            "desar-com", NULL, NULL },
+    SEP,
     { 's', "Surt",                 "sortir",    NULL, NULL },
     { 0 } } };
 
 static const Menu m_edit = { "Edita", (const MenuItem[]){
     { 'd', "Desfés",               "desfer",          NULL, NULL },
     { 'r', "Refés",                "refer",           NULL, NULL },
+    SEP,
     { 't', "Talla",                "tallar",          NULL, NULL },
     { 'c', "Copia",                "copiar",          NULL, NULL },
     { 'e', "Enganxa",              "enganxar",        NULL, NULL },
+    SEP,
     { 's', "Selecciona-ho tot",    "seleccionar-tot", NULL, NULL },
     { 'm', "Comença una selecció", "marca",           NULL, NULL },
+    SEP,
     { 'p', "Puja el paràgraf",     "pujar-paragraf",  NULL, NULL },
     { 'b', "Baixa el paràgraf",    "baixar-paragraf", NULL, NULL },
+    SEP,
     { 'i', "Tipografia automàtica", "tipografia",     NULL, NULL },
+    SEP,
     { 'n', "Nota al peu",          "nota-peu",        NULL, NULL },
     { 'v', "Ves a la nota o torna", "anar-a-nota",    NULL, NULL },
     { 'u', "Renumera les notes",   "renumerar-notes", NULL, NULL },
@@ -55,7 +66,9 @@ static const Menu m_find = { "Cerca", (const MenuItem[]){
     { 's', "Següent",              "cercar-seguent",  NULL, NULL },
     { 'a', "Anterior",             "cercar-anterior", NULL, NULL },
     { 'u', "Substitueix…",         "substituir",      NULL, NULL },
+    SEP,
     { 'e', "Esquema…",             "esquema",         NULL, NULL },
+    SEP,
     { 'l', "Ves a la línia…",      "anar-a-linia",    NULL, NULL },
     { 'i', "Inici del document",   "inici-document",  NULL, NULL },
     { 'f', "Final del document",   "fi-document",     NULL, NULL },
@@ -63,9 +76,11 @@ static const Menu m_find = { "Cerca", (const MenuItem[]){
 
 static const Menu m_spell = { "Ortografia", (const MenuItem[]){
     { 'o', "Marca o no els errors", "ortografia",         NULL, NULL },
-    { 'a', "Alterna l'idioma",      "alternar-idioma",    NULL, NULL },
+    SEP,
     { 'e', "Error següent",         "revisar-ortografia", NULL, NULL },
     { 's', "Suggeriments",          "suggeriments",       NULL, NULL },
+    SEP,
+    { 'a', "Alterna l'idioma",      "alternar-idioma",    NULL, NULL },
     { 'd', "Tria el diccionari…",   "idioma",             NULL, NULL },
     { 0 } } };
 
@@ -76,6 +91,7 @@ static const Menu m_theme = { "Tema", (const MenuItem[]){
     { 's', "Sèpia",                "tema", "sepia",    NULL },
     { 'o', "Fòsfor",               "tema", "fosfor",   NULL },
     { 'w', "WordPerfect",          "tema", "wordperfect", NULL },
+    SEP,
     { 'e', "El següent",           "tema", NULL,       NULL },
     { 0 } } };
 
@@ -84,16 +100,20 @@ static const Menu m_view = { "Vista", (const MenuItem[]){
     { 'c', "Centra la columna",    "centrar",          NULL, NULL },
     { 'o', "Colors de Markdown",   "colors",           NULL, NULL },
     { 'e', "Enfocament",           "enfocament",       NULL, NULL },
+    SEP,
     { 't', "Tema",                 NULL,               NULL, &m_theme },
+    SEP,
     { 'r', "Redibuixa",            "redibuixar",       NULL, NULL },
     { 0 } } };
 
 static const Menu m_help = { "Ajuda", (const MenuItem[]){
     { 'a', "Ajuda",                "ajuda",                   NULL, NULL },
     { 'p', "Paleta d'ordres…",     "paleta",                  NULL, NULL },
+    SEP,
     { 'd', "Autodesat",            "autodesat",               NULL, NULL },
     { 'r', "Recarrega la configuració", "recarregar-configuracio", NULL, NULL },
     { 'c', "Desa la configuració",      "desar-configuracio",      NULL, NULL },
+    SEP,
     { 'q', "Quant a Phileas",      "quant-a",                 NULL, NULL },
     { 0 } } };
 
@@ -103,12 +123,13 @@ static const MenuItem byok_known[] = {
     { 'g', "Lletra més gran",      "lletra",  "+",  NULL },
     { 'p', "Lletra més petita",    "lletra",  "-",  NULL },
     { 'r', "Gira la pantalla",     "gira",    NULL, NULL },
+    SEP,
     { 'e', "Exporta al pendrive",  "exporta", NULL, NULL },
     { 'n', "Envia a un ordinador", "envia",   NULL, NULL },
 };
 #define NBYOK_KNOWN (sizeof byok_known / sizeof byok_known[0])
 
-static MenuItem byok_items[NBYOK_KNOWN + 40];
+static MenuItem byok_items[NBYOK_KNOWN + 41];
 static const Menu m_byok = { "BYOK", byok_items };
 
 static const Menu m_main = { "Menú", (const MenuItem[]){
@@ -117,7 +138,9 @@ static const Menu m_main = { "Menú", (const MenuItem[]){
     { 'c', "Cerca",                NULL, NULL, &m_find },
     { 'o', "Ortografia",           NULL, NULL, &m_spell },
     { 'v', "Vista",                NULL, NULL, &m_view },
+    SEP,
     { 'b', "BYOK",                 NULL, NULL, &m_byok },
+    SEP,
     { 'a', "Ajuda i configuració", NULL, NULL, &m_help },
     { 0 } } };
 
@@ -128,8 +151,11 @@ static void build_byok(void)
     const Command *c;
 
     for (size_t i = 0; i < NBYOK_KNOWN; i++)
-        if ((c = cmd_find(byok_known[i].cmd)) && !c->fn)
+        if (IS_SEP(&byok_known[i])
+            || ((c = cmd_find(byok_known[i].cmd)) && !c->fn))
             byok_items[n++] = byok_known[i];
+    /* Les altres, en un grup a part */
+    byok_items[n++] = (MenuItem)SEP;
     for (size_t i = 0; i < cmd_count() && n < max; i++) {
         int known = 0;
         char key = 0;
@@ -138,7 +164,7 @@ static void build_byok(void)
         if (c->fn)
             continue;
         for (size_t k = 0; k < NBYOK_KNOWN && !known; k++)
-            known = !strcmp(byok_known[k].cmd, c->name);
+            known = !IS_SEP(&byok_known[k]) && !strcmp(byok_known[k].cmd, c->name);
         if (known)
             continue;
         /* La primera lletra del nom que encara no fa servir cap opció */
@@ -155,6 +181,8 @@ static void build_byok(void)
 
 static int visible(const MenuItem *it)
 {
+    if (IS_SEP(it))
+        return 0;
     if (it->cmd)
         return cmd_find(it->cmd) != NULL;
     for (const MenuItem *s = it->sub->items; s->label; s++)
@@ -177,9 +205,27 @@ static void open_level(Level *l, const Menu *m)
 {
     l->menu = m;
     l->n = l->sel = l->top = 0;
-    for (const MenuItem *it = m->items; it->label && l->n < MAX_ITEMS; it++)
-        if (visible(it))
+    for (const MenuItem *it = m->items; it->label && l->n < MAX_ITEMS; it++) {
+        /* Ni al principi, ni repetides (grups buits) */
+        if (IS_SEP(it) ? l->n && !IS_SEP(l->items[l->n - 1]) : visible(it))
             l->items[l->n++] = it;
+    }
+    if (l->n && IS_SEP(l->items[l->n - 1]))
+        l->n--;
+}
+
+/* La propera opció en la direcció dir, saltant les línies i tornant a
+ * començar pels extrems */
+static int step(const Level *l, int from, int dir)
+{
+    int i = from;
+
+    if (l->n == 0)
+        return 0;
+    do
+        i = (i + dir + l->n) % l->n;
+    while (IS_SEP(l->items[i]) && i != from);
+    return i;
 }
 
 /* Escriu s a partir de la posició actual sense passar de maxw columnes.
@@ -228,6 +274,8 @@ static void shortcut(const MenuItem *it, char *out, size_t size)
     int key;
 
     out[0] = '\0';
+    if (IS_SEP(it))
+        return;
     if (it->sub)
         snprintf(out, size, "→");
     else if (!it->args && (c = cmd_find(it->cmd)) && cmd_keys(c, &key, 1) == 1)
@@ -319,6 +367,13 @@ static void draw_level(const Level *l, int active)
         char sc[64];
         int scw, labelw;
 
+        if (IS_SEP(it)) {
+            attrset(ui_attr(UI_MENU));
+            mvaddch(y, l->x, ACS_LTEE);
+            hline(ACS_HLINE, iw);
+            mvaddch(y, l->x + l->w - 1, ACS_RTEE);
+            continue;
+        }
         shortcut(it, sc, sizeof sc);
         scw = str_width(sc);
         labelw = iw - 5 - (scw ? 3 + scw : 0);
@@ -392,10 +447,10 @@ const Command *menu_choose(Editor *e, const char **args)
             continue;
         switch (key) {
         case KEY_FLAG_FN | KEY_UP:
-            l->sel = l->sel > 0 ? l->sel - 1 : l->n - 1;
+            l->sel = step(l, l->sel, -1);
             break;
         case KEY_FLAG_FN | KEY_DOWN:
-            l->sel = l->sel < l->n - 1 ? l->sel + 1 : 0;
+            l->sel = step(l, l->sel, 1);
             break;
         case KEY_FLAG_FN | KEY_HOME:
         case KEY_FLAG_FN | KEY_PPAGE:
