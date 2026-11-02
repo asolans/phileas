@@ -296,7 +296,7 @@ de recordar tres tecles: **Esc** (menús), **F1** (ajuda) i **Ctrl+P**
 | F4 | enfocament: paràgraf, frase o cap |
 | F2 / Alt+E | esquema del document |
 | F5 / F6 | nota al peu nova / anar de la crida a la nota i tornar |
-| F9 | idea al calaix d'idees |
+| F9 | al calaix d'idees: la selecció (només es demanen les etiquetes), o una idea nova si no n'hi ha |
 | Ctrl+L | redibuixar la pantalla |
 
 Les alternatives amb Alt existeixen perquè a la consola de Linux (sense

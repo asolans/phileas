@@ -478,26 +478,40 @@ static void calaix_origin(const Editor *e, char *out, size_t size)
 }
 
 /* Demana les etiquetes i afegeix el text al calaix */
-static void calaix_add(Editor *e, const char *text, size_t n)
+/* 1 si l'entrada s'ha desat */
+static int calaix_add(Editor *e, const char *text, size_t n)
 {
     char tags[256] = "", origin[PATH_MAX + 64], err[256];
 
     if (!prompt(e, "Etiquetes (opcional): ", tags, sizeof tags, NULL))
-        return;
+        return 0;
     calaix_origin(e, origin, sizeof origin);
     if (calaix_append(e->calaix, origin, tags, text, n, err, sizeof err) < 0) {
         ed_msg(e, "No s'ha pogut desar al calaix: %s", err);
-        return;
+        return 0;
     }
     ed_msg(e, "Afegit al calaix: %s", origin);
+    return 1;
 }
 
+/* Amb una selecció, la idea és el bloc seleccionat (només es demanen les
+ * etiquetes); sense selecció, es demana el text de la idea. */
 static void c_calaix_idea(Editor *e)
 {
     char text[1024] = "";
+    Pos a, z;
+    size_t n;
+    char *sel;
 
     if (calaix_is_open(e)) {
         ed_msg(e, "El calaix és obert: tanca'l per afegir-hi una idea");
+        return;
+    }
+    if (ed_selection(e, &a, &z)) {
+        sel = buf_export(&e->buf, a, z, &n);
+        if (calaix_add(e, sel, n))
+            ed_sel_clear(e);
+        free(sel);
         return;
     }
     if (!prompt(e, "Idea: ", text, sizeof text, NULL) || !text[0])
@@ -520,7 +534,8 @@ static void c_calaix_seleccio(Editor *e)
         return;
     }
     text = buf_export(&e->buf, a, z, &n);
-    calaix_add(e, text, n);
+    if (calaix_add(e, text, n))
+        ed_sel_clear(e);
     free(text);
 }
 
@@ -1188,7 +1203,7 @@ static const Command commands[] = {
     { "anar-a-nota",               c_goto_note,      "De la crida [^n] a la nota, o de la nota a la crida", ACT_NONE },
     { "renumerar-notes",           c_renumber_notes, "Numera les notes 1, 2, 3… en l'ordre del text i n'ordena les definicions", ACT_NONE },
     { "calaix",                    c_calaix,         "Mostra el calaix d'idees i va a l'entrada triada", ACT_NONE },
-    { "calaix-idea",               c_calaix_idea,    "Afegeix una idea al calaix d'idees (F9)", ACT_NONE },
+    { "calaix-idea",               c_calaix_idea,    "Afegeix al calaix d'idees la selecció, o una idea nova si no n'hi ha (F9)", ACT_NONE },
     { "calaix-seleccio",           c_calaix_seleccio, "Envia la selecció al calaix d'idees, amb la referència al document", ACT_NONE },
     { "tallar",                    c_cut,            "Talla la selecció", ACT_NONE },
     { "copiar",                    c_copy,           "Copia la selecció", ACT_NONE },
