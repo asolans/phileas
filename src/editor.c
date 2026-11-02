@@ -31,6 +31,7 @@ void ed_init(Editor *e, int columns)
     e->tw_mode = TW_SALT;
     e->tw_limit = 80;
     e->tw_anchor = 50;
+    snprintf(e->calaix, sizeof e->calaix, "%s/calaix.md", getenv("HOME") ? getenv("HOME") : ".");
     theme_apply(e, theme_at(0));
     e->console_palette = 1;
     e->remember_pos = 1;

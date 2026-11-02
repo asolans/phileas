@@ -214,6 +214,15 @@ int config_set(Editor *e, const char *key, const char *v, char *err, size_t errs
             return -1;
         }
         snprintf(e->dict, sizeof e->dict, "%s", v);
+    } else if (!strcmp(key, "calaix")) {
+        if (!*v || strlen(v) >= sizeof e->calaix) {
+            snprintf(err, errsz, "camí del calaix no vàlid «%s»", v);
+            return -1;
+        }
+        if (v[0] == '~' && v[1] == '/' && getenv("HOME"))
+            snprintf(e->calaix, sizeof e->calaix, "%s%s", getenv("HOME"), v + 1);
+        else
+            snprintf(e->calaix, sizeof e->calaix, "%s", v);
     } else if (!strcmp(key, "idiomes")) {
         char tmp[128], *tok, *save;
         int k = 0;
@@ -606,6 +615,7 @@ void config_template(FILE *f, const Editor *e)
         fprintf(f, "diccionari = %-22s# un diccionari concret en arrencar\n", e->dict);
     else
         fputs("# diccionari = ca_ES-valencia      # un diccionari concret en arrencar\n", f);
+    fprintf(f, "calaix = %s\n", e->calaix);
     fprintf(f, "\n"
             "# Tema de colors: terminal (els colors del terminal), fosc, clar, sepia,\n"
             "# fosfor o wordperfect. També es canvia des del menú Vista o amb l'ordre «tema»,\n"

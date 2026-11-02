@@ -32,6 +32,7 @@ struct Menu {
 static const Menu m_file = { "Fitxer", (const MenuItem[]){
     { 'o', "Obre…",                "obrir",     NULL, NULL },
     { 'r', "Recents…",             "recents",   NULL, NULL },
+    { 'a', "Calaix d'idees…",      "calaix",    NULL, NULL },
     { 'n', "Nou",                  "nou",       NULL, NULL },
     SEP,
     { 'd', "Desa",                 "desar",     NULL, NULL },
@@ -59,6 +60,9 @@ static const Menu m_edit = { "Edita", (const MenuItem[]){
     { 'n', "Nota al peu",          "nota-peu",        NULL, NULL },
     { 'v', "Ves a la nota o torna", "anar-a-nota",    NULL, NULL },
     { 'u', "Renumera les notes",   "renumerar-notes", NULL, NULL },
+    SEP,
+    { 'f', "Idea al calaix",       "calaix-idea",     NULL, NULL },
+    { 'l', "Selecció al calaix",   "calaix-seleccio", NULL, NULL },
     { 0 } } };
 
 static const Menu m_find = { "Cerca", (const MenuItem[]){

@@ -84,6 +84,13 @@ només serveix per escriure.
   cursor**: en tornar a obrir un document, el cursor és on era. Tot es desa
   al fitxer `historial` del directori de configuració, fora dels documents,
   que no es modifiquen.
+- **Calaix d'idees:** F9 afegeix una idea mentre s'escriu, i Esc → Edita →
+  Selecció al calaix hi envia el bloc seleccionat amb la referència al
+  document i a la línia. Cada entrada és un paràgraf Markdown amb data,
+  origen i etiquetes `#paraula`; Fitxer → Calaix d'idees (o l'ordre
+  `calaix`) les llista, filtrables, i porta a l'entrada triada. Es desa al
+  fitxer de l'opció `calaix` (per defecte `~/calaix.md`). Mentre el calaix
+  és obert com a document, no s'hi afegeix res.
 - **Ordres externes:** es poden afegir a la paleta ordres del sistema
   (exportar amb pandoc, comptar paraules, enviar el text…).
 - **UTF-8 complet:** accents, ç, l·l, cometes tipogràfiques i caràcters
@@ -289,6 +296,7 @@ de recordar tres tecles: **Esc** (menús), **F1** (ajuda) i **Ctrl+P**
 | F4 | enfocament: paràgraf, frase o cap |
 | F2 / Alt+E | esquema del document |
 | F5 / F6 | nota al peu nova / anar de la crida a la nota i tornar |
+| F9 | idea al calaix d'idees |
 | Ctrl+L | redibuixar la pantalla |
 
 Les alternatives amb Alt existeixen perquè a la consola de Linux (sense
@@ -331,8 +339,10 @@ tipografia = si                # -- → —, << >> → « », ... → …
 apostrof-tipografic = si       # ' entre lletres → ’
 color-capcalera-1 = blau       # retoca un color del tema (després de «tema»)
 
+calaix = ~/calaix.md           # on es desa el calaix d'idees (F9)
+
 # Dreceres: tecla.NOM = ordre (buit = treure-la)
-tecla.f9 = colors
+tecla.f10 = colors
 
 # Ordres externes, que apareixen a la paleta (Ctrl+P)
 externa-breu.paraules = wc -w      # Ctrl+P, «paraules cap1.md»
@@ -405,6 +415,7 @@ cadena musl de Buildroot.
 | `filebrowser.c`, `dirlist.c` | navegador de fitxers |
 | `outline.c`, `outlineview.c` | esquema: capçaleres i paraules per secció, i el seu diàleg |
 | `footnote.c` | notes al peu: inserir, anar i tornar, renumerar |
+| `calaix.c`, `calaixview.c` | calaix d'idees: format, escriptura atòmica i la llista filtrable |
 | `history.c`, `recentview.c` | historial: posició del cursor per document i documents recents |
 | `config.c` | fitxers de configuració |
 | `utf8.c`, `util.c` | UTF-8 i utilitats |
@@ -419,6 +430,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **En desenvolupament**: calaix d'idees (F9, Edita → Selecció al calaix, Fitxer → Calaix d'idees; opció `calaix`).
 - **2.1.2**: separadors als menús; les notes al peu no perden el text que va després de dos espais al final d'una línia.
 - **2.1.1** (2026-10-30): notes al peu (F5 nova, F6 va i torna,
   `renumerar-notes`); documents recents (Alt+O) i posició del cursor per

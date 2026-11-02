@@ -1,6 +1,7 @@
 /* Proves dels mòduls que no depenen de ncurses: make test */
 #include "autosave.h"
 #include "buffer.h"
+#include "calaix.h"
 #include "complete.h"
 #include "config.h"
 #include "dirlist.h"
@@ -1805,6 +1806,41 @@ static void test_history(void)
     unsetenv("PHILEAS_CONFIG");
 }
 
+static void test_calaix(void)
+{
+    char path[PATH_MAX], err[256], head[512];
+    Calaix c;
+    size_t hl;
+    const char *h;
+
+    snprintf(path, sizeof path, "%s/calaix.md", tmpdir);
+    unlink(path);
+    CHECK(calaix_load(path, &c) == 0 && c.n == 0);
+    calaix_free(&c);
+
+    CHECK(calaix_append(path, "a.md, línia 3", " personatge, #final ", "Una idea.\n", 10,
+                        err, sizeof err) == 0);
+    CHECK(calaix_append(path, "sense nom, línia 1", NULL, "## Dins\n\nno és capçalera",
+                        strlen("## Dins\n\nno és capçalera"), err, sizeof err) == 0);
+    CHECK(calaix_load(path, &c) == 0);
+    CHECK(c.n == 2);
+    h = calaix_head(&c, 0, &hl);
+    snprintf(head, sizeof head, "%.*s", (int)hl, h);
+    CHECK(strstr(head, "## ") == head);
+    CHECK(strstr(head, " · a.md, línia 3 · #personatge #final") != NULL);
+    CHECK(calaix_match(&c, 0, "PERSONATGE"));
+    CHECK(calaix_match(&c, 0, ""));
+    CHECK(!calaix_match(&c, 0, "dins"));
+    CHECK(calaix_match(&c, 1, "DINS"));
+    CHECK(!calaix_match(&c, 1, "personatge"));
+    calaix_free(&c);
+
+    /* Un document que no existeix ni la carpeta no es pot desar */
+    snprintf(path, sizeof path, "%s/no-existeix/calaix.md", tmpdir);
+    CHECK(calaix_append(path, "x", NULL, "y", 1, err, sizeof err) == -1);
+    CHECK(err[0] != '\0');
+}
+
 int main(void)
 {
     /* Qualsevol configuració UTF-8 (una Raspberry amb buildroot pot no tenir C.UTF-8) */
@@ -1843,6 +1879,7 @@ int main(void)
     test_emergency();
     test_history();
     test_complete();
+    test_calaix();
     rmdir(tmpdir);
 
     printf("%d comprovacions, %d errors\n", checks, failures);

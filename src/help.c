@@ -19,7 +19,7 @@ static const struct {
     const char *title;
     const char *const *names;
 } sections[] = {
-    { "Fitxer", (const char *const[]){ "obrir", "recents", "nou", "desar", "desar-com", "sortir", NULL } },
+    { "Fitxer", (const char *const[]){ "obrir", "recents", "calaix", "nou", "desar", "desar-com", "sortir", NULL } },
     { "Moviment", (const char *const[]){
         "moure-amunt", "moure-avall", "moure-esquerra", "moure-dreta", "inici-linia",
         "fi-linia", "pagina-amunt", "pagina-avall", "paraula-anterior", "paraula-seguent",
@@ -36,7 +36,7 @@ static const struct {
         "nova-linia", "tabulador", "esborrar-enrere", "esborrar-endavant",
         "esborrar-paraula-anterior", "esborrar-paraula-seguent", "pujar-paragraf",
         "baixar-paragraf", "tipografia", "nota-peu", "anar-a-nota", "renumerar-notes",
-        "desfer", "refer", NULL } },
+        "desfer", "refer", "calaix-idea", "calaix-seleccio", NULL } },
     { "Cerca", (const char *const[]){
         "cercar", "cercar-seguent", "cercar-anterior", "substituir", NULL } },
     { "Ortografia", (const char *const[]){

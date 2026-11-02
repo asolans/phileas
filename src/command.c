@@ -1,3 +1,5 @@
+#include "calaix.h"
+#include "calaixview.h"
 #include "clipboard.h"
 #include "command.h"
 #include "complete.h"
@@ -451,6 +453,97 @@ static void c_recent(Editor *e)
 
     if (recent_view(e, path, sizeof path))
         open_path(e, path);
+}
+
+/* 1 si el calaix és el document obert: no s'hi afegeix res mentre hi és */
+static int calaix_is_open(const Editor *e)
+{
+    char a[PATH_MAX], b[PATH_MAX];
+    const char *fa, *fb;
+
+    if (!e->filename)
+        return 0;
+    fa = realpath(e->filename, a) ? a : e->filename;
+    fb = realpath(e->calaix, b) ? b : e->calaix;
+    return !strcmp(fa, fb);
+}
+
+/* Origen de l'entrada: el nom del document i la línia del cursor */
+static void calaix_origin(const Editor *e, char *out, size_t size)
+{
+    const char *name = e->filename ? strrchr(e->filename, '/') : NULL;
+
+    name = name ? name + 1 : e->filename ? e->filename : "sense nom";
+    snprintf(out, size, "%s, línia %zu", name, e->cy + 1);
+}
+
+/* Demana les etiquetes i afegeix el text al calaix */
+static void calaix_add(Editor *e, const char *text, size_t n)
+{
+    char tags[256] = "", origin[PATH_MAX + 64], err[256];
+
+    if (!prompt(e, "Etiquetes (opcional): ", tags, sizeof tags, NULL))
+        return;
+    calaix_origin(e, origin, sizeof origin);
+    if (calaix_append(e->calaix, origin, tags, text, n, err, sizeof err) < 0) {
+        ed_msg(e, "No s'ha pogut desar al calaix: %s", err);
+        return;
+    }
+    ed_msg(e, "Afegit al calaix: %s", origin);
+}
+
+static void c_calaix_idea(Editor *e)
+{
+    char text[1024] = "";
+
+    if (calaix_is_open(e)) {
+        ed_msg(e, "El calaix és obert: tanca'l per afegir-hi una idea");
+        return;
+    }
+    if (!prompt(e, "Idea: ", text, sizeof text, NULL) || !text[0])
+        return;
+    calaix_add(e, text, strlen(text));
+}
+
+static void c_calaix_seleccio(Editor *e)
+{
+    Pos a, z;
+    size_t n;
+    char *text;
+
+    if (!ed_selection(e, &a, &z)) {
+        ed_msg(e, "No hi ha cap selecció per enviar al calaix");
+        return;
+    }
+    if (calaix_is_open(e)) {
+        ed_msg(e, "El calaix és obert: tanca'l per afegir-hi una idea");
+        return;
+    }
+    text = buf_export(&e->buf, a, z, &n);
+    calaix_add(e, text, n);
+    free(text);
+}
+
+/* Va a la capçalera d'una entrada del document obert */
+static void calaix_goto(Editor *e, const char *head)
+{
+    for (size_t i = 0; i < e->buf.nlines; i++)
+        if (!strcmp(e->buf.lines[i].text, head)) {
+            ed_goto_line(e, i + 1);
+            return;
+        }
+    ed_msg(e, "No s'ha trobat l'entrada al document");
+}
+
+static void c_calaix(Editor *e)
+{
+    char head[1024];
+
+    if (!calaix_view(e, head, sizeof head))
+        return;
+    open_path(e, e->calaix);
+    if (calaix_is_open(e))
+        calaix_goto(e, head);
 }
 
 static void c_new(Editor *e)
@@ -1094,6 +1187,9 @@ static const Command commands[] = {
     { "nota-peu",                  c_footnote,       "Insereix una nota al peu [^n] i la seva definició al final, on queda el cursor", ACT_NONE },
     { "anar-a-nota",               c_goto_note,      "De la crida [^n] a la nota, o de la nota a la crida", ACT_NONE },
     { "renumerar-notes",           c_renumber_notes, "Numera les notes 1, 2, 3… en l'ordre del text i n'ordena les definicions", ACT_NONE },
+    { "calaix",                    c_calaix,         "Mostra el calaix d'idees i va a l'entrada triada", ACT_NONE },
+    { "calaix-idea",               c_calaix_idea,    "Afegeix una idea al calaix d'idees (F9)", ACT_NONE },
+    { "calaix-seleccio",           c_calaix_seleccio, "Envia la selecció al calaix d'idees, amb la referència al document", ACT_NONE },
     { "tallar",                    c_cut,            "Talla la selecció", ACT_NONE },
     { "copiar",                    c_copy,           "Copia la selecció", ACT_NONE },
     { "enganxar",                  c_paste,          "Enganxa el porta-retalls (el del sistema, si n'hi ha)", ACT_NONE },
@@ -1168,6 +1264,7 @@ static const char *const default_bindings[][2] = {
     { "alt-d", "esborrar-paraula-seguent" },   { "ctrl-delete", "esborrar-paraula-seguent" },
     { "alt-up", "pujar-paragraf" },            { "alt-down", "baixar-paragraf" },
     { "f5", "nota-peu" },                      { "f6", "anar-a-nota" },
+    { "f9", "calaix-idea" },
     { "ctrl-x", "tallar" },  { "ctrl-c", "copiar" },  { "ctrl-v", "enganxar" },
 
     { "alt-c", "centrar" },           { "f4", "enfocament" },

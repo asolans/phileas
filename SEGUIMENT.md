@@ -525,7 +525,7 @@ Llista oberta: l'usuari hi afegeix, en treu i n'ordena la prioritat.
 | C15 | Diari d'escriptura | Tots dos | En sortir, `data;fitxer;paraules+` a un CSV del directori de configuració; ordre `estadistiques` amb ratxa de dies i mitjana. |
 | C16 | Ecos i paraules crossa | Tots dos | Ordre `repeticions`: repeticions en un radi de N paraules dins el paràgraf i llista configurable («molt», «doncs», «muy», adverbis -ment/-mente). A demanda. |
 | C17 | Tipografia de diàleg | Tots dos | ✅ Fet (2026-10-29): `tipografia`, Edita; `apostrof-tipografic`. Per idioma: `--` → «—», `<<`/`>>` → «», `...` → «…», apòstrof tipogràfic opcional; fora del codi Markdown. |
-| C18 | Calaix | Tots dos | Envia la selecció a `calaix.md` (retalls, idees descartades) i el mostra en un diàleg. |
+| C18 | Calaix d'idees | Tots dos | ✅ Implementat (2026-11-02, sense etiqueta ni provat a la Pi): F9 afegeix una idea; `calaix-seleccio` envia la selecció amb la referència; `calaix` llista i filtra per etiqueta o text. Fitxer `calaix.md` (opció `calaix`); a la BYOK ha d'apuntar a `/data/textos`, que `envia` copia. Vegeu «Proposta: calaix d'idees». |
 | C19 | Notes al peu | Tots dos | ✅ Fet (2026-10-30): `nota-peu` (F5) insereix `[^n]` amb el número següent i la definició al final, on queda el cursor; `anar-a-nota` (F6) va i torna; `renumerar-notes` numera en l'ordre de les crides i ordena les definicions als llocs on eren (les etiquetes amb nom es queden). Menú Edita. Sintaxi de pandoc; les del codi no compten. `src/footnote.c`. |
 | C20 | Citacions | Tots dos | Llegeix un `.bib` o CSL-JSON (YAML o phileasrc); `cita` obre una llista filtrable i insereix `[@clau, p. 23]` amb la compleció de la paleta. La bibliografia la fa `pandoc --citeproc` a l'ordinador. |
 | C21 | Capçalera YAML | Tots dos | `lang: ca`/`es` fixa l'idioma del corrector per document; `title`/`author` a la barra; plantilles (article, capítol, ressenya, acta). |
@@ -544,6 +544,69 @@ Llista oberta: l'usuari hi afegeix, en treu i n'ordena la prioritat.
 ### Estat de la decisió
 
 Pendent de confirmar: el principi d'un sol programa, els requisits D1–D7 i l'ordre de les millores C2–C26 (C7–C26 afegides el 2026-10-29; prioritat de l'usuari: C7, C8, C12, C17).
+
+## Proposta: dues finestres de text (C27, sense decidir)
+
+**Petició:** obrir dos documents, una finestra al costat de l'altra, i passar d'un a l'altre amb una combinació de tecles. Pensat per tenir un text obert en una banda i treballar sobre l'altre a l'altra.
+
+**Dificultat:** mitjana-alta. Canviar de document és senzill; el cost és dibuixar dues àrees en paral·lel.
+
+**Estat actual:** tot l'estat d'un document és a `struct Editor` (`src/editor.h`) i `main.c` en té una sola instància. `ed_layout(e, COLS, LINES)` i `render.c` (unes 35 referències) suposen tota la pantalla. El desat d'emergència de `main.c` guarda un únic `Editor *`.
+
+**Canvis necessaris:**
+
+| Part | Dificultat | Nota |
+|------|------------|------|
+| Dos documents i canvi amb una drecera | Baixa | Array de dos `Editor` i un punter al focus. Desfer i autodesat ja són per document |
+| Dibuix de dues àrees | Mitjana-alta | `ed_layout` i `render` han de treballar amb un rectangle (fila, columna, amplada, alçada): wordwrap, màquina d'escriure, selecció i cursor |
+| Barra d'estat | Mitjana | Una per finestra o una de compartida |
+| Desat d'emergència | Baixa | Desar els dos documents en SIGTERM i SIGHUP |
+| Portaretalls intern | Baixa | Passar-lo a global per copiar d'una finestra a l'altra |
+| Obrir fitxers, recents, navegador, rescat | Mitjana | Decidir en quina finestra s'obre cada cosa |
+| Menús, paleta i ajuda | Baixa | Ordres de finestra |
+| Proves | Mitjana | Les proves actuals suposen una sola instància |
+
+**Riscos:**
+
+- **R7 (un sol document obert alhora):** és imprescindible en els requisits. Aquesta proposta el contradiu, així que cal modificar R7 abans de començar.
+- **Amplada a la Pi:** la pantalla vertical fa 75 columnes. Dues finestres esquerra–dreta en donen unes 37 cada una, poc per al wordwrap de 72. Un repartiment dalt–baix (60 files) seria més útil a la Pi.
+- **Màquina d'escriure:** l'ancoratge i el límit depenen de l'alçada. Cada finestra hauria de tenir la seva.
+
+**Proposta de disseny:** una divisió fixa de dues finestres, amb el focus canviable per tecla. Pendent de decidir l'orientació (vertical o horitzontal) i la tecla de canvi.
+
+## Proposta: calaix d'idees (C18, decisions preses)
+
+**Petició:** un dipòsit d'idees que surten mentre s'escriu, i també a partir d'un bloc seleccionat. Ha d'encaixar amb `envia` (còpia al PC per SSH) i tenir un etiquetatge mínim.
+
+**Dificultat:** baixa-mitjana. No calen dependències noves; el codi es pot basar en el navegador de recents (`recentview.c`) i en l'escriptura atòmica del desat.
+
+**Format:** un fitxer `calaix.md` a `/data/textos`, que `envia` ja copia al PC. Cada idea és una entrada Markdown amb data, origen i etiquetes:
+
+```markdown
+## 2026-11-02 10:15 · capitol-3.md, línia 42 · #personatge #final
+
+Potser la mare ja sap què ha passat i calla.
+```
+
+- L'etiqueta és un `#paraula` lliure a la línia de capçalera. Es pot filtrar des del diàleg; no hi ha llista tancada.
+- Una idea sense selecció és text lliure. Una idea amb selecció porta el bloc sencer i la referència al document i a la línia.
+- El fitxer és Markdown normal: es llegeix i es cerca amb qualsevol editor, també al PC.
+
+**Entrada:**
+
+| Acció | Proposta | Nota |
+|-------|----------|------|
+| Afegir idea mentre s'escriu | F9 (decidit) | Diàleg d'una línia per al text i les etiquetes. El document no es mou |
+| Enviar la selecció al calaix | Ordre `calaix-seleccio` (Edita) | Copia el bloc amb la referència i demana les etiquetes |
+| Veure i filtrar | Ordre `calaix` (Fitxer o Vista) | Llista com `recents`; escriure filtra per etiqueta o text; Enter obre el calaix a l'entrada |
+
+**Decisions (2026-11-02, decidides per l'usuari):**
+
+1. Tecla d'entrada: **F9** (no està assignada per defecte).
+2. Si el calaix és obert com a document, **no es pot afegir-hi** una idea: el dipòsit es nega i avisa. Així no hi ha conflicte entre el document obert i el fitxer.
+3. `envia` **no serà bidireccional**: el calaix només l'escriu la Pi i el PC el rep per còpia.
+
+**Pi:** afegir una entrada és una escriptura al final del fitxer; el diàleg només llegeix el fitxer quan s'obre.
 
 ## Arquitectura
 

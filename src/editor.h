@@ -74,6 +74,7 @@ typedef struct {
     int     spell;             /* marcar els errors ortogràfics */
     char    dict[64];          /* diccionari triat: "ca", "es" (F8), o el de -d o «idioma» */
     char    dict_loaded[64];   /* el que hi ha carregat; "" = cap */
+    char    calaix[1024];      /* fitxer del calaix d'idees (opció «calaix») */
     char    langs[MAX_LANGS][16]; /* rotació de F8 */
     int     nlangs;
     int     spell_start;       /* activar l'ortografia en arrencar */
