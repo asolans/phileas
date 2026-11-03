@@ -61,6 +61,7 @@ static const char *const intro[] = {
     "Esquema (F2): capçaleres i paraules de cada secció; Enter hi va, Alt+↑/↓ mou la secció.",
     "Suggeriments (Alt+Enter): el número substitueix, a afegeix, i ignora.",
     "Porta-retalls: a l'escriptori, Ctrl+C/Ctrl+V el comparteixen amb les altres aplicacions.",
+    "Barra d'estat, a la dreta: desplaçament (salt, fixa o clàssic), idioma, paraules i pàgines.",
 };
 #define NINTRO (sizeof intro / sizeof intro[0])
 

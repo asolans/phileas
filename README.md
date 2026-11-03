@@ -81,7 +81,8 @@ només serveix per escriure.
   1, 2, 3… en l'ordre del text i n'ordena les definicions (les etiquetes amb
   nom, com `[^font]`, es queden). Les del codi no compten.
 - **Navegador de fitxers** integrat (Ctrl+O) i **recompte de paraules** i
-  **estimació de pàgines** a la barra d'estat.
+  **estimació de pàgines** a la barra d'estat, que també indica el mode de
+  desplaçament (`salt`, `fixa` o `clàssic`).
 - **Documents recents** (Alt+O, o Esc → Fitxer → Recents) i **posició del
   cursor**: en tornar a obrir un document, el cursor és on era. Tot es desa
   al fitxer `historial` del directori de configuració, fora dels documents,
