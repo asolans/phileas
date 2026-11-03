@@ -433,6 +433,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.1.4**: màquina d'escriure: un document nou comença a dalt, amb dues files en blanc (també en clàssic), i el mode de desplaçament surt a la barra d'estat.
 - **2.1.3**: calaix d'idees (F9, Edita → Selecció al calaix, Fitxer → Calaix d'idees; opció `calaix`).
 - **2.1.2**: separadors als menús; les notes al peu no perden el text que va després de dos espais al final d'una línia.
 - **2.1.1** (2026-10-30): notes al peu (F5 nova, F6 va i torna,
