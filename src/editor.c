@@ -13,6 +13,9 @@
 #include <string.h>
 #include <wctype.h>
 
+/* Files en blanc per sobre d'un document buit en obrir-lo */
+#define NEW_DOC_BLANK 2
+
 void ed_init(Editor *e, int columns)
 {
     char code[16];
@@ -25,6 +28,7 @@ void ed_init(Editor *e, int columns)
     e->want_x = -1;
     e->autosave = e->autosave_last = 30;
     e->autosave_max = 300;
+    e->top_blank = NEW_DOC_BLANK;
     e->margin_left = e->margin_right = 4;
     e->colors = 1;
     e->tw_mode = TW_SALT;
@@ -69,10 +73,11 @@ int ed_open(Editor *e, const char *path)
     e->filename = path ? xstrdup(path) : NULL;
     e->cy = e->cx = 0;
     e->top_line = e->top_row = 0;
-    e->top_blank = 0;
-    /* El final del text a l'ancoratge; un document buit comença a dalt i,
-     * en mode salt, la primera vegada que passa el límit puja a l'ancoratge */
+    /* El final del text a l'ancoratge; un document buit comença a dalt, amb
+     * dues files en blanc, i en mode salt la primera vegada que passa el
+     * límit puja a l'ancoratge */
     e->recenter = e->buf.nlines > 1 || e->buf.lines[0].len > 0;
+    e->top_blank = e->recenter ? 0 : NEW_DOC_BLANK;
     e->want_x = -1;
     e->sel_mode = SEL_NONE;
     e->last_act = ACT_NONE;

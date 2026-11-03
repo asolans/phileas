@@ -1201,15 +1201,16 @@ static void test_typewriter(void)
 
     ed_init(&e, 72);
     CHECK(e.tw_limit == 80 && e.tw_anchor == 50);
-    /* Document nou: comença a dalt i, en passar el límit, puja a l'ancoratge */
-    for (int i = 0; i < 17; i++) {
+    /* Document nou: comença a dalt, amb dues files en blanc, i en passar
+     * el límit puja a l'ancoratge */
+    for (int i = 0; i < 15; i++) {
         ed_layout(&e, 80, 22);
-        CHECK(e.top_line == 0 && e.top_blank == 0);
+        CHECK(e.top_line == 0 && e.top_blank == 2);
         ed_insert(&e, "- x", 3);
         ed_newline(&e);
     }
     ed_layout(&e, 80, 22);             /* fila 17: salta */
-    CHECK(e.top_line == 7 && e.top_blank == 0);
+    CHECK(e.top_line == 5 && e.top_blank == 0);
     ed_free(&e);
 
     ed_init(&e, 72);
