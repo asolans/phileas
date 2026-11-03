@@ -60,7 +60,8 @@ només serveix per escriure.
   i, com a molt, cada 5 minuts. Si es tanca el terminal o el sistema s'apaga
   (SIGHUP, SIGTERM), desa abans de sortir.
 - **Mode màquina d'escriure:** la línia on s'escriu es queda a una altura fixa
-  de la pantalla.
+  de la pantalla. Un document nou comença a dalt; en arribar al límit (80 %),
+  el text puja i la línia queda a l'ancoratge (50 %).
 - **Esquema** (F2): les capçaleres del document, sagnades pel nivell, amb
   les paraules de cada secció; Enter hi salta, escrivint es filtren i
   Alt+↑/↓ mou una secció sencera, amb les subseccions.

@@ -1201,6 +1201,19 @@ static void test_typewriter(void)
 
     ed_init(&e, 72);
     CHECK(e.tw_limit == 80 && e.tw_anchor == 50);
+    /* Document nou: comença a dalt i, en passar el límit, puja a l'ancoratge */
+    for (int i = 0; i < 17; i++) {
+        ed_layout(&e, 80, 22);
+        CHECK(e.top_line == 0 && e.top_blank == 0);
+        ed_insert(&e, "- x", 3);
+        ed_newline(&e);
+    }
+    ed_layout(&e, 80, 22);             /* fila 17: salta */
+    CHECK(e.top_line == 7 && e.top_blank == 0);
+    ed_free(&e);
+
+    ed_init(&e, 72);
+    e.recenter = 1;                    /* com en obrir un document amb text */
     /* 100 elements de llista: una fila per línia, sense separació */
     for (int i = 0; i < 100; i++)
         p = buf_insert(&e.buf, p, i ? "\n- x" : "- x", i ? 4 : 3);
