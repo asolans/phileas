@@ -1283,6 +1283,7 @@ static const char *const default_bindings[][2] = {
     { "ctrl-x", "tallar" },  { "ctrl-c", "copiar" },  { "ctrl-v", "enganxar" },
 
     { "alt-c", "centrar" },           { "f4", "enfocament" },
+    { "f10", "maquina-escriure" },    { "alt-m", "maquina-escriure" },
     { "ctrl-o", "obrir" },            { "ctrl-n", "nou" },
     { "alt-o", "recents" },
     { "ctrl-s", "desar" },            { "alt-s", "desar-com" },

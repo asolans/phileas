@@ -63,6 +63,7 @@ només serveix per escriure.
   de la pantalla. Un document nou comença a dalt, amb dues files en blanc; en
   arribar al límit (80 %), el text puja i la línia queda a l'ancoratge (50 %).
   En mode clàssic, les files en blanc es mantenen fins que s'arriba a baix.
+  F10 (o Alt+M) passa d'un mode a l'altre: salt, línia fixa i clàssic.
 - **Esquema** (F2): les capçaleres del document, sagnades pel nivell, amb
   les paraules de cada secció; Enter hi salta, escrivint es filtren i
   Alt+↑/↓ mou una secció sencera, amb les subseccions.
@@ -297,6 +298,7 @@ de recordar tres tecles: **Esc** (menús), **F1** (ajuda) i **Ctrl+P**
 | Maj+F7 / Alt+Retorn | revisar d'error en error / suggeriments |
 | Alt+C | centrar la columna |
 | F4 | enfocament: paràgraf, frase o cap |
+| F10 / Alt+M | màquina d'escriure: salt, línia fixa o clàssic |
 | F2 / Alt+E | esquema del document |
 | F5 / F6 | nota al peu nova / anar de la crida a la nota i tornar |
 | F9 | al calaix d'idees: la selecció (només es demanen les etiquetes), o una idea nova si no n'hi ha |
