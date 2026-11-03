@@ -75,7 +75,7 @@ int ed_open(Editor *e, const char *path)
     e->top_line = e->top_row = 0;
     /* El final del text a l'ancoratge; un document buit comença a dalt, amb
      * dues files en blanc, i en mode salt la primera vegada que passa el
-     * límit puja a l'ancoratge */
+     * límit puja a l'ancoratge (en clàssic, el text puja fila a fila) */
     e->recenter = e->buf.nlines > 1 || e->buf.lines[0].len > 0;
     e->top_blank = e->recenter ? 0 : NEW_DOC_BLANK;
     e->want_x = -1;
@@ -284,8 +284,13 @@ void ed_layout(Editor *e, int screen_cols, int screen_lines)
         typewriter_layout(e);
         return;
     }
-    e->top_blank = 0;
     e->recenter = 0;
+    /* Les files en blanc d'un document nou (vegeu ed_open) es gasten una a
+     * una quan el cursor arriba a baix */
+    if (e->top_blank > NEW_DOC_BLANK || e->top_line || e->top_row)
+        e->top_blank = 0;
+    while (e->top_blank > 0 && cursor_screen_row(e, e->height - 1) > e->height - 1)
+        e->top_blank--;
     cr = ed_cursor_row(e);
     if (vpos_before(e->cy, cr, e->top_line, e->top_row)) {
         e->top_line = e->cy;

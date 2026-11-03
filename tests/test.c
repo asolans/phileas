@@ -1213,6 +1213,22 @@ static void test_typewriter(void)
     CHECK(e.top_line == 5 && e.top_blank == 0);
     ed_free(&e);
 
+    /* En clàssic, les dues files en blanc es gasten quan s'arriba a baix */
+    ed_init(&e, 72);
+    e.tw_mode = TW_CLASSIC;
+    for (int i = 0; i < 20; i++) {
+        ed_layout(&e, 80, 22);
+        CHECK(e.top_line == 0 && e.top_blank == (i < 18 ? 2 : 19 - i));
+        ed_insert(&e, "- x", 3);
+        ed_newline(&e);
+    }
+    ed_layout(&e, 80, 22);             /* línia 20: el text puja */
+    CHECK(e.top_line == 1 && e.top_blank == 0);
+    ed_doc_start(&e);
+    ed_layout(&e, 80, 22);             /* tornar a dalt no les recupera */
+    CHECK(e.top_line == 0 && e.top_blank == 0);
+    ed_free(&e);
+
     ed_init(&e, 72);
     e.recenter = 1;                    /* com en obrir un document amb text */
     /* 100 elements de llista: una fila per línia, sense separació */
