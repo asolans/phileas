@@ -292,7 +292,7 @@ Lliures per al futur: Ctrl+D, Ctrl+E, Ctrl+J, Ctrl+K, Ctrl+T, Ctrl+U, F4–F6, F
 - línies consecutives d'una cita (`>`);
 - files d'una taula (`|`);
 - línies dins d'un bloc de codi (` ``` `) i d'una capçalera de metadades YAML (`---` al principi);
-- una línia acabada en salt dur (dos espais o `\` al final).
+- una línia acabada en salt dur (dos espais o `\` al final) amb el text que la continua; una llista, una cita, una capçalera o una nota al peu que vinguin darrere comencen bloc igualment.
 
 **Fitxers amb paràgrafs tallats a mà:** dues línies de text seguides que no formen un bloc unit són un sol paràgraf en Markdown. En carregar s'ajunten amb un espai. El significat del document no canvia, però el fitxer desat ja no tindrà els talls.
 
@@ -1121,3 +1121,4 @@ make clean && make debug   # amb AddressSanitizer i UBSan
 - **2026-11-03** — **Drecera per a la màquina d'escriure**, a petició de l'usuari: F10 i Alt+M executen `maquina-escriure` (salt → fixa → clàssic), com F2/Alt+E per a l'esquema. Alt+M perquè a la consola de Linux algunes F altes poden fallar; F10 perquè és una sola tecla. El menú Vista i l'ajuda (F1) mostren la tecla sols; al README, la taula de dreceres i la descripció del mode. **Proves:** 1.970 comprovacions; en un pty, F10 i Alt+M fan el cicle complet a la barra (fixa, clàssic, salt). **Pendent:** a la Pi.
 - **2026-11-03** — **Versió 2.1.4** (etiqueta `v2.1.4`, `PHILEAS_VERSION` 2.1.4): document nou a dalt amb dues files en blanc (salt i clàssic) i mode de desplaçament a la barra d'estat. Sense provar a la Pi.
 - **2026-11-04** — **Versió 2.1.5** (etiqueta `v2.1.5`, `PHILEAS_VERSION` 2.1.5): drecera F10 / Alt+M per a la màquina d'escriure. Sense provar a la Pi.
+- **2026-11-04** — **Les llistes ja no ballen després de dos espais** (observació de l'usuari: la correcció de les notes al peu de l'1 de novembre no ho resolia quan el paràgraf següent és una llista). `md_tight()` unia qualsevol bloc a una línia amb salt dur; en escriure el segon espai al final d'un paràgraf, la llista de sota pujava una fila i en escriure la lletra següent tornava a baixar. Ara el salt dur només uneix el text (i el sagnat) que continua el paràgraf; els elements de llista seguits continuen units. Conseqüència: un fitxer amb «Text··» i una llista just a sota, sense línia en blanc, es desa amb la línia en blanc (el Markdown és equivalent). **Proves:** 1.973 comprovacions; amb el codi antic la separació feia 1 → 0 → 1 en escriure espai, espai, lletra, i ara es manté. **Pendent:** a la Pi.

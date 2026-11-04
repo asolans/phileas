@@ -1511,6 +1511,16 @@ static void test_footnotes(void)
     CHECK(buf_gap_after(&b, 0) && md_tight(MD_TEXT | MD_HARDBREAK, MD_TEXT));
     buf_free(&b);
 
+    /* Ni una llista, una cita o una capçalera; els elements de llista
+     * seguits continuen units */
+    buf_init(&b);
+    buf_insert(&b, (Pos){ 0, 0 }, "Text  \n- a  \n- b  \n> c", 22);
+    buf_scan(&b);
+    CHECK(b.nlines == 4 && buf_gap_after(&b, 0) && !buf_gap_after(&b, 1) && buf_gap_after(&b, 2));
+    buf_free(&b);
+    CHECK(!md_tight(MD_TEXT | MD_HARDBREAK, MD_HEADING) && md_tight(MD_LIST | MD_HARDBREAK, MD_TEXT));
+    CHECK(md_tight(MD_TEXT | MD_HARDBREAK, MD_UNDERLINE));
+
     buf_init(&b);
     buf_insert(&b, (Pos){ 0, 0 }, doc, sizeof doc - 1);
     buf_scan(&b);

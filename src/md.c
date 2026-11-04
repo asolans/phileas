@@ -202,7 +202,10 @@ int md_tight(int k1, int k2)
         return 1;
     if (b1 == MD_META && b2 == MD_META)
         return 1;
-    if (k1 & MD_HARDBREAK)
+    /* El salt dur només uneix el text que continua el paràgraf; una llista,
+     * una cita o una capçalera comencen bloc igualment (si no, pujarien i
+     * baixarien mentre s'escriuen els dos espais) */
+    if ((k1 & MD_HARDBREAK) && (b2 == MD_TEXT || b2 == MD_INDENT))
         return 1;
     if (b1 == b2 && (b1 == MD_LIST || b1 == MD_QUOTE || b1 == MD_TABLE ||
                      b1 == MD_HTML || b1 == MD_INDENT))
