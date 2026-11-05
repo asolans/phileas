@@ -2,6 +2,7 @@
 #define PHILEAS_EDITOR_H
 
 #include "buffer.h"
+#include "calaix.h"
 
 /* Accions que s'agrupen en un sol pas de desfer si es repeteixen seguides */
 enum {
@@ -75,6 +76,7 @@ typedef struct {
     char    dict[64];          /* diccionari triat: "ca", "es" (F8), o el de -d o «idioma» */
     char    dict_loaded[64];   /* el que hi ha carregat; "" = cap */
     char    calaix[1024];      /* fitxer del calaix d'idees (opció «calaix») */
+    CalaixState cstate;        /* font activa del calaix i fonts recents */
     char    langs[MAX_LANGS][16]; /* rotació de F8 */
     int     nlangs;
     int     spell_start;       /* activar l'ortografia en arrencar */

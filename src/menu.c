@@ -63,6 +63,7 @@ static const Menu m_edit = { "Edita", (const MenuItem[]){
     SEP,
     { 'f', "Idea al calaix",       "calaix-idea",     NULL, NULL },
     { 'l', "Selecció al calaix",   "calaix-seleccio", NULL, NULL },
+    { 'o', "Font del calaix…",     "calaix-font",     NULL, NULL },
     { 0 } } };
 
 static const Menu m_find = { "Cerca", (const MenuItem[]){

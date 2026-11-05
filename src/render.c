@@ -415,7 +415,7 @@ static size_t fit_chars(const char *s, int n)
 static void draw_status(Editor *e)
 {
     int y = LINES - 2;
-    char left[512], right[64], code[16] = "";
+    char left[512], right[96], code[16] = "", font[40] = "";
     size_t words = buf_words(&e->buf);
     /* Mode de desplaçament, discret, al principi de la part dreta */
     const char *tw = e->tw_mode == TW_SALT ? "salt" : e->tw_mode == TW_FIXA ? "fixa" : "clàssic";
@@ -428,7 +428,9 @@ static void draw_status(Editor *e)
         spell_code(spell_lang(), code, sizeof code - 2);
         strcat(code, "  ");
     }
-    snprintf(right, sizeof right, "%s  %s%zu %s  %zu pàg. ", tw, code,
+    if (e->cstate.font[0])
+        snprintf(font, sizeof font, "[%.*s]  ", (int)fit_chars(e->cstate.font, 20), e->cstate.font);
+    snprintf(right, sizeof right, "%s%s  %s%zu %s  %zu pàg. ", font, tw, code,
              words, words == 1 ? "paraula" : "paraules", buf_pages(&e->buf));
     rlen = (int)utf8_count(right, strlen(right));
 

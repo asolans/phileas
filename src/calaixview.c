@@ -113,7 +113,7 @@ static void draw(View *v)
     }
 }
 
-int calaix_view(Editor *e, char *out, size_t outsz)
+int calaix_view(Editor *e, size_t *line)
 {
     View v;
     size_t len;
@@ -166,10 +166,7 @@ int calaix_view(Editor *e, char *out, size_t outsz)
             break;
         case '\n':
             if (v.nshown) {
-                size_t hl;
-                const char *head = calaix_head(&v.c, v.shown[v.sel], &hl);
-
-                snprintf(out, outsz, "%.*s", (int)hl, head);
+                *line = calaix_line(&v.c, v.shown[v.sel]);
                 done = chosen = 1;
             }
             break;

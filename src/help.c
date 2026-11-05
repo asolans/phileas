@@ -36,7 +36,7 @@ static const struct {
         "nova-linia", "tabulador", "esborrar-enrere", "esborrar-endavant",
         "esborrar-paraula-anterior", "esborrar-paraula-seguent", "pujar-paragraf",
         "baixar-paragraf", "tipografia", "nota-peu", "anar-a-nota", "renumerar-notes",
-        "desfer", "refer", "calaix-idea", "calaix-seleccio", NULL } },
+        "desfer", "refer", "calaix-idea", "calaix-seleccio", "calaix-font", NULL } },
     { "Cerca", (const char *const[]){
         "cercar", "cercar-seguent", "cercar-anterior", "substituir", NULL } },
     { "Ortografia", (const char *const[]){
@@ -57,6 +57,7 @@ static const char *const intro[] = {
     "Navegador (Ctrl+O): Enter obre, ← puja, escriu per filtrar.",
     "Fitxer nou sense extensió (navegador, Desa com): es crea amb .md.",
     "Notes al peu (F5): [^1] al text i «[^1]: text» al final; F6 va i torna.",
+    "Calaix (F9): la idea va amb la font activa i la pàgina; calaix-font canvia la font (Tab: recents).",
     "Una línia amb només *** es mostra centrada a la pantalla (el fitxer no canvia).",
     "Recents (Alt+O): Enter obre, Supr treu de la llista; el cursor torna on era.",
     "Esquema (F2): capçaleres i paraules de cada secció; Enter hi va, Alt+↑/↓ mou la secció.",

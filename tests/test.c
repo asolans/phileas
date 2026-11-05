@@ -1848,37 +1848,108 @@ static void test_history(void)
 
 static void test_calaix(void)
 {
-    char path[PATH_MAX], err[256], head[512];
+    char path[PATH_MAX], err[256], head[512], conf[PATH_MAX];
     Calaix c;
+    CalaixState st, st2;
     size_t hl;
     const char *h;
+    FILE *f;
 
     snprintf(path, sizeof path, "%s/calaix.md", tmpdir);
     unlink(path);
     CHECK(calaix_load(path, &c) == 0 && c.n == 0);
     calaix_free(&c);
 
-    CHECK(calaix_append(path, "a.md, línia 3", " personatge, #final ", "Una idea.\n", 10,
+    /* Amb font i pàgina; sense font; sense res */
+    CHECK(calaix_append(path, "Prous, 1935", "42", " personatge, #final ", "/t/a.md:3", "Una idea.\n", 10,
                         err, sizeof err) == 0);
-    CHECK(calaix_append(path, "sense nom, línia 1", NULL, "## Dins\n\nno és capçalera",
+    CHECK(calaix_append(path, NULL, NULL, "dins", NULL, "## Dins\n\nno és capçalera",
                         strlen("## Dins\n\nno és capçalera"), err, sizeof err) == 0);
+    CHECK(calaix_append(path, "", "", "", NULL, "res", 3, err, sizeof err) == 0);
     CHECK(calaix_load(path, &c) == 0);
-    CHECK(c.n == 2);
+    CHECK(c.n == 3);
+    CHECK(c.flags[0] == CAL_CLOSED && c.flags[1] == CAL_CLOSED && c.flags[2] == CAL_CLOSED);
     h = calaix_head(&c, 0, &hl);
     snprintf(head, sizeof head, "%.*s", (int)hl, h);
-    CHECK(strstr(head, "## ") == head);
-    CHECK(strstr(head, " · a.md, línia 3 · #personatge #final") != NULL);
+    CHECK(!strcmp(head, "## Prous, 1935 · p. 42 · #personatge #final"));
+    h = calaix_head(&c, 1, &hl);
+    snprintf(head, sizeof head, "%.*s", (int)hl, h);
+    CHECK(!strcmp(head, "## #dins"));
+    h = calaix_head(&c, 2, &hl);
+    snprintf(head, sizeof head, "%.*s", (int)hl, h);
+    CHECK(!strcmp(head, "## (idea)"));
+    CHECK(calaix_line(&c, 0) == 3);
     CHECK(calaix_match(&c, 0, "PERSONATGE"));
+    CHECK(calaix_match(&c, 0, "/t/a.md:3"));    /* el peu compta */
     CHECK(calaix_match(&c, 0, ""));
     CHECK(!calaix_match(&c, 0, "dins"));
     CHECK(calaix_match(&c, 1, "DINS"));
     CHECK(!calaix_match(&c, 1, "personatge"));
     calaix_free(&c);
 
+    /* La font no pot trencar la capçalera: salts i «·» */
+    unlink(path);
+    CHECK(calaix_append(path, "A · B\nC", "x", NULL, NULL, "t", 1, err, sizeof err) == 0);
+    CHECK(calaix_load(path, &c) == 0 && c.n == 1);
+    h = calaix_head(&c, 0, &hl);
+    snprintf(head, sizeof head, "%.*s", (int)hl, h);
+    CHECK(!strcmp(head, "## A - B C · p. x"));
+    calaix_free(&c);
+
+    /* Un calaix en el format antic: es llegeix, i l'última entrada es tanca */
+    unlink(path);
+    f = fopen(path, "w");
+    CHECK(f != NULL);
+    fputs("# Calaix\n\n## 2026-11-02 10:15 · a.md, línia 4 · #u\n\nvella 1\n\n"
+          "## 2026-11-03 11:00 · b.md, línia 1 · #d\n\nvella 2\n\n## Dins\n\nencara vella 2\n", f);
+    fclose(f);
+    CHECK(calaix_load(path, &c) == 0 && c.n == 2);
+    CHECK(c.flags[0] == CAL_OLD && c.flags[1] == CAL_OLD);
+    calaix_free(&c);
+    CHECK(calaix_append(path, "Llibre", "7", "nova", NULL, "nova", 4, err, sizeof err) == 0);
+    CHECK(calaix_load(path, &c) == 0 && c.n == 3);
+    CHECK((c.flags[1] & CAL_CLOSED) && (c.flags[1] & CAL_OLD));
+    CHECK(c.flags[2] == CAL_CLOSED);
+    CHECK(strstr(c.text, "\n\xe2\x88\x99 2026-11-03\n") != NULL);   /* peu de l'antiga */
+    CHECK(calaix_match(&c, 1, "encara vella 2") && !calaix_match(&c, 2, "encara vella 2"));
+    calaix_free(&c);
+
     /* Un document que no existeix ni la carpeta no es pot desar */
     snprintf(path, sizeof path, "%s/no-existeix/calaix.md", tmpdir);
-    CHECK(calaix_append(path, "x", NULL, "y", 1, err, sizeof err) == -1);
+    CHECK(calaix_append(path, NULL, NULL, NULL, NULL, "y", 1, err, sizeof err) == -1);
     CHECK(err[0] != '\0');
+
+    /* Estat: font activa, pàgina i recents; es desa i es torna a llegir */
+    snprintf(conf, sizeof conf, "%s/conf-calaix", tmpdir);
+    setenv("PHILEAS_CONFIG", conf, 1);
+    calaix_state_load(&st);
+    CHECK(st.font[0] == '\0' && st.nrecent == 0);
+    calaix_state_set_font(&st, "Prous, 1935");
+    snprintf(st.page, sizeof st.page, "42");
+    calaix_state_set_font(&st, "Prous, 1935");          /* la mateixa: la pàgina es manté */
+    CHECK(!strcmp(st.page, "42"));
+    calaix_state_set_font(&st, "Cabanellas");           /* una altra: s'esborra */
+    CHECK(st.page[0] == '\0' && st.nrecent == 2);
+    calaix_state_set_font(&st, "Prous, 1935");          /* torna al capdavant, sense duplicar */
+    CHECK(st.nrecent == 2 && !strcmp(st.recent[0], "Prous, 1935"));
+    snprintf(st.page, sizeof st.page, "43");
+    CHECK(calaix_state_save(&st) == 0);
+    calaix_state_load(&st2);
+    CHECK(!strcmp(st2.font, "Prous, 1935") && !strcmp(st2.page, "43") && st2.nrecent == 2);
+    CHECK(!strcmp(st2.recent[1], "Cabanellas"));
+    calaix_state_set_font(&st2, "");                    /* cap font */
+    CHECK(st2.font[0] == '\0' && st2.nrecent == 2);
+    for (int i = 0; i < CALAIX_RECENT + 5; i++) {
+        char nom[32];
+
+        snprintf(nom, sizeof nom, "Font %d", i);
+        calaix_state_set_font(&st2, nom);
+    }
+    CHECK(st2.nrecent == CALAIX_RECENT && !strcmp(st2.recent[0], "Font 24"));
+    snprintf(path, sizeof path, "%s/calaix-font", conf);
+    unlink(path);
+    rmdir(conf);
+    unsetenv("PHILEAS_CONFIG");
 }
 
 int main(void)

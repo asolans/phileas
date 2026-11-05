@@ -468,37 +468,70 @@ static int calaix_is_open(const Editor *e)
     return !strcmp(fa, fb);
 }
 
-/* Origen de l'entrada: el nom del document i la línia del cursor */
+/* Origen de l'entrada: el camí absolut del document i la línia del cursor.
+ * Sense document, buit. */
 static void calaix_origin(const Editor *e, char *out, size_t size)
 {
-    const char *name = e->filename ? strrchr(e->filename, '/') : NULL;
+    char abs[PATH_MAX];
 
-    name = name ? name + 1 : e->filename ? e->filename : "sense nom";
-    snprintf(out, size, "%s, línia %zu", name, e->cy + 1);
+    if (!e->filename) {
+        out[0] = '\0';
+        return;
+    }
+    snprintf(out, size, "%s:%zu", realpath(e->filename, abs) ? abs : e->filename, e->cy + 1);
 }
 
-/* Demana les etiquetes i afegeix el text al calaix */
-/* 1 si l'entrada s'ha desat */
+/* Desa l'estat de la font; si no es pot, avisa però no perd la idea */
+static void calaix_state_keep(Editor *e)
+{
+    if (calaix_state_save(&e->cstate) < 0)
+        ed_msg(e, "No s'ha pogut desar la font del calaix: %s", strerror(errno));
+}
+
+/* Afegeix una idea al calaix. Amb font activa demana la pàgina (la de l'última
+ * idea de la mateixa font, per defecte); després el text, si text és NULL, i
+ * les etiquetes. 1 si l'entrada s'ha desat. */
 static int calaix_add(Editor *e, const char *text, size_t n)
 {
-    char tags[256] = "", origin[PATH_MAX + 64], err[256];
+    CalaixState *st = &e->cstate;
+    char page[CALAIX_PAGE_MAX] = "", tags[256] = "", idea[1024] = "";
+    char origin[PATH_MAX + 32], err[256], label[256];
 
+    if (st->font[0]) {
+        snprintf(page, sizeof page, "%s", st->page);
+        snprintf(label, sizeof label, "%.40s · pàgina (buit = cap): ", st->font);
+        if (!prompt(e, label, page, sizeof page, NULL))
+            return 0;
+    }
+    if (!text) {
+        if (!prompt(e, "Idea: ", idea, sizeof idea, NULL) || !idea[0])
+            return 0;
+        text = idea;
+        n = strlen(idea);
+    }
     if (!prompt(e, "Etiquetes (opcional): ", tags, sizeof tags, NULL))
         return 0;
     calaix_origin(e, origin, sizeof origin);
-    if (calaix_append(e->calaix, origin, tags, text, n, err, sizeof err) < 0) {
+    if (calaix_append(e->calaix, st->font, page, tags, origin, text, n, err, sizeof err) < 0) {
         ed_msg(e, "No s'ha pogut desar al calaix: %s", err);
         return 0;
     }
-    ed_msg(e, "Afegit al calaix: %s", origin);
+    if (st->font[0]) {
+        if (strcmp(st->page, page)) {
+            snprintf(st->page, sizeof st->page, "%s", page);
+            calaix_state_keep(e);
+        }
+        ed_msg(e, "Afegit al calaix: %s%s%s", st->font, page[0] ? ", p. " : "", page);
+    } else {
+        ed_msg(e, "Afegit al calaix");
+    }
     return 1;
 }
 
-/* Amb una selecció, la idea és el bloc seleccionat (només es demanen les
- * etiquetes); sense selecció, es demana el text de la idea. */
+/* Amb una selecció, la idea és el bloc seleccionat (no es demana el text);
+ * sense selecció, es demana el text de la idea. */
 static void c_calaix_idea(Editor *e)
 {
-    char text[1024] = "";
     Pos a, z;
     size_t n;
     char *sel;
@@ -514,9 +547,47 @@ static void c_calaix_idea(Editor *e)
         free(sel);
         return;
     }
-    if (!prompt(e, "Idea: ", text, sizeof text, NULL) || !text[0])
+    calaix_add(e, NULL, 0);
+}
+
+/* Tab: completa la font amb les recents i mostra les que coincideixen */
+static void font_complete(Editor *e, char *buf, size_t size, char *hint, size_t hintsz)
+{
+    const CalaixState *s = &e->cstate;
+    const char *names[CALAIX_RECENT];
+    size_t len, used = 0;
+
+    for (size_t i = 0; i < s->nrecent; i++)
+        names[i] = s->recent[i];
+    hint[0] = '\0';
+    if (s->nrecent == 0) {
+        snprintf(hint, hintsz, "  (cap font recent)");
         return;
-    calaix_add(e, text, strlen(text));
+    }
+    complete_word(buf, size, names, s->nrecent);
+    len = strlen(buf);
+    for (size_t i = 0; i < s->nrecent && used + 4 < hintsz; i++)
+        if (!strncmp(names[i], buf, len))
+            used += (size_t)snprintf(hint + used, hintsz - used, "%s %s", used ? " |" : "  ", names[i]);
+}
+
+/* El diàleg comença buit: Enter manté la font activa, «-» la treu i Tab ofereix les recents */
+static void c_calaix_font(Editor *e)
+{
+    char buf[CALAIX_FONT_MAX] = "", label[160];
+
+    if (e->cstate.font[0])
+        snprintf(label, sizeof label, "Font [%.30s] (Enter: mantén, -: cap, Tab: recents): ", e->cstate.font);
+    else
+        snprintf(label, sizeof label, "Font [cap] (Tab: recents): ");
+    if (!prompt_complete(e, label, buf, sizeof buf, font_complete) || !buf[0])
+        return;
+    calaix_state_set_font(&e->cstate, strcmp(buf, "-") ? buf : "");
+    calaix_state_keep(e);
+    if (e->cstate.font[0])
+        ed_msg(e, "Font del calaix: %s", e->cstate.font);
+    else
+        ed_msg(e, "Calaix sense font");
 }
 
 static void c_calaix_seleccio(Editor *e)
@@ -539,26 +610,15 @@ static void c_calaix_seleccio(Editor *e)
     free(text);
 }
 
-/* Va a la capçalera d'una entrada del document obert */
-static void calaix_goto(Editor *e, const char *head)
-{
-    for (size_t i = 0; i < e->buf.nlines; i++)
-        if (!strcmp(e->buf.lines[i].text, head)) {
-            ed_goto_line(e, i + 1);
-            return;
-        }
-    ed_msg(e, "No s'ha trobat l'entrada al document");
-}
-
 static void c_calaix(Editor *e)
 {
-    char head[1024];
+    size_t line;
 
-    if (!calaix_view(e, head, sizeof head))
+    if (!calaix_view(e, &line))
         return;
     open_path(e, e->calaix);
     if (calaix_is_open(e))
-        calaix_goto(e, head);
+        ed_goto_line(e, line);
 }
 
 static void c_new(Editor *e)
@@ -1204,7 +1264,8 @@ static const Command commands[] = {
     { "renumerar-notes",           c_renumber_notes, "Numera les notes 1, 2, 3… en l'ordre del text i n'ordena les definicions", ACT_NONE },
     { "calaix",                    c_calaix,         "Mostra el calaix d'idees i va a l'entrada triada", ACT_NONE },
     { "calaix-idea",               c_calaix_idea,    "Afegeix al calaix d'idees la selecció, o una idea nova si no n'hi ha (F9)", ACT_NONE },
-    { "calaix-seleccio",           c_calaix_seleccio, "Envia la selecció al calaix d'idees, amb la referència al document", ACT_NONE },
+    { "calaix-seleccio",           c_calaix_seleccio, "Envia la selecció al calaix d'idees, amb la font i la pàgina", ACT_NONE },
+    { "calaix-font",               c_calaix_font,    "Tria la font (llibre o article) que el calaix proposa a cada idea", ACT_NONE },
     { "tallar",                    c_cut,            "Talla la selecció", ACT_NONE },
     { "copiar",                    c_copy,           "Copia la selecció", ACT_NONE },
     { "enganxar",                  c_paste,          "Enganxa el porta-retalls (el del sistema, si n'hi ha)", ACT_NONE },

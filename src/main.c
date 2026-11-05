@@ -139,6 +139,7 @@ int main(int argc, char **argv)
     config_bind_hook = cmd_config_bind;
     config_extern_hook = cmd_config_extern;
     cfg_errors = config_load(&e, CONFIG_SYSTEM, NULL, cfg_msg, sizeof cfg_msg);
+    calaix_state_load(&e.cstate);
 
     if (optind < argc) {
         char path[PATH_MAX];

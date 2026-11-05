@@ -90,13 +90,20 @@ només serveix per escriure.
   cursor**: en tornar a obrir un document, el cursor és on era. Tot es desa
   al fitxer `historial` del directori de configuració, fora dels documents,
   que no es modifiquen.
-- **Calaix d'idees:** F9 afegeix una idea mentre s'escriu, i Esc → Edita →
-  Selecció al calaix hi envia el bloc seleccionat amb la referència al
-  document i a la línia. Cada entrada és un paràgraf Markdown amb data,
-  origen i etiquetes `#paraula`; Fitxer → Calaix d'idees (o l'ordre
+- **Calaix d'idees, orientat a la referència:** F9 afegeix una idea mentre
+  s'escriu, i Esc → Edita → Selecció al calaix hi envia el bloc seleccionat.
+  Cada entrada és `## font · p. pàgina · #etiquetes`, el text i un peu
+  `∙ data · document:línia`; sense font, només `## #etiquetes`. La **font
+  activa** (un llibre o article, p. ex. «Prous, 1935») es recorda entre
+  sessions i es proposa a cada idea fins que es canvia: Esc → Edita → Font del
+  calaix (o l'ordre `calaix-font`; Enter manté, `-` treu la font, Tab ofereix
+  les recents). Amb font activa, F9 demana la pàgina (la de l'última idea, per
+  defecte) i la font surt a la barra d'estat. Fitxer → Calaix d'idees (o
   `calaix`) les llista, filtrables, i porta a l'entrada triada. Es desa al
-  fitxer de l'opció `calaix` (per defecte `~/calaix.md`). Mentre el calaix
-  és obert com a document, no s'hi afegeix res.
+  fitxer de l'opció `calaix` (per defecte `~/calaix.md`) i la font activa a
+  `calaix-font` del directori de configuració. Mentre el calaix és obert com a
+  document, no s'hi afegeix res. Els calaixos antics (capçalera amb data i hora)
+  es continuen llegint.
 - **Ordres externes:** es poden afegir a la paleta ordres del sistema
   (exportar amb pandoc, comptar paraules, enviar el text…).
 - **UTF-8 complet:** accents, ç, l·l, cometes tipogràfiques i caràcters
@@ -303,7 +310,7 @@ de recordar tres tecles: **Esc** (menús), **F1** (ajuda) i **Ctrl+P**
 | F10 / Alt+M | màquina d'escriure: salt, línia fixa o clàssic |
 | F2 / Alt+E | esquema del document |
 | F5 / F6 | nota al peu nova / anar de la crida a la nota i tornar |
-| F9 | al calaix d'idees: la selecció (només es demanen les etiquetes), o una idea nova si no n'hi ha |
+| F9 | al calaix d'idees: la selecció, o una idea nova si no n'hi ha; demana la pàgina (si hi ha font activa) i les etiquetes |
 | Ctrl+L | redibuixar la pantalla |
 
 Les alternatives amb Alt existeixen perquè a la consola de Linux (sense
@@ -422,7 +429,7 @@ cadena musl de Buildroot.
 | `filebrowser.c`, `dirlist.c` | navegador de fitxers |
 | `outline.c`, `outlineview.c` | esquema: capçaleres i paraules per secció, i el seu diàleg |
 | `footnote.c` | notes al peu: inserir, anar i tornar, renumerar |
-| `calaix.c`, `calaixview.c` | calaix d'idees: format, escriptura atòmica i la llista filtrable |
+| `calaix.c`, `calaixview.c` | calaix d'idees: format, escriptura atòmica, font activa persistent i la llista filtrable |
 | `history.c`, `recentview.c` | historial: posició del cursor per document i documents recents |
 | `config.c` | fitxers de configuració |
 | `utf8.c`, `util.c` | UTF-8 i utilitats |
@@ -437,6 +444,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.2.0**: calaix orientat a la referència: capçalera `font · p. pàgina · #etiquetes` i peu `∙ data · document:línia`; font activa persistent (`calaix-font`, F9 la proposa i la barra d'estat la mostra) i pàgina per defecte. El calaix antic es continua llegint.
 - **2.1.7**: una línia que només conté `***` es mostra centrada a la pantalla (només vista; el fitxer no canvia).
 - **2.1.6**: les llistes ja no pugen ni baixen en escriure després de dos espais al final d'un paràgraf.
 - **2.1.5**: drecera F10 / Alt+M per canviar el mode de la màquina d'escriure (salt, fixa, clàssic).
