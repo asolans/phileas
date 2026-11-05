@@ -435,6 +435,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.1.6**: les llistes ja no pugen ni baixen en escriure després de dos espais al final d'un paràgraf.
 - **2.1.5**: drecera F10 / Alt+M per canviar el mode de la màquina d'escriure (salt, fixa, clàssic).
 - **2.1.4**: màquina d'escriure: un document nou comença a dalt, amb dues files en blanc (també en clàssic), i el mode de desplaçament surt a la barra d'estat.
 - **2.1.3**: calaix d'idees (F9, Edita → Selecció al calaix, Fitxer → Calaix d'idees; opció `calaix`).
