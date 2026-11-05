@@ -91,13 +91,13 @@ només serveix per escriure.
   al fitxer `historial` del directori de configuració, fora dels documents,
   que no es modifiquen.
 - **Calaix d'idees, orientat a la referència:** F9 afegeix una idea mentre
-  s'escriu, i Esc → Edita → Selecció al calaix hi envia el bloc seleccionat.
+  s'escriu; amb un bloc seleccionat, F9 hi envia el bloc.
   Cada entrada és `## font · p. pàgina · #etiquetes`, el text i un peu
   `∙ data · document:línia`; sense font, només `## #etiquetes`. La **font
   activa** (un llibre o article, p. ex. «Prous, 1935») es recorda entre
   sessions i es proposa a cada idea fins que es canvia: Esc → Edita → Font del
-  calaix (o l'ordre `calaix-font`; Enter manté, `-` treu la font, Tab ofereix
-  les recents). Amb font activa, F9 demana la pàgina (la de l'última idea, per
+  calaix (o l'ordre `calaix-font`): un camp editable amb la font actual; escriure-hi
+  la canvia i esborrar-la la treu. Amb font activa, F9 demana la pàgina (la de l'última idea, per
   defecte) i la font surt a la barra d'estat. Fitxer → Calaix d'idees (o
   `calaix`) les llista, filtrables, i porta a l'entrada triada. Es desa al
   fitxer de l'opció `calaix` (per defecte `~/calaix.md`) i la font activa a
@@ -444,6 +444,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.2.1**: «Font del calaix» és un camp editable amb la font actual (esborrar-la la treu; sense Tab ni `-`); s'elimina «Selecció al calaix», perquè F9 ja envia la selecció.
 - **2.2.0**: calaix orientat a la referència: capçalera `font · p. pàgina · #etiquetes` i peu `∙ data · document:línia`; font activa persistent (`calaix-font`, F9 la proposa i la barra d'estat la mostra) i pàgina per defecte. El calaix antic es continua llegint.
 - **2.1.7**: una línia que només conté `***` es mostra centrada a la pantalla (només vista; el fitxer no canvia).
 - **2.1.6**: les llistes ja no pugen ni baixen en escriure després de dos espais al final d'un paràgraf.

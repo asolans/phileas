@@ -61,8 +61,7 @@ static const Menu m_edit = { "Edita", (const MenuItem[]){
     { 'v', "Ves a la nota o torna", "anar-a-nota",    NULL, NULL },
     { 'u', "Renumera les notes",   "renumerar-notes", NULL, NULL },
     SEP,
-    { 'f', "Idea al calaix",       "calaix-idea",     NULL, NULL },
-    { 'l', "Selecció al calaix",   "calaix-seleccio", NULL, NULL },
+    { 'f', "Idea al calaix (F9)",  "calaix-idea",     NULL, NULL },
     { 'o', "Font del calaix…",     "calaix-font",     NULL, NULL },
     { 0 } } };
 
