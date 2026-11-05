@@ -338,6 +338,16 @@ void ui_sync_size(void)
         resize_term(ws.ws_row, ws.ws_col);
 }
 
+/* Una línia que només conté "***" es mostra centrada a la pantalla (només
+ * a la vista: el fitxer no canvia). Retorna la columna de pantalla on
+ * comença, o -1 si la línia no es centra. */
+static int centred_x(const Line *l, size_t r)
+{
+    if (r != 0 || l->nrows != 1 || l->len != 3 || memcmp(l->text, "***", 3) != 0)
+        return -1;
+    return COLS > 3 ? (COLS - 3) / 2 : 0;
+}
+
 /* Dibuixa la fila r de la línia y. [s0, s1) és la part seleccionada i, amb
  * l'enfocament, [f0, f1) la que no s'atenua. */
 static void draw_row(Editor *e, Line *l, size_t r, int y, size_t s0, size_t s1,
@@ -345,16 +355,18 @@ static void draw_row(Editor *e, Line *l, size_t r, int y, size_t s0, size_t s1,
 {
     size_t i = l->rows[r], end = wrap_row_end(l, r);
     int indent = wrap_row_indent(l, r);
+    int cx = centred_x(l, r);
+    int limit = cx >= 0 ? COLS - cx : e->width - indent;
     int col = 0;
 
-    move(y, e->margin + indent);
+    move(y, cx >= 0 ? cx : e->margin + indent);
     while (i < end) {
         wchar_t wc;
         size_t n = utf8_decode(l->text, l->len, i, &wc);
         int w = utf8_width(wc, col);
         int sel = i >= s0 && i < s1;
 
-        if (col + w > e->width - indent)
+        if (col + w > limit)
             break;
         if (e->focus && (i < f0 || i >= f1)) {
             attr_t a = have_colors ? focus_attr : A_DIM;
@@ -431,7 +443,7 @@ static void draw_status(Editor *e)
 void render(Editor *e)
 {
     size_t tl, tr, crow, styled = (size_t)-1, fa = 0, fb = 0;
-    int cur_y = -1, cur_x = 0, has_sel;
+    int cur_y = -1, cur_x = 0, has_sel, cx;
     Pos sa, sz;
 
     ed_layout(e, COLS, LINES);
@@ -459,7 +471,8 @@ void render(Editor *e)
         }
         if (tl == e->cy && tr == crow) {
             cur_y = y;
-            cur_x = e->margin + ed_cursor_x(e);
+            cx = centred_x(ed_line(e, tl), tr);
+            cur_x = (cx >= 0 ? cx : e->margin) + ed_cursor_x(e);
         }
         if (!ed_vpos_next(e, &tl, &tr))
             break;
