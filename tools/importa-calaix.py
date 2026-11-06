@@ -7,7 +7,7 @@ Què ja s'ha importat ho diu el vault mateix: cada nota porta `calaix: ID` i
 es compta encara que l'hagis moguda o reanomenada; si l'esborres, es torna a crear.
 
 Opcions (no cal cap): --simula (no escriu res), --reimporta (torna a crear
-també les que ja hi són), --calaix FITXER i --config FITXER.
+també les que ja hi són), --calaix FITXER, --config FITXER i --inicia VAULT (crea la configuració).
 Sense --calaix, fa servir el calaix.md de la carpeta des d'on es crida.
 
 Els vaults, la carpeta d'entrada i la resta de la configuració són en un fitxer
@@ -250,10 +250,35 @@ def avisa(titol, text):
             pass
 
 
+def inicia(camí, vault):
+    """Crea la configuració mínima amb un vault; no toca una configuració existent."""
+    v = Path(vault).expanduser()
+    if not v.is_dir():
+        avisa("Calaix", f"{v} no és una carpeta. Indica la carpeta del vault d'Obsidian.")
+        return 1
+    if camí.exists():
+        avisa("Calaix", f"Ja existeix {camí}; no la toco. Edita-la a mà.")
+        return 1
+    nom = re.sub(r"[^a-z0-9_-]+", "-", v.resolve().name.lower()).strip("-") or "vault"
+    camí.parent.mkdir(parents=True, exist_ok=True)
+    camí.write_text(f"""# Configuració de phileas-importa-calaix. Només cal el vault.
+[vaults.{nom}]
+vault = "{vault}"
+
+# Avançat (opcional); vegeu importa-calaix.exemple.toml:
+#   inbox = "Inbox-byok"      carpeta d'entrada del vault
+#   camp_tipus = "tipus"      nom de la propietat del tipus (Idea, Cita, Observació)
+#   [fonts."Prous, 1935"]     fonts conegudes, i `textos` / `defecte` si hi ha diversos vaults
+""", encoding="utf-8")
+    avisa("Calaix", f"Configuració creada: {camí}\nVault «{nom}» = {vault}\nAra ja pots executar phileas-importa-calaix des de la carpeta del calaix.md.")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--calaix", default=None)
     ap.add_argument("--config", help="fitxer de configuració (per defecte ~/.config/phileas/importa-calaix.toml)")
+    ap.add_argument("--inicia", metavar="VAULT", help="crea la configuració amb aquest vault d'Obsidian i surt")
     ap.add_argument("--simula", action="store_true", help="mostra què es faria, sense escriure res")
     ap.add_argument("--reimporta", action="store_true", help="torna a crear també les notes que ja hi són")
     a = ap.parse_args()
@@ -261,12 +286,13 @@ def main():
         a.calaix = str(Path.cwd() / "calaix.md")  # el que `envia` va deixar a la carpeta des d'on es crida
 
     camí = camí_config(a.config)
+    if a.inicia:
+        return inicia(camí, a.inicia)
     try:
         cfg.update(llegeix_config(camí))
     except FileNotFoundError:
-        ex = next((d / TOML_EXEMPLE for d in (Path(__file__).resolve().parent,
-                   Path("/usr/share/doc/phileas/examples")) if (d / TOML_EXEMPLE).exists()), TOML_EXEMPLE)
-        avisa("Calaix", f"No trobo la configuració {camí}.\nCopia el model i edita'l:\n  mkdir -p {camí.parent} && cp {ex} {camí}")
+        avisa("Calaix", f"No trobo la configuració {camí}.\nCrea-la amb el teu vault d'Obsidian:\n"
+                        "  phileas-importa-calaix --inicia ~/Documents/ElTeuVault")
         return 1
     except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
         avisa("Calaix", f"Configuració no vàlida ({camí}):\n{exc}")

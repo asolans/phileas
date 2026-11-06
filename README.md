@@ -105,7 +105,7 @@ només serveix per escriure.
   `calaix-font` del directori de configuració. Mentre el calaix és obert com a
   document, no s'hi afegeix res. El format antic (capçalera amb data i hora) ja no es llegeix.
   Per portar el calaix a Obsidian, `tools/importa-calaix.py` (el `.deb` l'instal·la com a
-  `phileas-importa-calaix`, amb `python3` ≥ 3.11) crea una nota per idea a la carpeta `Inbox-byok` del vault; la configuració (vaults) és a `~/.config/phileas/importa-calaix.toml`, fora de la release (model: `importa-calaix.exemple.toml`, al `.deb` a `/usr/share/doc/phileas/examples/`; si falta, l'importador diu com copiar-lo).
+  `phileas-importa-calaix`, amb `python3` ≥ 3.11) crea una nota per idea a la carpeta `Inbox-byok` del vault; la configuració (vaults) és a `~/.config/phileas/importa-calaix.toml`, fora de la release (es crea amb `phileas-importa-calaix --inicia ~/Documents/ElVault`, que només necessita el vault; model complet: `importa-calaix.exemple.toml`, al `.deb` a `/usr/share/doc/phileas/examples/`; si falta, l'importador diu com copiar-lo).
 - **Ordres externes:** es poden afegir a la paleta ordres del sistema
   (exportar amb pandoc, comptar paraules, enviar el text…).
 - **UTF-8 complet:** accents, ç, l·l, cometes tipogràfiques i caràcters
@@ -446,6 +446,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.2.7**: `phileas-importa-calaix --inicia VAULT` crea la configuració mínima (només cal el vault; la resta té valors per defecte); l'avís quan falta la configuració ho explica; model reordenat amb el mínim a dalt.
 - **2.2.6**: `phileas-importa-calaix` instal·lat fa servir el `calaix.md` de la carpeta des d'on es crida (abans el buscava a `/usr/bin`); la 2.2.5 no es va publicar.
 - **2.2.5**: arregla `phileas-importa-calaix` instal·lat: cerca `calaix.md` al costat de l'script, a la carpeta actual i a `~/BYOK` (abans només al costat de l'script, és a dir `/usr/bin`).
 - **2.2.4**: el `.deb` instal·la l'importador com a ordre (`phileas-importa-calaix`), depèn de `python3` ≥ 3.11, i l'importador explica com copiar el model de configuració si falta.

@@ -1,10 +1,18 @@
-# Configuració de tools/importa-calaix.py.
-# Copia aquest fitxer a ~/.config/phileas/importa-calaix.toml i edita'l.
+# Model de configuració de phileas-importa-calaix (~/.config/phileas/importa-calaix.toml).
+# La manera fàcil de crear-la:  phileas-importa-calaix --inicia ~/Documents/ElTeuVault
+#
+# MÍNIM: només cal això (la resta té valors per defecte).
+#
+#   [vaults.recerca]
+#   vault = "~/Documents/Recerca"
+#
+# AVANÇAT (tot opcional):
 
 # Carpeta d'entrada de cada vault quan no se'n diu cap altra
 inbox = "Inbox-byok"
 
 # Projecte (vault) quan no se'n pot deduir cap; ha de ser un de [vaults]
+# (per defecte, el primer)
 defecte = "exemple"
 
 # El projecte d'una idea és la primera carpeta del seu document darrere d'aquests camins
@@ -17,7 +25,7 @@ vault = "~/Documents/Exemple"
 inbox = "Inbox-byok"
 camp_tipus = "tipus"
 
-# Fonts conegudes (opcional): a quin projecte van. La propietat «font» de la
+# Fonts conegudes: a quin projecte van. La propietat «font» de la
 # nota importada és sempre un enllaç al document de la font al vault
 # («[[Prous, 1935]]»); `resum` el canvia pel nom d'una altra nota.
 # [fonts."Prous, 1935"]
