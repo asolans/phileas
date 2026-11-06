@@ -18,7 +18,6 @@ strip --strip-unneeded "$ARREL/usr/bin/phileas"
 DOC="$ARREL/usr/share/doc/phileas"
 install -D -m 0644 README.md "$DOC/README.md"
 install -D -m 0755 tools/importa-calaix.py "$ARREL/usr/bin/phileas-importa-calaix"
-install -D -m 0644 tools/importa-calaix.exemple.toml "$DOC/examples/importa-calaix.exemple.toml"
 install -D -m 0644 packaging/copyright "$DOC/copyright"
 printf 'phileas (%s) unstable; urgency=low\n\n  * Versió %s.\n\n -- %s  %s\n' \
     "$VERSIO" "$VERSIO" "Àngel Solans <asolans@xtec.cat>" "$(date -R)" |
@@ -33,7 +32,7 @@ Version: $VERSIO
 Architecture: $ARQ
 Maintainer: Àngel Solans <asolans@xtec.cat>
 Installed-Size: $MIDA
-Depends: libc6 (>= 2.34), libncursesw6 (>= 6), libtinfo6 (>= 6), python3 (>= 3.11)
+Depends: libc6 (>= 2.34), libncursesw6 (>= 6), libtinfo6 (>= 6), python3
 Recommends: libhunspell-1.7-0, hunspell-ca, hunspell-es, wl-clipboard | xclip | xsel
 Section: editors
 Priority: optional

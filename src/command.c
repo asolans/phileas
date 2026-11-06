@@ -568,6 +568,154 @@ static void c_calaix_font(Editor *e)
         ed_msg(e, "Calaix sense font");
 }
 
+/* ---- Idees → Obsidian ---- */
+
+/* El camí amb el directori personal com a «~» (per al missatge) */
+static const char *tilde(const char *path, char *out, size_t outsz)
+{
+    const char *home = getenv("HOME");
+    size_t n = home ? strlen(home) : 0;
+
+    if (n > 1 && !strncmp(path, home, n) && (path[n] == '/' || !path[n]))
+        snprintf(out, outsz, "~%s", path + n);
+    else
+        snprintf(out, outsz, "%s", path);
+    return out;
+}
+
+/* Tria la carpeta del vault amb el navegador i, si es vol, els camps addicionals */
+static void c_obsidian_vault(Editor *e)
+{
+    char dir[1024], shown[1100], inbox[sizeof e->obs_inbox], tipus[sizeof e->obs_tipus];
+
+    if (!dir_browser(e, e->obs_vault[0] ? e->obs_vault : getenv("HOME"), dir, sizeof dir))
+        return;
+    snprintf(e->obs_vault, sizeof e->obs_vault, "%s", dir);
+    remember(e, "obsidian-vault", tilde(dir, shown, sizeof shown));
+    if (prompt_yesno(e, "Vols definir també la carpeta d'entrada i la propietat del tipus?")) {
+        snprintf(inbox, sizeof inbox, "%s", e->obs_inbox);
+        if (!prompt(e, "Carpeta d'entrada del vault: ", inbox, sizeof inbox, NULL) || !inbox[0]
+            || strchr(inbox, '/') || strchr(inbox, '"')) {
+            ed_msg(e, "Vault d'Obsidian: %s (carpeta d'entrada sense canviar)", shown);
+            return;
+        }
+        snprintf(tipus, sizeof tipus, "%s", e->obs_tipus);
+        if (!prompt(e, "Propietat del tipus (Idea, Cita, Observació): ", tipus, sizeof tipus, NULL)
+            || !tipus[0] || strchr(tipus, '"')) {
+            ed_msg(e, "Vault d'Obsidian: %s (propietat sense canviar)", shown);
+            return;
+        }
+        snprintf(e->obs_inbox, sizeof e->obs_inbox, "%s", inbox);
+        snprintf(e->obs_tipus, sizeof e->obs_tipus, "%s", tipus);
+        remember(e, "obsidian-inbox", inbox);
+        remember(e, "obsidian-tipus", tipus);
+    }
+    ed_msg(e, "Vault d'Obsidian: %s (carpeta %s, tipus «%s»)", shown, e->obs_inbox, e->obs_tipus);
+}
+
+/* On és el calaix que arriba de la Pi amb «envia» */
+static void c_calaix_pi(Editor *e)
+{
+    char path[1024], shown[1100];
+
+    if (!file_browser(e, path, sizeof path))
+        return;
+    if (path[0] != '/') {
+        char cwd[PATH_MAX], full[PATH_MAX + 1100];
+
+        if (getcwd(cwd, sizeof cwd)) {
+            snprintf(full, sizeof full, "%s/%s", cwd, path);
+            if (strlen(full) < sizeof path)
+                memcpy(path, full, strlen(full) + 1);
+        }
+    }
+    snprintf(e->calaix_pi, sizeof e->calaix_pi, "%s", path);
+    remember(e, "calaix-pi", tilde(path, shown, sizeof shown));
+    ed_msg(e, "Calaix de la Pi: %s", shown);
+}
+
+/* Cometes simples per a /bin/sh */
+static void shq(char *out, size_t size, const char *s)
+{
+    size_t n = strlen(out);
+
+    if (n + 2 >= size)
+        return;
+    out[n++] = '\'';
+    for (; *s && n + 5 < size; s++) {
+        if (*s == '\'') {
+            memcpy(out + n, "'\\''", 4);
+            n += 4;
+        } else {
+            out[n++] = *s;
+        }
+    }
+    out[n++] = '\'';
+    out[n] = '\0';
+}
+
+/* Importa els calaixos (el local i el de la Pi, si existeixen) al vault amb
+ * l'eina phileas-importa-calaix. La sortida és la primera línia que escriu. */
+static void c_obsidian_import(Editor *e)
+{
+    char cmd[8192], line[512], first[512] = "", shown[1100];
+    int n = 0, st;
+    FILE *p;
+
+    if (!e->obs_vault[0]) {
+        ed_msg(e, "Cal triar abans el vault: Idees → Vault d'Obsidian…");
+        return;
+    }
+    snprintf(cmd, sizeof cmd, "phileas-importa-calaix --quiet --vault ");
+    shq(cmd, sizeof cmd, e->obs_vault);
+    strncat(cmd, " --inbox ", sizeof cmd - strlen(cmd) - 1);
+    shq(cmd, sizeof cmd, e->obs_inbox);
+    strncat(cmd, " --camp-tipus ", sizeof cmd - strlen(cmd) - 1);
+    shq(cmd, sizeof cmd, e->obs_tipus);
+    if (access(e->calaix, R_OK) == 0) {
+        strncat(cmd, " --calaix ", sizeof cmd - strlen(cmd) - 1);
+        shq(cmd, sizeof cmd, e->calaix);
+        n++;
+    }
+    if (strcmp(e->calaix_pi, e->calaix) && access(e->calaix_pi, R_OK) == 0) {
+        strncat(cmd, " --calaix ", sizeof cmd - strlen(cmd) - 1);
+        shq(cmd, sizeof cmd, e->calaix_pi);
+        n++;
+    }
+    if (!n) {
+        ed_msg(e, "No hi ha cap calaix: %s ni %s", tilde(e->calaix, shown, sizeof shown),
+               e->calaix_pi);
+        return;
+    }
+    strncat(cmd, " </dev/null 2>&1", sizeof cmd - strlen(cmd) - 1);
+    ed_msg(e, "Important a Obsidian…");
+    render(e);
+    refresh();
+    p = popen(cmd, "r");
+    if (!p) {
+        ed_msg(e, "No s'ha pogut executar phileas-importa-calaix");
+        return;
+    }
+    for (;;) {
+        if (fgets(line, sizeof line, p)) {
+            line[strcspn(line, "\r\n")] = '\0';
+            if (line[0] && !first[0])
+                snprintf(first, sizeof first, "%s", line);
+        } else if (ferror(p) && errno == EINTR) {
+            clearerr(p);
+        } else {
+            break;
+        }
+    }
+    st = pclose(p);
+    if (st != -1 && WIFEXITED(st) && WEXITSTATUS(st) == 127)
+        ed_msg(e, "No trobo l'ordre phileas-importa-calaix (cal python3 i el paquet de Phileas)");
+    else if (st != -1 && WIFEXITED(st) && WEXITSTATUS(st) == 0)
+        ed_msg(e, "%s", first[0] ? first : "Importat");
+    else
+        ed_msg(e, "Importació: %s", first[0] ? first : "ha fallat");
+}
+
 static void c_calaix(Editor *e)
 {
     size_t line;
@@ -1223,6 +1371,9 @@ static const Command commands[] = {
     { "calaix",                    c_calaix,         "Mostra el calaix d'idees i va a l'entrada triada", ACT_NONE },
     { "calaix-idea",               c_calaix_idea,    "Afegeix al calaix d'idees la selecció, o una idea nova si no n'hi ha (F9)", ACT_NONE },
     { "calaix-font",               c_calaix_font,    "Tria la font (llibre o article) que el calaix proposa a cada idea", ACT_NONE },
+    { "obsidian-vault",            c_obsidian_vault, "Tria la carpeta del vault d'Obsidian (i, si es vol, la carpeta d'entrada i la propietat del tipus)", ACT_NONE },
+    { "calaix-pi",                 c_calaix_pi,      "Diu on és el calaix que arriba de la Pi amb «envia»", ACT_NONE },
+    { "obsidian-importa",          c_obsidian_import, "Importa el calaix local i el de la Pi al vault d'Obsidian, sense sortir de Phileas", ACT_NONE },
     { "tallar",                    c_cut,            "Talla la selecció", ACT_NONE },
     { "copiar",                    c_copy,           "Copia la selecció", ACT_NONE },
     { "enganxar",                  c_paste,          "Enganxa el porta-retalls (el del sistema, si n'hi ha)", ACT_NONE },

@@ -8,4 +8,8 @@
  * a out el camí triat, que pot no existir (fitxer nou), o 0 si es cancel·la. */
 int file_browser(Editor *e, char *out, size_t outsz);
 
+/* El mateix, per triar una carpeta: Enter hi entra, Tab tria la carpeta on
+ * som. Retorna 1 i deixa a out el camí absolut, o 0 si es cancel·la. */
+int dir_browser(Editor *e, const char *start, char *out, size_t outsz);
+
 #endif

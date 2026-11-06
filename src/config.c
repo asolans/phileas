@@ -223,6 +223,27 @@ int config_set(Editor *e, const char *key, const char *v, char *err, size_t errs
             snprintf(e->calaix, sizeof e->calaix, "%s%s", getenv("HOME"), v + 1);
         else
             snprintf(e->calaix, sizeof e->calaix, "%s", v);
+    } else if (!strcmp(key, "calaix-pi") || !strcmp(key, "obsidian-vault")) {
+        char *dst = key[0] == 'c' ? e->calaix_pi : e->obs_vault;
+        size_t dsz = key[0] == 'c' ? sizeof e->calaix_pi : sizeof e->obs_vault;
+
+        if (strlen(v) >= dsz || (key[0] == 'c' && !*v)) {
+            snprintf(err, errsz, "camí no vàlid «%s»", v);
+            return -1;
+        }
+        if (v[0] == '~' && v[1] == '/' && getenv("HOME"))
+            snprintf(dst, dsz, "%s%s", getenv("HOME"), v + 1);
+        else
+            snprintf(dst, dsz, "%s", v);
+    } else if (!strcmp(key, "obsidian-inbox") || !strcmp(key, "obsidian-tipus")) {
+        char *dst = key[9] == 'i' ? e->obs_inbox : e->obs_tipus;
+        size_t dsz = key[9] == 'i' ? sizeof e->obs_inbox : sizeof e->obs_tipus;
+
+        if (!*v || strlen(v) >= dsz || strchr(v, '/') || strchr(v, '"')) {
+            snprintf(err, errsz, "valor no vàlid «%s»", v);
+            return -1;
+        }
+        snprintf(dst, dsz, "%s", v);
     } else if (!strcmp(key, "idiomes")) {
         char tmp[128], *tok, *save;
         int k = 0;
@@ -616,6 +637,16 @@ void config_template(FILE *f, const Editor *e)
     else
         fputs("# diccionari = ca_ES-valencia      # un diccionari concret en arrencar\n", f);
     fprintf(f, "calaix = %s\n", e->calaix);
+    fprintf(f, "\n"
+            "# Idees → Obsidian: el calaix que arriba de la Pi amb «envia», el vault\n"
+            "# d'Obsidian, la seva carpeta d'entrada i la propietat del tipus (Idees →\n"
+            "# Vault d'Obsidian…). Sense vault, no s'importa res.\n"
+            "calaix-pi = %s\n", e->calaix_pi);
+    if (e->obs_vault[0])
+        fprintf(f, "obsidian-vault = %s\n", e->obs_vault);
+    else
+        fputs("# obsidian-vault = ~/Documents/ElVault\n", f);
+    fprintf(f, "obsidian-inbox = %s\nobsidian-tipus = %s\n", e->obs_inbox, e->obs_tipus);
     fprintf(f, "\n"
             "# Tema de colors: terminal (els colors del terminal), fosc, clar, sepia,\n"
             "# fosfor o wordperfect. També es canvia des del menú Vista o amb l'ordre «tema»,\n"

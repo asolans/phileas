@@ -26,6 +26,8 @@ typedef struct {
 
 static char last_dir[PATH_MAX];
 static int  show_hidden;
+static char force_start[PATH_MAX];   /* dir_browser: carpeta inicial */
+static int  dir_mode;   /* dir_browser: es tria una carpeta, no un fitxer */
 
 /* Escriu s a partir de la posició actual sense passar de maxw columnes.
  * Retorna les columnes ocupades. */
@@ -227,7 +229,7 @@ static void draw(Browser *b)
     mvhline(0, 0, ' ', COLS);
     pretty_path(b->dir, path, sizeof path);
     move(0, 1);
-    put_str("Obrir: ", COLS - 1);
+    put_str(dir_mode ? "Carpeta: " : "Obrir: ", COLS - 1);
     put_tail(path, COLS - 9);
     attrset(A_NORMAL);
 
@@ -240,8 +242,10 @@ static void draw(Browser *b)
     attrset(ui_attr(UI_BAR));
     mvhline(LINES - 2, 0, ' ', COLS);
     move(LINES - 2, 1);
-    put_str(show_hidden ? "Enter obre · ← pare · escriu per filtrar · Ctrl+A amaga ocults · Esc surt"
-                        : "Enter obre · ← pare · escriu per filtrar · Ctrl+A mostra ocults · Esc surt",
+    put_str(dir_mode ? (show_hidden ? "Enter entra · Tab tria aquesta carpeta · ← pare · Ctrl+A amaga ocults · Esc surt"
+                                    : "Enter entra · Tab tria aquesta carpeta · ← pare · Ctrl+A mostra ocults · Esc surt")
+                     : show_hidden ? "Enter obre · ← pare · escriu per filtrar · Ctrl+A amaga ocults · Esc surt"
+                                   : "Enter obre · ← pare · escriu per filtrar · Ctrl+A mostra ocults · Esc surt",
             COLS - 2);
     attrset(A_NORMAL);
 
@@ -314,6 +318,10 @@ static void start_dir(Editor *e, char *dir, size_t dirsz, char *select, size_t s
     char real[PATH_MAX];
 
     select[0] = '\0';
+    if (force_start[0] && access(force_start, X_OK) == 0) {
+        snprintf(dir, dirsz, "%s", force_start);
+        return;
+    }
     if (e->filename) {
         const char *slash;
 
@@ -393,8 +401,12 @@ int file_browser(Editor *e, char *out, size_t outsz)
                 activate(&b, out, outsz);
             break;
         case '\n':
-            if (activate(&b, out, outsz))
-                done = chosen = 1;
+            if (activate(&b, out, outsz)) {
+                if (dir_mode)
+                    snprintf(b.msg, sizeof b.msg, "Tria una carpeta: Enter hi entra, Tab la tria");
+                else
+                    done = chosen = 1;
+            }
             break;
         case KEY_FLAG_FN | KEY_BACKSPACE:
         case 8:
@@ -412,6 +424,12 @@ int file_browser(Editor *e, char *out, size_t outsz)
                 refilter(&b);
             } else {
                 done = 1;
+            }
+            break;
+        case 9:   /* Tab: tria la carpeta on som (dir_browser) */
+            if (dir_mode) {
+                snprintf(out, outsz, "%s", b.dir);
+                done = chosen = 1;
             }
             break;
         case 1:   /* Ctrl+A */
@@ -436,4 +454,16 @@ int file_browser(Editor *e, char *out, size_t outsz)
     dirlist_free(&b.list);
     free(b.shown);
     return chosen;
+}
+
+int dir_browser(Editor *e, const char *start, char *out, size_t outsz)
+{
+    int r;
+
+    snprintf(force_start, sizeof force_start, "%s", start ? start : "");
+    dir_mode = 1;
+    r = file_browser(e, out, outsz);
+    dir_mode = 0;
+    force_start[0] = '\0';
+    return r;
 }

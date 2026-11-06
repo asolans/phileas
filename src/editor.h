@@ -76,6 +76,10 @@ typedef struct {
     char    dict[64];          /* diccionari triat: "ca", "es" (F8), o el de -d o «idioma» */
     char    dict_loaded[64];   /* el que hi ha carregat; "" = cap */
     char    calaix[1024];      /* fitxer del calaix d'idees (opció «calaix») */
+    char    calaix_pi[1024];   /* calaix rebut de la Pi amb «envia» (opció «calaix-pi») */
+    char    obs_vault[1024];   /* vault d'Obsidian (opció «obsidian-vault»); buit = cap */
+    char    obs_inbox[128];    /* carpeta d'entrada del vault («obsidian-inbox») */
+    char    obs_tipus[64];     /* propietat del tipus de nota («obsidian-tipus») */
     CalaixState cstate;        /* font activa del calaix i fonts recents */
     char    langs[MAX_LANGS][16]; /* rotació de F8 */
     int     nlangs;

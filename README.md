@@ -104,8 +104,16 @@ només serveix per escriure.
   fitxer de l'opció `calaix` (per defecte `~/calaix.md`) i la font activa a
   `calaix-font` del directori de configuració. Mentre el calaix és obert com a
   document, no s'hi afegeix res. El format antic (capçalera amb data i hora) ja no es llegeix.
-  Per portar el calaix a Obsidian, `tools/importa-calaix.py` (el `.deb` l'instal·la com a
-  `phileas-importa-calaix`, amb `python3` ≥ 3.11) crea una nota per idea a la carpeta `Inbox-byok` del vault; la configuració (vaults) és a `~/.config/phileas/importa-calaix.toml`, fora de la release (es crea amb `phileas-importa-calaix --inicia ~/Documents/ElVault`, que només necessita el vault; model complet: `importa-calaix.exemple.toml`, al `.deb` a `/usr/share/doc/phileas/examples/`; si falta, l'importador diu com copiar-lo).
+  Totes les ordres del calaix són al menú **Idees** (Esc → Idees, després de Vista).
+  **Obsidian:** «Vault d'Obsidian…» tria la carpeta del vault amb el navegador (Tab tria la
+  carpeta on som) i pregunta si es vol definir també la carpeta d'entrada (`Inbox-byok`) i la
+  propietat del tipus (`tipus`); «Calaix de la Pi…» diu on és el calaix que arriba amb
+  `envia` (per defecte `~/BYOK/calaix.md`). Tot es desa al phileasrc (`obsidian-vault`,
+  `obsidian-inbox`, `obsidian-tipus`, `calaix-pi`). «Importa a Obsidian» (`obsidian-importa`)
+  crea una nota per idea a la carpeta d'entrada, amb el calaix local i el de la Pi; una idea
+  que ja és al vault no es duplica. Fa servir l'ordre `phileas-importa-calaix` (el `.deb` la
+  instal·la, amb `python3`), que també es pot cridar a mà: `--calaix`, `--vault`, `--inbox`,
+  `--camp-tipus`, `--simula`, `--reimporta`; sense opcions llegeix el phileasrc.
 - **Ordres externes:** es poden afegir a la paleta ordres del sistema
   (exportar amb pandoc, comptar paraules, enviar el text…).
 - **UTF-8 complet:** accents, ç, l·l, cometes tipogràfiques i caràcters
@@ -446,6 +454,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.3.0**: menú **Idees** (després de Vista) amb les ordres del calaix; «Vault d'Obsidian…», «Calaix de la Pi…» i «Importa a Obsidian» des de Phileas; la configuració és al phileasrc i desapareix el fitxer TOML i `--inicia`.
 - **2.2.7**: `phileas-importa-calaix --inicia VAULT` crea la configuració mínima (només cal el vault; la resta té valors per defecte); l'avís quan falta la configuració ho explica; model reordenat amb el mínim a dalt.
 - **2.2.6**: `phileas-importa-calaix` instal·lat fa servir el `calaix.md` de la carpeta des d'on es crida (abans el buscava a `/usr/bin`); la 2.2.5 no es va publicar.
 - **2.2.5**: arregla `phileas-importa-calaix` instal·lat: cerca `calaix.md` al costat de l'script, a la carpeta actual i a `~/BYOK` (abans només al costat de l'script, és a dir `/usr/bin`).

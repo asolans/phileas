@@ -1330,6 +1330,19 @@ static void test_config(void)
     CHECK(SET("marge-dret", "0") == 0 && e.margin_right == 0);
     CHECK(SET("marge-dret", "-1") < 0 && e.margin_right == 0);
 
+    /* Idees → Obsidian */
+    CHECK(e.obs_vault[0] == '\0' && !strcmp(e.obs_inbox, "Inbox-byok") && !strcmp(e.obs_tipus, "tipus"));
+    CHECK(strlen(e.calaix_pi) > 11 && strstr(e.calaix_pi, "BYOK/calaix.md"));
+    CHECK(SET("obsidian-vault", "/tmp/vault") == 0 && !strcmp(e.obs_vault, "/tmp/vault"));
+    CHECK(SET("obsidian-vault", "~/Doc/V") == 0 && e.obs_vault[0] == '/' && strstr(e.obs_vault, "/Doc/V"));
+    CHECK(SET("obsidian-inbox", "Entrada") == 0 && !strcmp(e.obs_inbox, "Entrada"));
+    CHECK(SET("obsidian-inbox", "a/b") < 0 && !strcmp(e.obs_inbox, "Entrada"));
+    CHECK(SET("obsidian-inbox", "") < 0);
+    CHECK(SET("obsidian-tipus", "tipus de nota") == 0 && !strcmp(e.obs_tipus, "tipus de nota"));
+    CHECK(SET("obsidian-tipus", "a\"b") < 0);
+    CHECK(SET("calaix-pi", "/tmp/pi.md") == 0 && !strcmp(e.calaix_pi, "/tmp/pi.md"));
+    CHECK(SET("calaix-pi", "") < 0 && !strcmp(e.calaix_pi, "/tmp/pi.md"));
+
     /* Marges: el text comença a marge-esquerre i deixa marge-dret si el
      * terminal és més estret que les columnes */
     SET("marge-esquerre", "2");

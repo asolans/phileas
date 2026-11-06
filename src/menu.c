@@ -32,7 +32,6 @@ struct Menu {
 static const Menu m_file = { "Fitxer", (const MenuItem[]){
     { 'o', "Obre…",                "obrir",     NULL, NULL },
     { 'r', "Recents…",             "recents",   NULL, NULL },
-    { 'a', "Calaix d'idees…",      "calaix",    NULL, NULL },
     { 'n', "Nou",                  "nou",       NULL, NULL },
     SEP,
     { 'd', "Desa",                 "desar",     NULL, NULL },
@@ -60,9 +59,16 @@ static const Menu m_edit = { "Edita", (const MenuItem[]){
     { 'n', "Nota al peu",          "nota-peu",        NULL, NULL },
     { 'v', "Ves a la nota o torna", "anar-a-nota",    NULL, NULL },
     { 'u', "Renumera les notes",   "renumerar-notes", NULL, NULL },
+    { 0 } } };
+
+static const Menu m_ideas = { "Idees", (const MenuItem[]){
+    { 'a', "Idea al calaix (F9)",  "calaix-idea",      NULL, NULL },
+    { 'f', "Font del calaix…",     "calaix-font",      NULL, NULL },
+    { 'c', "Calaix d'idees…",      "calaix",           NULL, NULL },
     SEP,
-    { 'f', "Idea al calaix (F9)",  "calaix-idea",     NULL, NULL },
-    { 'o', "Font del calaix…",     "calaix-font",     NULL, NULL },
+    { 'p', "Calaix de la Pi…",     "calaix-pi",        NULL, NULL },
+    { 'v', "Vault d'Obsidian…",    "obsidian-vault",   NULL, NULL },
+    { 'i', "Importa a Obsidian",   "obsidian-importa", NULL, NULL },
     { 0 } } };
 
 static const Menu m_find = { "Cerca", (const MenuItem[]){
@@ -142,6 +148,7 @@ static const Menu m_main = { "Menú", (const MenuItem[]){
     { 'c', "Cerca",                NULL, NULL, &m_find },
     { 'o', "Ortografia",           NULL, NULL, &m_spell },
     { 'v', "Vista",                NULL, NULL, &m_view },
+    { 'i', "Idees",                NULL, NULL, &m_ideas },
     SEP,
     { 'b', "BYOK",                 NULL, NULL, &m_byok },
     SEP,
