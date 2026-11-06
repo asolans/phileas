@@ -8,7 +8,7 @@ es compta encara que l'hagis moguda o reanomenada; si l'esborres, es torna a cre
 
 Opcions (no cal cap): --simula (no escriu res), --reimporta (torna a crear
 també les que ja hi són), --calaix FITXER i --config FITXER.
-Sense --calaix, busca calaix.md al costat de l'script, a la carpeta actual i a ~/BYOK.
+Sense --calaix, fa servir el calaix.md de la carpeta des d'on es crida.
 
 Els vaults, la carpeta d'entrada i la resta de la configuració són en un fitxer
 TOML propi de cada usuari, `importa-calaix.toml` al directori de configuració de
@@ -258,10 +258,7 @@ def main():
     ap.add_argument("--reimporta", action="store_true", help="torna a crear també les notes que ja hi són")
     a = ap.parse_args()
     if not a.calaix:
-        # calaix.md rebut amb `envia`: al costat de l'script, a la carpeta actual o a ~/BYOK
-        cand = [Path(os.path.abspath(__file__)).parent, Path.cwd(), Path.home() / "BYOK"]
-        a.calaix = str(next((d / "calaix.md" for d in cand if (d / "calaix.md").exists()),
-                            Path.cwd() / "calaix.md"))
+        a.calaix = str(Path.cwd() / "calaix.md")  # el que `envia` va deixar a la carpeta des d'on es crida
 
     camí = camí_config(a.config)
     try:
