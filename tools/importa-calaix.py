@@ -166,8 +166,9 @@ def nota(e, tags, tipus, v, cfg):
     camp = v.get("camp_tipus", "tipus")
     font = e["font"]
     if font:
-        enllac = cfg.get("fonts", {}).get(font, {}).get("resum")
-        font = f"\"[[{enllac}]]\"" if enllac else f"\"{font}\""
+        # Enllaç al document de la font al vault («[[Prous, 1936]]»); `resum` el canvia
+        enllac = cfg.get("fonts", {}).get(font, {}).get("resum") or neteja(font)
+        font = f"\"[[{enllac}]]\"" if enllac else ""
     fm = ["---", f"{camp}: {tipus}"]
     if e["titol"]:
         fm.append("títol: \"" + e["titol"].replace('"', "'") + "\"")

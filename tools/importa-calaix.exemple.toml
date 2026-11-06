@@ -17,8 +17,9 @@ vault = "~/Documents/Exemple"
 inbox = "Inbox-byok"
 camp_tipus = "tipus"
 
-# Fonts conegudes (opcional): a quin projecte van i el nom de la seva nota de
-# resum, a la qual s'enllaça la propietat «font» de la nota importada.
+# Fonts conegudes (opcional): a quin projecte van. La propietat «font» de la
+# nota importada és sempre un enllaç al document de la font al vault
+# («[[Prous, 1935]]»); `resum` el canvia pel nom d'una altra nota.
 # [fonts."Prous, 1935"]
 # projecte = "exemple"
 # resum = "Nom de la nota de resum"
