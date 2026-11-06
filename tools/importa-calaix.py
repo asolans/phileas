@@ -261,7 +261,9 @@ def main():
     try:
         cfg.update(llegeix_config(camí))
     except FileNotFoundError:
-        avisa("Calaix", f"No trobo la configuració {camí}.\nCopia-hi {TOML_EXEMPLE} (és al costat de l'script) i edita'l.")
+        ex = next((d / TOML_EXEMPLE for d in (Path(__file__).resolve().parent,
+                   Path("/usr/share/doc/phileas/examples")) if (d / TOML_EXEMPLE).exists()), TOML_EXEMPLE)
+        avisa("Calaix", f"No trobo la configuració {camí}.\nCopia el model i edita'l:\n  mkdir -p {camí.parent} && cp {ex} {camí}")
         return 1
     except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
         avisa("Calaix", f"Configuració no vàlida ({camí}):\n{exc}")

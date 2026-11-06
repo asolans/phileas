@@ -104,8 +104,8 @@ només serveix per escriure.
   fitxer de l'opció `calaix` (per defecte `~/calaix.md`) i la font activa a
   `calaix-font` del directori de configuració. Mentre el calaix és obert com a
   document, no s'hi afegeix res. El format antic (capçalera amb data i hora) ja no es llegeix.
-  Per portar el calaix a Obsidian, `tools/importa-calaix.py` (al `.deb`, a
-  `/usr/share/doc/phileas/examples/`) crea una nota per idea a la carpeta `Inbox-byok` del vault; la configuració (vaults) és a `~/.config/phileas/importa-calaix.toml`, fora de la release (model: `importa-calaix.exemple.toml`).
+  Per portar el calaix a Obsidian, `tools/importa-calaix.py` (el `.deb` l'instal·la com a
+  `phileas-importa-calaix`, amb `python3` ≥ 3.11) crea una nota per idea a la carpeta `Inbox-byok` del vault; la configuració (vaults) és a `~/.config/phileas/importa-calaix.toml`, fora de la release (model: `importa-calaix.exemple.toml`, al `.deb` a `/usr/share/doc/phileas/examples/`; si falta, l'importador diu com copiar-lo).
 - **Ordres externes:** es poden afegir a la paleta ordres del sistema
   (exportar amb pandoc, comptar paraules, enviar el text…).
 - **UTF-8 complet:** accents, ç, l·l, cometes tipogràfiques i caràcters
@@ -446,6 +446,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.2.4**: el `.deb` instal·la l'importador com a ordre (`phileas-importa-calaix`), depèn de `python3` ≥ 3.11, i l'importador explica com copiar el model de configuració si falta.
 - **2.2.3**: l'importador del calaix a Obsidian escriu la propietat `font` sempre com a enllaç `[[font]]` al document de la font (`resum` en canvia el nom).
 - **2.2.2**: les idees del calaix tenen un títol opcional (`### títol`, després de la capçalera; F9 el demana després de la pàgina; la llista del calaix el mostra); es deixa de llegir el calaix en el format antic.
 - **2.2.1**: «Font del calaix» és un camp editable amb la font actual (esborrar-la la treu; sense Tab ni `-`); s'elimina «Selecció al calaix», perquè F9 ja envia la selecció.
