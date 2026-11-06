@@ -8,6 +8,7 @@ es compta encara que l'hagis moguda o reanomenada; si l'esborres, es torna a cre
 
 Opcions (no cal cap): --simula (no escriu res), --reimporta (torna a crear
 també les que ja hi són), --calaix FITXER i --config FITXER.
+Sense --calaix, busca calaix.md al costat de l'script, a la carpeta actual i a ~/BYOK.
 
 Els vaults, la carpeta d'entrada i la resta de la configuració són en un fitxer
 TOML propi de cada usuari, `importa-calaix.toml` al directori de configuració de
@@ -251,11 +252,16 @@ def avisa(titol, text):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--calaix", default=str(Path(os.path.abspath(__file__)).parent / "calaix.md"))
+    ap.add_argument("--calaix", default=None)
     ap.add_argument("--config", help="fitxer de configuració (per defecte ~/.config/phileas/importa-calaix.toml)")
     ap.add_argument("--simula", action="store_true", help="mostra què es faria, sense escriure res")
     ap.add_argument("--reimporta", action="store_true", help="torna a crear també les notes que ja hi són")
     a = ap.parse_args()
+    if not a.calaix:
+        # calaix.md rebut amb `envia`: al costat de l'script, a la carpeta actual o a ~/BYOK
+        cand = [Path(os.path.abspath(__file__)).parent, Path.cwd(), Path.home() / "BYOK"]
+        a.calaix = str(next((d / "calaix.md" for d in cand if (d / "calaix.md").exists()),
+                            Path.cwd() / "calaix.md"))
 
     camí = camí_config(a.config)
     try:

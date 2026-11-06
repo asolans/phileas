@@ -446,6 +446,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.2.5**: arregla `phileas-importa-calaix` instal·lat: cerca `calaix.md` al costat de l'script, a la carpeta actual i a `~/BYOK` (abans només al costat de l'script, és a dir `/usr/bin`).
 - **2.2.4**: el `.deb` instal·la l'importador com a ordre (`phileas-importa-calaix`), depèn de `python3` ≥ 3.11, i l'importador explica com copiar el model de configuració si falta.
 - **2.2.3**: l'importador del calaix a Obsidian escriu la propietat `font` sempre com a enllaç `[[font]]` al document de la font (`resum` en canvia el nom).
 - **2.2.2**: les idees del calaix tenen un títol opcional (`### títol`, després de la capçalera; F9 el demana després de la pàgina; la llista del calaix el mostra); es deixa de llegir el calaix en el format antic.
