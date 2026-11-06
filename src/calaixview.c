@@ -69,7 +69,16 @@ static void draw_entry(View *v, size_t idx, int y, int selected)
         attrset(ui_attr(UI_SEL));
     hline(' ', COLS);
     move(y, 1);
-    put_str_n(head + 3, hl - 3, COLS - 2);
+    {
+        size_t tl;
+        const char *t = calaix_title(&v->c, idx, &tl);
+        int used = put_str_n(head + 3, hl - 3, COLS - 2);
+
+        if (t && tl && used + 4 < COLS - 2) {
+            put_str(" \xe2\x80\x94 ", 3);
+            put_str_n(t, tl, COLS - 2 - used - 3);
+        }
+    }
     attrset(A_NORMAL);
 }
 

@@ -11,23 +11,6 @@
 #include <time.h>
 #include <unistd.h>
 
-/* Capçalera antiga: «## AAAA-MM-DD HH:MM · » (la d és un dígit) */
-static int is_old_head(const char *s, size_t n)
-{
-    static const char date[] = "dddd-dd-dd dd:dd";
-    size_t i;
-
-    if (n < 3 + sizeof date - 1 + 4 || memcmp(s, "## ", 3))
-        return 0;
-    for (i = 0; date[i]; i++) {
-        char c = s[3 + i];
-
-        if (date[i] == 'd' ? !isdigit((unsigned char)c) : c != date[i])
-            return 0;
-    }
-    return !memcmp(s + 3 + i, " \xc2\xb7 ", 4);
-}
-
 /* Peu: «∙ AAAA-MM-DD» (∙ és U+2219) */
 static int is_foot(const char *s, size_t n)
 {
@@ -101,27 +84,24 @@ fail:
 int calaix_load(const char *path, Calaix *c)
 {
     size_t p, ll, cap = 0;
-    enum { OUT, NEW, OLD } state = OUT;
+    int open = 0;
 
     memset(c, 0, sizeof *c);
     if (read_all(path, &c->text, &c->len) < 0)
         return -1;
     for (p = 0; p < c->len; p += ll + 1) {
         const char *s = c->text + p;
-        int begin = 0;
 
         ll = line_len(c->text, p, c->len);
-        if (state == OUT) {
-            begin = ll >= 3 && !memcmp(s, "## ", 3);
-        } else if (is_foot(s, ll)) {
-            c->flags[c->n - 1] |= CAL_CLOSED;
-            c->end[c->n - 1] = p + ll + (p + ll < c->len);
-            state = OUT;
+        if (open) {
+            if (is_foot(s, ll)) {
+                c->flags[c->n - 1] |= CAL_CLOSED;
+                c->end[c->n - 1] = p + ll + (p + ll < c->len);
+                open = 0;
+            }
             continue;
-        } else if (state == OLD) {
-            begin = is_old_head(s, ll);
         }
-        if (!begin)
+        if (ll < 3 || memcmp(s, "## ", 3))
             continue;
         if (c->n == cap) {
             cap = cap ? cap * 2 : 16;
@@ -129,12 +109,10 @@ int calaix_load(const char *path, Calaix *c)
             c->end = xrealloc(c->end, cap * sizeof *c->end);
             c->flags = xrealloc(c->flags, cap);
         }
-        if (state == OLD)
-            c->end[c->n - 1] = p;
         c->head[c->n] = p;
         c->end[c->n] = c->len;
-        c->flags[c->n] = is_old_head(s, ll) ? CAL_OLD : 0;
-        state = is_old_head(s, ll) ? OLD : NEW;
+        c->flags[c->n] = 0;
+        open = 1;
         c->n++;
     }
     if (!c->head) {
@@ -158,6 +136,29 @@ const char *calaix_head(const Calaix *c, size_t i, size_t *len)
 {
     *len = line_len(c->text, c->head[i], c->len);
     return c->text + c->head[i];
+}
+
+const char *calaix_title(const Calaix *c, size_t i, size_t *len)
+{
+    size_t p = c->head[i], hl = line_len(c->text, p, c->len);
+
+    p += hl + 1;
+    while (p < c->end[i] && p < c->len && c->text[p] == '\n')
+        p++;
+    if (p < c->end[i] && p < c->len) {
+        size_t ll = line_len(c->text, p, c->len);
+
+        if (ll == 3 && !memcmp(c->text + p, "###", 3)) {
+            *len = 0;
+            return c->text + p + 3;
+        }
+        if (ll > 4 && !memcmp(c->text + p, "### ", 4)) {
+            *len = ll - 4;
+            return c->text + p + 4;
+        }
+    }
+    *len = 0;
+    return NULL;
 }
 
 size_t calaix_line(const Calaix *c, size_t i)
@@ -266,26 +267,11 @@ static void put_inline(Str *b, const char *s)
         b->s[--b->n] = '\0';
 }
 
-/* Data AAAA-MM-DD de la capçalera antiga de l'última entrada, per tancar-la */
-static void close_old_last(const Calaix *c, Str *out)
-{
-    size_t i = c->n - 1;
-    const char *h = c->text + c->head[i];
-
-    if (!(c->flags[i] & CAL_OLD) || (c->flags[i] & CAL_CLOSED))
-        return;
-    if (out->n && out->s[out->n - 1] != '\n')
-        str_put(out, "\n", 1);
-    str_put(out, "\n\xe2\x88\x99 ", 5);
-    str_put(out, h + 3, 10);
-    str_put(out, "\n", 1);
-}
-
 int calaix_append(const char *path, const char *font, const char *page,
-                  const char *tags, const char *origin,
+                  const char *tags, const char *title, const char *origin,
                   const char *body, size_t n, char *err, size_t errsz)
 {
-    static const char title[] = "# Calaix\n\n";
+    static const char heading[] = "# Calaix\n\n";
     char *data, *target, *tmp;
     size_t len, t = 0;
     time_t now = time(NULL);
@@ -296,7 +282,6 @@ int calaix_append(const char *path, const char *font, const char *page,
     Str out = { NULL, 0, 0, 0 };
     FILE *f;
     int fd, rc = -1, parts = 0;
-    Calaix cal;
 
     if (read_all(path, &data, &len) < 0) {
         set_err(err, errsz, strerror(errno));
@@ -305,15 +290,10 @@ int calaix_append(const char *path, const char *font, const char *page,
     while (n && body[n - 1] == '\n')
         n--;
     if (len == 0) {
-        str_put(&out, title, sizeof title - 1);
+        str_put(&out, heading, sizeof heading - 1);
     } else {
         /* El fitxer acaba amb una línia en blanc abans de la nova entrada */
         str_put(&out, data, len);
-        if (calaix_load(path, &cal) == 0) {
-            if (cal.n)
-                close_old_last(&cal, &out);   /* l'última entrada antiga rep un peu */
-            calaix_free(&cal);
-        }
         for (size_t i = out.n; i > 0 && out.s[i - 1] == '\n'; i--)
             t++;
         for (; t < 2; t++)
@@ -344,6 +324,22 @@ int calaix_append(const char *path, const char *font, const char *page,
     if (!parts)
         str_put(&out, "(idea)", 6);
     str_put(&out, "\n\n", 2);
+    {
+        /* Títol opcional: «### títol». Si no n'hi ha però el text comença per
+         * «###», una línia «###» buida evita que el text es llegeixi com a títol. */
+        Str tt = { NULL, 0, 0, 0 };
+
+        if (title)
+            put_inline(&tt, title);
+        if (tt.n) {
+            str_put(&out, "### ", 4);
+            str_put(&out, tt.s, tt.n);
+            str_put(&out, "\n\n", 2);
+        } else if (n >= 3 && !memcmp(body, "###", 3) && (n == 3 || body[3] == ' ')) {
+            str_put(&out, "###\n\n", 5);
+        }
+        free(tt.s);
+    }
     str_put(&out, body, n);
     str_put(&out, "\n\n\xe2\x88\x99 ", 6);
     str_put(&out, stamp, strlen(stamp));

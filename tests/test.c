@@ -1853,7 +1853,6 @@ static void test_calaix(void)
     CalaixState st, st2;
     size_t hl;
     const char *h;
-    FILE *f;
 
     snprintf(path, sizeof path, "%s/calaix.md", tmpdir);
     unlink(path);
@@ -1861,14 +1860,19 @@ static void test_calaix(void)
     calaix_free(&c);
 
     /* Amb font i pàgina; sense font; sense res */
-    CHECK(calaix_append(path, "Prous, 1935", "42", " personatge, #final ", "/t/a.md:3", "Una idea.\n", 10,
+    CHECK(calaix_append(path, "Prous, 1935", "42", " personatge, #final ", "Un títol", "/t/a.md:3", "Una idea.\n", 10,
                         err, sizeof err) == 0);
-    CHECK(calaix_append(path, NULL, NULL, "dins", NULL, "## Dins\n\nno és capçalera",
+    CHECK(calaix_append(path, NULL, NULL, "dins", NULL, NULL, "## Dins\n\nno és capçalera",
                         strlen("## Dins\n\nno és capçalera"), err, sizeof err) == 0);
-    CHECK(calaix_append(path, "", "", "", NULL, "res", 3, err, sizeof err) == 0);
+    CHECK(calaix_append(path, "", "", "", "", NULL, "res", 3, err, sizeof err) == 0);
     CHECK(calaix_load(path, &c) == 0);
     CHECK(c.n == 3);
     CHECK(c.flags[0] == CAL_CLOSED && c.flags[1] == CAL_CLOSED && c.flags[2] == CAL_CLOSED);
+    h = calaix_title(&c, 0, &hl);
+    CHECK(h && hl == strlen("Un títol") && !memcmp(h, "Un títol", hl));
+    CHECK(calaix_title(&c, 1, &hl) == NULL);   /* el text comença per «## Dins», no per «###» */
+    CHECK(calaix_title(&c, 2, &hl) == NULL);
+    CHECK(calaix_match(&c, 0, "UN T"));
     h = calaix_head(&c, 0, &hl);
     snprintf(head, sizeof head, "%.*s", (int)hl, h);
     CHECK(!strcmp(head, "## Prous, 1935 · p. 42 · #personatge #final"));
@@ -1889,34 +1893,28 @@ static void test_calaix(void)
 
     /* La font no pot trencar la capçalera: salts i «·» */
     unlink(path);
-    CHECK(calaix_append(path, "A · B\nC", "x", NULL, NULL, "t", 1, err, sizeof err) == 0);
+    CHECK(calaix_append(path, "A · B\nC", "x", NULL, NULL, NULL, "t", 1, err, sizeof err) == 0);
     CHECK(calaix_load(path, &c) == 0 && c.n == 1);
     h = calaix_head(&c, 0, &hl);
     snprintf(head, sizeof head, "%.*s", (int)hl, h);
     CHECK(!strcmp(head, "## A - B C · p. x"));
     calaix_free(&c);
 
-    /* Un calaix en el format antic: es llegeix, i l'última entrada es tanca */
+    /* Títol buit amb un text que comença per «###»: no es llegeix com a títol */
     unlink(path);
-    f = fopen(path, "w");
-    CHECK(f != NULL);
-    fputs("# Calaix\n\n## 2026-11-02 10:15 · a.md, línia 4 · #u\n\nvella 1\n\n"
-          "## 2026-11-03 11:00 · b.md, línia 1 · #d\n\nvella 2\n\n## Dins\n\nencara vella 2\n", f);
-    fclose(f);
+    CHECK(calaix_append(path, "L", "1", NULL, "", NULL, "### Això és text", strlen("### Això és text"), err, sizeof err) == 0);
+    CHECK(calaix_append(path, "L", "2", NULL, "T\nmés · x", NULL, "cos", 3, err, sizeof err) == 0);
     CHECK(calaix_load(path, &c) == 0 && c.n == 2);
-    CHECK(c.flags[0] == CAL_OLD && c.flags[1] == CAL_OLD);
-    calaix_free(&c);
-    CHECK(calaix_append(path, "Llibre", "7", "nova", NULL, "nova", 4, err, sizeof err) == 0);
-    CHECK(calaix_load(path, &c) == 0 && c.n == 3);
-    CHECK((c.flags[1] & CAL_CLOSED) && (c.flags[1] & CAL_OLD));
-    CHECK(c.flags[2] == CAL_CLOSED);
-    CHECK(strstr(c.text, "\n\xe2\x88\x99 2026-11-03\n") != NULL);   /* peu de l'antiga */
-    CHECK(calaix_match(&c, 1, "encara vella 2") && !calaix_match(&c, 2, "encara vella 2"));
+    h = calaix_title(&c, 0, &hl);
+    CHECK(h && hl == 0);                        /* «###» sola: sense títol */
+    CHECK(strstr(c.text, "### Això és text") != NULL);
+    h = calaix_title(&c, 1, &hl);
+    CHECK(h && hl == strlen("T més - x") && !memcmp(h, "T més - x", hl));
     calaix_free(&c);
 
     /* Un document que no existeix ni la carpeta no es pot desar */
     snprintf(path, sizeof path, "%s/no-existeix/calaix.md", tmpdir);
-    CHECK(calaix_append(path, NULL, NULL, NULL, NULL, "y", 1, err, sizeof err) == -1);
+    CHECK(calaix_append(path, NULL, NULL, NULL, NULL, NULL, "y", 1, err, sizeof err) == -1);
     CHECK(err[0] != '\0');
 
     /* Estat: font activa, pàgina i recents; es desa i es torna a llegir */

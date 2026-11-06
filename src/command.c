@@ -489,12 +489,12 @@ static void calaix_state_keep(Editor *e)
 }
 
 /* Afegeix una idea al calaix. Amb font activa demana la pàgina (la de l'última
- * idea de la mateixa font, per defecte); després el text, si text és NULL, i
- * les etiquetes. 1 si l'entrada s'ha desat. */
+ * idea de la mateixa font, per defecte); després el títol (opcional), el text,
+ * si text és NULL, i les etiquetes. 1 si l'entrada s'ha desat. */
 static int calaix_add(Editor *e, const char *text, size_t n)
 {
     CalaixState *st = &e->cstate;
-    char page[CALAIX_PAGE_MAX] = "", tags[256] = "", idea[1024] = "";
+    char page[CALAIX_PAGE_MAX] = "", tags[256] = "", idea[1024] = "", title[256] = "";
     char origin[PATH_MAX + 32], err[256], label[256];
 
     if (st->font[0]) {
@@ -503,6 +503,8 @@ static int calaix_add(Editor *e, const char *text, size_t n)
         if (!prompt(e, label, page, sizeof page, NULL))
             return 0;
     }
+    if (!prompt(e, "Títol (opcional): ", title, sizeof title, NULL))
+        return 0;
     if (!text) {
         if (!prompt(e, "Idea: ", idea, sizeof idea, NULL) || !idea[0])
             return 0;
@@ -512,7 +514,7 @@ static int calaix_add(Editor *e, const char *text, size_t n)
     if (!prompt(e, "Etiquetes (opcional): ", tags, sizeof tags, NULL))
         return 0;
     calaix_origin(e, origin, sizeof origin);
-    if (calaix_append(e->calaix, st->font, page, tags, origin, text, n, err, sizeof err) < 0) {
+    if (calaix_append(e->calaix, st->font, page, tags, title, origin, text, n, err, sizeof err) < 0) {
         ed_msg(e, "No s'ha pogut desar al calaix: %s", err);
         return 0;
     }

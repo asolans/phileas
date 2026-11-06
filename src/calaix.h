@@ -7,18 +7,20 @@
  *
  *     ## font · p. pàgina · #etiquetes
  *
+ *     ### títol (opcional)
+ *
  *     text de la idea
  *
  *     ∙ AAAA-MM-DD · /camí/del/document.md:línia
  *
  * La capçalera només porta les parts que hi ha: sense font ni pàgina és
  * «## #etiquetes». El peu («∙ data · origen») tanca l'entrada, de manera que
- * el text pot contenir línies «## …». Les entrades antigues («## AAAA-MM-DD
- * HH:MM · origen · #etiquetes», sense peu) es continuen llegint.
+ * el text pot contenir línies «## …». El títol, si hi és, és la primera línia
+ * després de la capçalera («###» sola vol dir sense títol, quan el text
+ * comença per «###»). El format antic (capçalera amb data i hora) ja no es llegeix.
  * Es desa al camí de l'opció «calaix» del phileasrc. */
 
-#define CAL_OLD    1   /* format antic: sense peu */
-#define CAL_CLOSED 2   /* acaba en un peu */
+#define CAL_CLOSED 1   /* acaba en un peu */
 
 typedef struct {
     char   *text;   /* tot el fitxer */
@@ -37,6 +39,9 @@ void calaix_free(Calaix *c);
 /* La capçalera de l'entrada i, a len, la seva longitud. */
 const char *calaix_head(const Calaix *c, size_t i, size_t *len);
 
+/* El títol de l'entrada (sense «### »), o NULL si no en té; a len, la longitud. */
+const char *calaix_title(const Calaix *c, size_t i, size_t *len);
+
 /* Línia (des d'1) on comença la capçalera de l'entrada. */
 size_t calaix_line(const Calaix *c, size_t i);
 
@@ -45,10 +50,10 @@ int  calaix_match(const Calaix *c, size_t i, const char *filter);
 
 /* Afegeix una entrada al final del fitxer, amb escriptura atòmica.
  * font, page i tags (poden ser NULL o buits) formen la capçalera; tags són les
- * etiquetes escrites per l'usuari. origin és el document i la línia
+ * etiquetes escrites per l'usuari. title (pot ser NULL o buit) és el títol. origin és el document i la línia
  * («/data/textos/a.md:4»), per al peu. Retorna 0, o -1 amb el motiu a err. */
 int  calaix_append(const char *path, const char *font, const char *page,
-                   const char *tags, const char *origin,
+                   const char *tags, const char *title, const char *origin,
                    const char *body, size_t n, char *err, size_t errsz);
 
 /* Estat persistent: la font activa (per defecte de cada idea nova, fins que

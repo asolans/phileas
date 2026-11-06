@@ -57,7 +57,7 @@ static const char *const intro[] = {
     "Navegador (Ctrl+O): Enter obre, ← puja, escriu per filtrar.",
     "Fitxer nou sense extensió (navegador, Desa com): es crea amb .md.",
     "Notes al peu (F5): [^1] al text i «[^1]: text» al final; F6 va i torna.",
-    "Calaix: F9 desa la selecció (o una idea nova) amb la font activa i la pàgina; Edita → Font del calaix la canvia o l'esborra.",
+    "Calaix: F9 desa la selecció (o una idea nova) amb la font activa, la pàgina, un títol opcional i les etiquetes; Edita → Font del calaix la canvia o l'esborra.",
     "Una línia amb només *** es mostra centrada a la pantalla (el fitxer no canvia).",
     "Recents (Alt+O): Enter obre, Supr treu de la llista; el cursor torna on era.",
     "Esquema (F2): capçaleres i paraules de cada secció; Enter hi va, Alt+↑/↓ mou la secció.",
