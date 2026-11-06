@@ -1,0 +1,24 @@
+# Configuració de tools/importa-calaix.py.
+# Copia aquest fitxer a ~/.config/phileas/importa-calaix.toml i edita'l.
+
+# Carpeta d'entrada de cada vault quan no se'n diu cap altra
+inbox = "Inbox-byok"
+
+# Projecte (vault) quan no se'n pot deduir cap; ha de ser un de [vaults]
+defecte = "exemple"
+
+# El projecte d'una idea és la primera carpeta del seu document darrere d'aquests camins
+textos = ["/data/textos"]
+
+# Un vault per projecte. Opcions: vault (obligatori), inbox, camp_tipus
+# (nom de la propietat del tipus: Idea, Cita, Observació).
+[vaults.exemple]
+vault = "~/Documents/Exemple"
+inbox = "Inbox-byok"
+camp_tipus = "tipus"
+
+# Fonts conegudes (opcional): a quin projecte van i el nom de la seva nota de
+# resum, a la qual s'enllaça la propietat «font» de la nota importada.
+# [fonts."Prous, 1935"]
+# projecte = "exemple"
+# resum = "Nom de la nota de resum"

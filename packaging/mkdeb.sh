@@ -18,6 +18,7 @@ strip --strip-unneeded "$ARREL/usr/bin/phileas"
 DOC="$ARREL/usr/share/doc/phileas"
 install -D -m 0644 README.md "$DOC/README.md"
 install -D -m 0755 tools/importa-calaix.py "$DOC/examples/importa-calaix.py"
+install -D -m 0644 tools/importa-calaix.exemple.toml "$DOC/examples/importa-calaix.exemple.toml"
 install -D -m 0644 packaging/copyright "$DOC/copyright"
 printf 'phileas (%s) unstable; urgency=low\n\n  * Versió %s.\n\n -- %s  %s\n' \
     "$VERSIO" "$VERSIO" "Àngel Solans <asolans@xtec.cat>" "$(date -R)" |

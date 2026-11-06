@@ -7,7 +7,11 @@ Què ja s'ha importat ho diu el vault mateix: cada nota porta `calaix: ID` i
 es compta encara que l'hagis moguda o reanomenada; si l'esborres, es torna a crear.
 
 Opcions (no cal cap): --simula (no escriu res), --reimporta (torna a crear
-també les que ja hi són), --calaix FITXER.
+també les que ja hi són), --calaix FITXER i --config FITXER.
+
+Els vaults, la carpeta d'entrada i la resta de la configuració són en un fitxer
+TOML propi de cada usuari, `importa-calaix.toml` al directori de configuració de
+Phileas (~/.config/phileas); vegeu importa-calaix.exemple.toml.
 """
 import argparse
 import hashlib
@@ -15,26 +19,42 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 import unicodedata
 from pathlib import Path
 
-# ---- Configuració: edita només aquest bloc ---------------------------------
-VAULTS = {
-    # projecte: vault, carpeta d'entrada i nom de la propietat del tipus (Idea, Cita...)
-    "annual": {"vault": "~/Documents/Literatura/Annual", "inbox": "Inbox-byok", "camp_tipus": "tipusdoc"},
-    # "naval": {"vault": "~/Documents/recerques/Naval", "inbox": "Idees", "camp_tipus": "tipus"},
-}
-INBOX = "Inbox-byok"   # carpeta d'entrada per defecte
-DEFECTE = "annual"   # projecte quan no se'n pot deduir cap
-TEXTOS = ["/data/textos", "~/BYOK"]   # el projecte és la primera carpeta darrere d'aquests camins
-FONTS = {
-    # "Prous, 1935": {"projecte": "annual", "resum": "Nom de la nota de resum"},
-}
-# -----------------------------------------------------------------------------
+TOML_EXEMPLE = "importa-calaix.exemple.toml"
+
+
+def camí_config(arg=None):
+    """--config, o importa-calaix.toml al directori de configuració de Phileas."""
+    if arg:
+        return Path(arg).expanduser()
+    base = os.environ.get("PHILEAS_CONFIG") or os.path.join(
+        os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "phileas")
+    return Path(base) / "importa-calaix.toml"
+
+
+def llegeix_config(camí):
+    """Carrega la configuració (TOML) i la deixa en la forma que fa servir l'script."""
+    with open(camí, "rb") as f:
+        c = tomllib.load(f)
+    vaults = c.get("vaults", {})
+    if not vaults:
+        raise ValueError("no hi ha cap [vaults.NOM]")
+    for nom, v in vaults.items():
+        if "vault" not in v:
+            raise ValueError(f"[vaults.{nom}] no té «vault»")
+    defecte = c.get("defecte") or next(iter(vaults))
+    if defecte not in vaults:
+        raise ValueError(f"«defecte» = «{defecte}» no és a [vaults]")
+    return {"vaults": vaults, "inbox": c.get("inbox", "Inbox-byok"), "defecte": {"projecte": defecte},
+            "textos": {"prefixos": c.get("textos", [])}, "fonts": c.get("fonts", {})}
+
 
 TAG = re.compile(r"(?<!\S)#(\S+)")
 TIPUS = {"idea": "Idea", "cita": "Cita", "observació": "Observació", "observacio": "Observació"}
-cfg = {"vaults": VAULTS, "defecte": {"projecte": DEFECTE}, "textos": {"prefixos": TEXTOS}, "fonts": FONTS}
+cfg = {}
 
 
 FOOT = re.compile(r"^∙ (\d{4}-\d{2}-\d{2})(?: · (.*))?$")
@@ -231,10 +251,21 @@ def avisa(titol, text):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--calaix", default=str(Path(os.path.abspath(__file__)).parent / "calaix.md"))
+    ap.add_argument("--config", help="fitxer de configuració (per defecte ~/.config/phileas/importa-calaix.toml)")
     ap.add_argument("--simula", action="store_true", help="mostra què es faria, sense escriure res")
     ap.add_argument("--reimporta", action="store_true", help="torna a crear també les notes que ja hi són")
     a = ap.parse_args()
 
+    camí = camí_config(a.config)
+    try:
+        cfg.update(llegeix_config(camí))
+    except FileNotFoundError:
+        avisa("Calaix", f"No trobo la configuració {camí}.\nCopia-hi {TOML_EXEMPLE} (és al costat de l'script) i edita'l.")
+        return 1
+    except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
+        avisa("Calaix", f"Configuració no vàlida ({camí}):\n{exc}")
+        return 1
+    VAULTS, DEFECTE, INBOX = cfg["vaults"], cfg["defecte"]["projecte"], cfg["inbox"]
     if not Path(a.calaix).exists():
         avisa("Calaix", f"No trobo {a.calaix}.\nPrimer cal executar «envia» a la Pi.")
         return 1
@@ -246,7 +277,7 @@ def main():
     for e in entrades:
         projecte, tags, tipus = projecte_de(e, cfg)
         if projecte not in VAULTS:
-            projecte = DEFECTE if DEFECTE in VAULTS else None
+            projecte = DEFECTE
         v = VAULTS.get(projecte) if projecte else None
         if v is None:
             errors.append(e["id"])

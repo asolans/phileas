@@ -105,7 +105,7 @@ només serveix per escriure.
   `calaix-font` del directori de configuració. Mentre el calaix és obert com a
   document, no s'hi afegeix res. El format antic (capçalera amb data i hora) ja no es llegeix.
   Per portar el calaix a Obsidian, `tools/importa-calaix.py` (al `.deb`, a
-  `/usr/share/doc/phileas/examples/`) crea una nota per idea a la carpeta `Inbox-byok` del vault; la configuració és a la capçalera de l'script.
+  `/usr/share/doc/phileas/examples/`) crea una nota per idea a la carpeta `Inbox-byok` del vault; la configuració (vaults) és a `~/.config/phileas/importa-calaix.toml`, fora de la release (model: `importa-calaix.exemple.toml`).
 - **Ordres externes:** es poden afegir a la paleta ordres del sistema
   (exportar amb pandoc, comptar paraules, enviar el text…).
 - **UTF-8 complet:** accents, ç, l·l, cometes tipogràfiques i caràcters
