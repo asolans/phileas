@@ -57,9 +57,14 @@ dist:
 	mkdir -p dist
 	git archive --format=tar.gz --prefix=phileas-$(VERSION)/ -o dist/phileas-$(VERSION).tar.gz HEAD
 
+# Manual en PDF (cal pandoc i LaTeX; la capçalera defineix els caràcters Unicode que pdflatex no coneix)
+manual:
+	mkdir -p dist
+	pandoc -f gfm MANUAL.md -o dist/MANUAL.pdf -H packaging/manual-cap.tex -V lang=ca -V geometry:margin=2.5cm --toc
+
 clean:
 	rm -rf build phileas dist
 
 -include $(OBJ:.o=.d)
 
-.PHONY: test debug clean install install-desktop deb dist
+.PHONY: test debug clean install install-desktop deb dist manual

@@ -460,7 +460,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
-- **2.3.1**: drecera Alt+T per activar o desactivar la tipografia automàtica; pendents (C11): ressaltat de `TODO`, `[?]` i `%%nota%%` i ordre `pendents` (Alt+K).
+- **2.3.1**: manual d'ús (`MANUAL.md`, i `make manual` per al PDF); drecera Alt+T per activar o desactivar la tipografia automàtica; pendents (C11): ressaltat de `TODO`, `[?]` i `%%nota%%` i ordre `pendents` (Alt+K).
 - **2.3.0**: menú **Idees** (després de Vista) amb les ordres del calaix; «Vault d'Obsidian…», «Calaix de la Pi…» i «Importa a Obsidian» des de Phileas; la configuració és al phileasrc i desapareix el fitxer TOML i `--inicia`.
 - **2.2.7**: `phileas-importa-calaix --inicia VAULT` crea la configuració mínima (només cal el vault; la resta té valors per defecte); l'avís quan falta la configuració ho explica; model reordenat amb el mínim a dalt.
 - **2.2.6**: `phileas-importa-calaix` instal·lat fa servir el `calaix.md` de la carpeta des d'on es crida (abans el buscava a `/usr/bin`); la 2.2.5 no es va publicar.
