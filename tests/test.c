@@ -10,6 +10,7 @@
 #include "history.h"
 #include "md.h"
 #include "outline.h"
+#include "todo.h"
 #include "search.h"
 #include "spell.h"
 #include "theme.h"
@@ -1963,6 +1964,33 @@ static void test_calaix(void)
     unsetenv("PHILEAS_CONFIG");
 }
 
+static void test_todo(void)
+{
+    size_t a, b;
+    const char *s = "fer TODO: això [?] i %%nota%% més";
+    Editor e;
+    size_t *ls;
+
+    CHECK(todo_next(s, strlen(s), MD_TEXT, 0, &a, &b) && a == 4 && b == 8);
+    CHECK(todo_next(s, strlen(s), MD_TEXT, b, &a, &b) && memcmp(s + a, "[?]", 3) == 0);
+    CHECK(todo_next(s, strlen(s), MD_TEXT, b, &a, &b) && b - a == 8 && memcmp(s + a, "%%nota%%", 8) == 0);
+    CHECK(!todo_next(s, strlen(s), MD_TEXT, b, &a, &b));
+    s = "TODOS, MYTODO i `TODO` o ``[?]`` i \\[?] i %%obert";
+    CHECK(!todo_next(s, strlen(s), MD_TEXT, 0, &a, &b));
+    s = "TODO";
+    CHECK(todo_next(s, 4, MD_LIST, 0, &a, &b) && a == 0 && b == 4);
+    CHECK(!todo_next(s, 4, MD_CODE, 0, &a, &b) && !todo_next(s, 4, MD_META, 0, &a, &b));
+    ed_init(&e, 72);
+    {
+        const char *d = "un\n\n```\nTODO\n```\n\n- TODO x\n\nfi [?]";
+
+        buf_insert(&e.buf, (Pos){ 0, 0 }, d, strlen(d));
+    }
+    CHECK(todo_collect(&e.buf, &ls) == 2 && ls[0] == 6 && ls[1] == 8);
+    free(ls);
+    ed_free(&e);
+}
+
 int main(void)
 {
     /* Qualsevol configuració UTF-8 (una Raspberry amb buildroot pot no tenir C.UTF-8) */
@@ -1975,6 +2003,7 @@ int main(void)
         perror("mkdtemp");
         return 1;
     }
+    test_todo();
     test_utf8();
     test_wrap();
     test_buffer();

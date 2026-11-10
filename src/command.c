@@ -16,6 +16,7 @@
 #include "search.h"
 #include "spell.h"
 #include "theme.h"
+#include "todoview.h"
 #include "utf8.h"
 #include "tui.h"
 #include "util.h"
@@ -232,6 +233,22 @@ static void c_outline(Editor *e)
     size_t line;
 
     if (!outline_view(e, &line))
+        return;
+    ed_sel_clear(e);
+    e->cy = line;
+    e->cx = 0;
+    e->want_x = -1;
+    e->top_line = line;
+    e->top_row = 0;
+    e->recenter = 1;
+}
+
+/* Com l'esquema: la línia triada queda a dalt de la pantalla */
+static void c_todo(Editor *e)
+{
+    size_t line;
+
+    if (!todo_view(e, &line))
         return;
     ed_sel_clear(e);
     e->cy = line;
@@ -1363,6 +1380,7 @@ static const Command commands[] = {
     { "esborrar-endavant",         c_delete,         "Esborra el caràcter següent", ACT_DELETE },
     { "esborrar-paraula-anterior", c_delete_word_prev, "Esborra fins a l'inici de la paraula", ACT_NONE },
     { "esborrar-paraula-seguent",  c_delete_word_next, "Esborra fins a la paraula següent", ACT_NONE },
+    { "pendents",          c_todo,       "Llista els pendents (TODO, [?], %%nota%%) i hi salta amb Enter", ACT_NONE },
     { "pujar-paragraf",            c_par_up,         "Puja el paràgraf (o les línies seleccionades) per sobre de l'anterior; a l'esquema, la secció", ACT_NONE },
     { "baixar-paragraf",           c_par_down,       "Baixa el paràgraf (o les línies seleccionades) per sota del següent; a l'esquema, la secció", ACT_NONE },
     { "nota-peu",                  c_footnote,       "Insereix una nota al peu [^n] i la seva definició al final, on queda el cursor", ACT_NONE },
@@ -1425,6 +1443,7 @@ static const char *const default_bindings[][2] = {
     { "ctrl-end", "fi-document" },        { "alt->", "fi-document" },
     { "alt-l", "anar-a-linia" },
     { "f2", "esquema" },              { "alt-e", "esquema" },
+    { "alt-k", "pendents" },
 
     { "shift-up", "seleccio-amunt" },     { "shift-down", "seleccio-avall" },
     { "shift-left", "seleccio-esquerra" }, { "shift-right", "seleccio-dreta" },
@@ -1453,6 +1472,7 @@ static const char *const default_bindings[][2] = {
 
     { "alt-c", "centrar" },           { "f4", "enfocament" },
     { "f10", "maquina-escriure" },    { "alt-m", "maquina-escriure" },
+    { "alt-t", "tipografia" },
     { "ctrl-o", "obrir" },            { "ctrl-n", "nou" },
     { "alt-o", "recents" },
     { "ctrl-s", "desar" },            { "alt-s", "desar-com" },

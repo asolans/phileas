@@ -3,6 +3,7 @@
 #include "md.h"
 #include "spell.h"
 #include "theme.h"
+#include "todo.h"
 #include "tui.h"
 #include "utf8.h"
 #include "wrap.h"
@@ -286,6 +287,10 @@ static void line_styles(Editor *e, size_t y)
             memset(errors + a, 1, b - a);
         from = b;
     }
+    /* Pendents (TODO, [?], %%nota%%): errors[] = 2 */
+    if (!e->buf.plain)
+        for (from = 0; todo_next(l->text, l->len, l->kind, from, &a, &b); from = b)
+            memset(errors + a, 2, b - a);
 }
 
 void ui_init(void)
@@ -375,7 +380,9 @@ static void draw_row(Editor *e, Line *l, size_t r, int y, size_t s0, size_t s1,
         } else if (styles_cap) {
             attr_t a = e->colors ? style_attr(styles[i]) : 0;
 
-            if (errors[i])
+            if (errors[i] == 2)
+                a |= A_REVERSE | A_BOLD;
+            else if (errors[i])
                 a = error_attr(a);
             attrset(sel ? over_role(a, UI_SEL) : a);
         } else if (sel) {

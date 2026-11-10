@@ -78,6 +78,7 @@ static const Menu m_find = { "Cerca", (const MenuItem[]){
     { 'u', "Substitueix…",         "substituir",      NULL, NULL },
     SEP,
     { 'e', "Esquema…",             "esquema",         NULL, NULL },
+    { 'p', "Pendents…",            "pendents",        NULL, NULL },
     SEP,
     { 'l', "Ves a la línia…",      "anar-a-linia",    NULL, NULL },
     { 'i', "Inici del document",   "inici-document",  NULL, NULL },

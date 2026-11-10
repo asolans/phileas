@@ -69,6 +69,10 @@ només serveix per escriure.
 - **Esquema** (F2): les capçaleres del document, sagnades pel nivell, amb
   les paraules de cada secció; Enter hi salta, escrivint es filtren i
   Alt+↑/↓ mou una secció sencera, amb les subseccions.
+- **Pendents** (Alt+K): `TODO` (paraula sencera, en majúscules), `[?]` i
+  `%%comentari%%` es ressalten al text (en vídeo invers); l'ordre `pendents`
+  els llista amb el número de línia, es filtren escrivint i Enter hi salta.
+  No compten dins del codi ni de les metadades YAML.
 - **Enfocament** (F4): atenua tot el text menys el paràgraf o la frase on
   s'escriu.
 - **Tipografia en escriure** (opcional): `--` → —, `<<` `>>` → « », `...` → …
@@ -318,7 +322,9 @@ de recordar tres tecles: **Esc** (menús), **F1** (ajuda) i **Ctrl+P**
 | Alt+C | centrar la columna |
 | F4 | enfocament: paràgraf, frase o cap |
 | F10 / Alt+M | màquina d'escriure: salt, línia fixa o clàssic |
+| Alt+T | tipografia automàtica: activa o desactiva |
 | F2 / Alt+E | esquema del document |
+| Alt+K | llista de pendents (TODO, [?], %%nota%%) |
 | F5 / F6 | nota al peu nova / anar de la crida a la nota i tornar |
 | F9 | al calaix d'idees: la selecció, o una idea nova si no n'hi ha; demana la pàgina (si hi ha font activa) i les etiquetes |
 | Ctrl+L | redibuixar la pantalla |
@@ -454,6 +460,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.3.1**: drecera Alt+T per activar o desactivar la tipografia automàtica; pendents (C11): ressaltat de `TODO`, `[?]` i `%%nota%%` i ordre `pendents` (Alt+K).
 - **2.3.0**: menú **Idees** (després de Vista) amb les ordres del calaix; «Vault d'Obsidian…», «Calaix de la Pi…» i «Importa a Obsidian» des de Phileas; la configuració és al phileasrc i desapareix el fitxer TOML i `--inicia`.
 - **2.2.7**: `phileas-importa-calaix --inicia VAULT` crea la configuració mínima (només cal el vault; la resta té valors per defecte); l'avís quan falta la configuració ho explica; model reordenat amb el mínim a dalt.
 - **2.2.6**: `phileas-importa-calaix` instal·lat fa servir el `calaix.md` de la carpeta des d'on es crida (abans el buscava a `/usr/bin`); la 2.2.5 no es va publicar.

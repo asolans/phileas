@@ -24,7 +24,7 @@ static const struct {
         "moure-amunt", "moure-avall", "moure-esquerra", "moure-dreta", "inici-linia",
         "fi-linia", "pagina-amunt", "pagina-avall", "paraula-anterior", "paraula-seguent",
         "paragraf-anterior", "paragraf-seguent", "inici-document", "fi-document",
-        "anar-a-linia", "esquema", NULL } },
+        "anar-a-linia", "esquema", "pendents", NULL } },
     { "Selecció i porta-retalls", (const char *const[]){
         "marca", "seleccionar-tot", "cancellar", "tallar", "copiar", "enganxar",
         "seleccio-esquerra", "seleccio-dreta", "seleccio-amunt", "seleccio-avall",
@@ -64,6 +64,7 @@ static const char *const intro[] = {
     "Una línia amb només *** es mostra centrada a la pantalla (el fitxer no canvia).",
     "Recents (Alt+O): Enter obre, Supr treu de la llista; el cursor torna on era.",
     "Esquema (F2): capçaleres i paraules de cada secció; Enter hi va, Alt+↑/↓ mou la secció.",
+    "Pendents (Alt+K): TODO, [?] i %%nota%% es ressalten al text; la llista filtrable hi salta amb Enter.",
     "Suggeriments (Alt+Enter): el número substitueix, a afegeix, i ignora.",
     "Porta-retalls: a l'escriptori, Ctrl+C/Ctrl+V el comparteixen amb les altres aplicacions.",
     "Barra d'estat, a la dreta: desplaçament (salt, fixa o clàssic), idioma, paraules i pàgines.",
