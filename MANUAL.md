@@ -146,7 +146,7 @@ També les llistes de tasques (`- [ ] `, `- [x] `) i les cites (`> `).
 
 ### Separador centrat
 
-Una línia que només conté `***` es mostra **centrada** a la pantalla, com els
+Una línia que només conté `***` (s'hi toleren espais davant i darrere) es mostra **centrada** a la pantalla, com els
 separadors d'escenes d'un llibre. És només una vista: al fitxer continua sent
 `***`.
 

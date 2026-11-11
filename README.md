@@ -27,7 +27,7 @@ només serveix per escriure.
 - **Markdown sense previsualització:** només el marcatge, amb colors mínims
   (capçaleres, negreta, cursiva, codi i cites) que funcionen fins i tot en
   terminals de 8 colors.
-- **Separador centrat:** una línia que només té `***` es mostra centrada a la
+- **Separador centrat:** una línia que només té `***` (tolera espais davant i darrere) es mostra centrada a la
   pantalla. És només una vista: el fitxer no canvia.
 - **Temes de colors:** terminal (els colors del terminal, per defecte), fosc,
   clar, sèpia, fòsfor i WordPerfect (gris sobre blau, com el WordPerfect 5.1

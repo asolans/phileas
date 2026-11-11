@@ -343,14 +343,24 @@ void ui_sync_size(void)
         resize_term(ws.ws_row, ws.ws_col);
 }
 
-/* Una línia que només conté "***" es mostra centrada a la pantalla (només
- * a la vista: el fitxer no canvia). Retorna la columna de pantalla on
- * comença, o -1 si la línia no es centra. */
+/* Una línia que només conté "***" (admet espais davant i darrere) es mostra
+ * centrada a la pantalla (només a la vista: el fitxer no canvia). Retorna la
+ * columna de pantalla on comença la línia, o -1 si no es centra. Els espais
+ * previs es dibuixen davant dels asteriscos, que queden centrats. */
 static int centred_x(const Line *l, size_t r)
 {
-    if (r != 0 || l->nrows != 1 || l->len != 3 || memcmp(l->text, "***", 3) != 0)
+    size_t a = 0, b = l->len;
+
+    if (r != 0 || l->nrows != 1)
         return -1;
-    return COLS > 3 ? (COLS - 3) / 2 : 0;
+    while (a < b && l->text[a] == ' ')
+        a++;
+    while (b > a && l->text[b - 1] == ' ')
+        b--;
+    if (b - a != 3 || memcmp(l->text + a, "***", 3) != 0)
+        return -1;
+    int x = COLS > 3 ? (COLS - 3) / 2 : 0;
+    return x > (int)a ? x - (int)a : 0;
 }
 
 /* Dibuixa la fila r de la línia y. [s0, s1) és la part seleccionada i, amb

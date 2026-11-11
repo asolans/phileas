@@ -61,7 +61,7 @@ static const char *const intro[] = {
     "Notes al peu (F5): [^1] al text i «[^1]: text» al final; F6 va i torna.",
     "Calaix: F9 desa la selecció (o una idea nova) amb la font activa, la pàgina, un títol opcional i les etiquetes; Idees → Font del calaix la canvia o l'esborra.",
     "Idees → Obsidian: «Calaix de la Pi» (el que arriba amb envia) i «Vault d'Obsidian» (Tab tria la carpeta) es desen al phileasrc; «Importa a Obsidian» porta els dos calaixos al vault.",
-    "Una línia amb només *** es mostra centrada a la pantalla (el fitxer no canvia).",
+    "Una línia amb només *** (amb o sense espais als costats) es mostra centrada a la pantalla (el fitxer no canvia).",
     "Recents (Alt+O): Enter obre, Supr treu de la llista; el cursor torna on era.",
     "Esquema (F2): capçaleres i paraules de cada secció; Enter hi va, Alt+↑/↓ mou la secció.",
     "Pendents (Alt+K): TODO, [?] i %%nota%% es ressalten al text; la llista filtrable hi salta amb Enter.",
