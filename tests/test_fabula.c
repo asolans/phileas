@@ -905,6 +905,87 @@ static void test_table(void)
     project_free(&p);
 }
 
+static void test_links(void)
+{
+    Project p;
+    char err[300], dir[512];
+    FNode *c1, *c2, *anna, *neus, *cafe;
+    FBack *b;
+    size_t n;
+    const FLink *l;
+
+    snprintf(dir, sizeof dir, "%s/lk", tmpdir);
+    put("lk/projecte.md", "x\n");
+    put("lk/manuscrit/01-a.md",
+        "## A\n\nVa veure [[Anna Puig]] al mas i [[Neus|la veïna]].\n\n"
+        "### Escena u\n<!-- pov: Anna; nota: [[Ignorat]] -->\n\n"
+        "Parla amb [[anna-puig#Aspecte]] i amb [[Aina]] i [[cafe]].\n\n"
+        "```\n[[Dins codi]]\n```\n\n"
+        "### Escena dos\n\nOu dir [[Anneta]]; [[ ]] no és res; [[]] tampoc.\n");
+    put("lk/manuscrit/02-b.md", "## B\n\nTorna a [[ANNA puig]] i veu [[01-a]]. Aquest paràgraf és molt llarg per veure com es talla el context al voltant d'un enllaç com [[Neus]] enmig de moltes paraules a banda i banda del fragment.\n");
+    put("lk/personatges/anna-puig.md", "---\nalies: [Anneta, Anna P.]\n---\n\n# Anna Puig\n\nParla amb [[Neus]] i amb ella mateixa [[Anna Puig]].\n");
+    put("lk/personatges/neus.md", "# Neus Roca\n\nres.\n");
+    put("lk/llocs/cafe.md", "# Cafè\n\nA [[Mas Roig]].\n");
+    CHECK(project_open(&p, dir, err, sizeof err) == 0);
+    c1 = p.manuscrit->kids[0];
+    c2 = p.manuscrit->kids[1];
+    anna = p.top->kids[1]->kids[0];
+    neus = p.top->kids[1]->kids[1];
+    cafe = p.top->kids[2]->kids[0];
+    CHECK(!strcmp(anna->title, "Anna Puig") && !strcmp(neus->name, "neus.md") && !strcmp(cafe->title, "Cafè"));
+    CHECK(!strcmp(anna->alies, "Anneta, Anna P."));
+
+    /* extracció: formes, escenes, línies; sense codi ni comentaris */
+    CHECK(c1->nlinks == 6);
+    l = &c1->links[0];
+    CHECK(!strcmp(l->target, "Anna Puig") && l->scene == 0 && l->to == anna && strstr(l->context, "[[Anna Puig]]"));
+    CHECK(!strcmp(c1->links[1].target, "Neus") && c1->links[1].to == neus);           /* [[Neus|la veïna]] */
+    CHECK(!strcmp(c1->links[2].target, "anna-puig") && c1->links[2].scene == 1 && c1->links[2].to == anna);
+    CHECK(!strcmp(c1->links[3].target, "Aina") && c1->links[3].to == NULL);            /* trencat */
+    CHECK(!strcmp(c1->links[4].target, "cafe") && c1->links[4].to == cafe);            /* sense accents */
+    CHECK(!strcmp(c1->links[5].target, "Anneta") && c1->links[5].scene == 2 && c1->links[5].to == anna);   /* àlies */
+    CHECK(c1->links[0].line < c1->links[2].line && c1->links[2].line < c1->links[5].line);
+    CHECK(c2->nlinks == 3 && c2->links[0].to == anna && c2->links[1].to == c1 && c2->links[2].to == neus);
+    CHECK(strstr(c2->links[2].context, "…") != NULL && strstr(c2->links[2].context, "[[Neus]]") != NULL);
+    CHECK(strlen(c2->links[2].context) < 140);
+
+    /* on surt */
+    n = project_backlinks(&p, anna, &b);
+    CHECK(n == 4);                                   /* 3 de 01-a, 1 de 02-b; no ella mateixa */
+    CHECK(b[0].file == c1 && b[2].file == c1 && b[3].file == c2);
+    CHECK(!strcmp(b[2].link->target, "Anneta"));
+    free(b);
+    n = project_backlinks(&p, neus, &b);
+    CHECK(n == 3 && b[0].file == c1 && b[1].file == c2 && b[2].file == anna);   /* manuscrit primer; després la fitxa */
+    free(b);
+    n = project_backlinks(&p, c1, &b);
+    CHECK(n == 1 && b[0].file == c2);
+    free(b);
+    n = project_backlinks(&p, c2, &b);
+    CHECK(n == 0 && b == NULL);
+
+    /* trencats */
+    n = project_broken_links(&p, &b);
+    CHECK(n == 2 && !strcmp(b[0].link->target, "Aina") && !strcmp(b[1].link->target, "Mas Roig"));
+    CHECK(b[0].file == c1 && b[1].file == cafe);
+    free(b);
+
+    /* refrescar conserva els enllaços dels fitxers que no han canviat, i veu els nous */
+    CHECK(project_refresh(&p, err, sizeof err) == 0);
+    c1 = p.manuscrit->kids[0];
+    CHECK(c1->nlinks == 6 && c1->links[0].to == p.top->kids[1]->kids[0]);
+    put("lk/personatges/aina.md", "---\nalies: [Ainoa]\n---\n\n# Aina Vall\n");
+    CHECK(project_refresh(&p, err, sizeof err) == 0);
+    n = project_broken_links(&p, &b);
+    CHECK(n == 1 && !strcmp(b[0].link->target, "Mas Roig"));        /* «Aina» ara té fitxa */
+    free(b);
+    put("lk/manuscrit/02-b.md", "## B\n\nNomés [[Ainoa]].\n");
+    CHECK(project_refresh(&p, err, sizeof err) == 0);
+    c2 = p.manuscrit->kids[1];
+    CHECK(c2->nlinks == 1 && c2->links[0].to != NULL && !strcmp(c2->links[0].to->name, "aina.md"));
+    project_free(&p);
+}
+
 static void rmtree(const char *dir)
 {
     char cmd[600];
@@ -931,6 +1012,7 @@ int main(void)
     test_versions();
     test_meta();
     test_table();
+    test_links();
     rmtree(tmpdir);
     printf("%d comprovacions, %d errors\n", checks, failures);
     return failures != 0;

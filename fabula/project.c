@@ -275,6 +275,7 @@ static FNode *node_new(FKind kind, FNode *parent)
     n->lloc = xstrdup("");
     n->data = xstrdup("");
     n->pers = xstrdup("");
+    n->alies = xstrdup("");
     if (parent) {
         parent->kids = xrealloc(parent->kids, (parent->nkids + 1) * sizeof *parent->kids);
         parent->kids[parent->nkids++] = n;
@@ -296,6 +297,12 @@ static void node_free(FNode *n)
     free(n->lloc);
     free(n->data);
     free(n->pers);
+    free(n->alies);
+    for (size_t i = 0; i < n->nlinks; i++) {
+        free(n->links[i].target);
+        free(n->links[i].context);
+    }
+    free(n->links);
     free(n);
 }
 
@@ -473,6 +480,24 @@ static void meta_from_yaml(FNode *n, const char *head, size_t hl)
         set_str(&n->lloc, tmp);
     if (yaml_get(head, hl, "data", tmp, sizeof tmp))
         set_str(&n->data, tmp);
+    if (yaml_get(head, hl, "alies", tmp, sizeof tmp)) {
+        char **items;
+        size_t cnt = yaml_list(tmp, &items);
+
+        if (cnt) {
+            char joined[512] = "";
+
+            for (size_t i = 0; i < cnt; i++) {
+                if (i)
+                    strncat(joined, ", ", sizeof joined - strlen(joined) - 1);
+                strncat(joined, items[i], sizeof joined - strlen(joined) - 1);
+            }
+            set_str(&n->alies, joined);
+            yaml_list_free(items, cnt);
+        } else {
+            set_str(&n->alies, tmp);
+        }
+    }
     if (yaml_get(head, hl, "personatges", tmp, sizeof tmp)) {
         char **items;
         size_t cnt = yaml_list(tmp, &items);
@@ -529,6 +554,213 @@ static void scene_meta(FNode *s, const FNode *ch, Buffer *b, size_t heading, con
     fields_free(&f);
 }
 
+/* ---------- enllaços [[ ]] ---------- */
+
+static void add_link(FNode *n, size_t line, size_t scene, const char *target, size_t tl,
+                     const char *ctx, size_t cl)
+{
+    FLink *l;
+
+    n->links = xrealloc(n->links, (n->nlinks + 1) * sizeof *n->links);
+    l = &n->links[n->nlinks++];
+    l->line = line;
+    l->scene = scene;
+    l->target = xmalloc(tl + 1);
+    memcpy(l->target, target, tl);
+    l->target[tl] = '\0';
+    l->context = xmalloc(cl + 1);
+    memcpy(l->context, ctx, cl);
+    l->context[cl] = '\0';
+    l->to = NULL;
+}
+
+/* Fragment del text al voltant de [a, b): fins a 30 caràcters abans i 40
+ * després, amb «…» si es talla */
+static char *link_context(const char *s, size_t len, size_t a, size_t b, size_t *outlen)
+{
+    size_t from = a, to = b;
+    int before = 0, after = 0;
+    char *out;
+    size_t o = 0;
+
+    while (from > 0 && before < 30) {
+        from = utf8_prev(s, from);
+        before++;
+    }
+    while (to < len && after < 40) {
+        size_t nx = utf8_next(s, len, to);
+
+        to = nx > to ? nx : to + 1;
+        after++;
+    }
+    out = xmalloc(len + 16);
+    if (from > 0)
+        o += (size_t)sprintf(out + o, "…");
+    memcpy(out + o, s + from, to - from);
+    o += to - from;
+    if (to < len)
+        o += (size_t)sprintf(out + o, "…");
+    out[o] = '\0';
+    *outlen = o;
+    return out;
+}
+
+/* Cerca els [[ ]] de cada línia del buffer (sense metadades, codi ni comentaris) */
+static void extract_links(FNode *n, Buffer *b, const Outline *o)
+{
+    for (size_t i = 0; i < b->nlines; i++) {
+        const char *s = b->lines[i].text;
+        size_t len = b->lines[i].len, pos = 0;
+        int k = MD_BASE(b->lines[i].kind);
+        size_t scene = 0;
+
+        if (k == MD_META || k == MD_CODE || k == MD_FENCE_OPEN || k == MD_FENCE_CLOSE)
+            continue;
+        if (k == MD_HTML) {
+            size_t a, z;
+
+            if (comment_body(s, len, &a, &z))
+                continue;
+        }
+        for (size_t sc = 0, idx = 0; sc < o->n; sc++)
+            if (o->items[sc].level == 3) {
+                idx++;
+                if (i > o->items[sc].line && i < outline_end(o, sc, b->nlines))
+                    scene = idx;
+            }
+        while (pos + 4 <= len) {
+            const char *open = memmem(s + pos, len - pos, "[[", 2), *close;
+            size_t a, z, ts, te;
+
+            if (!open)
+                break;
+            a = (size_t)(open - s);
+            close = memmem(s + a + 2, len - a - 2, "]]", 2);
+            if (!close)
+                break;
+            z = (size_t)(close - s) + 2;
+            ts = a + 2;
+            te = z - 2;
+            /* el nom acaba a | o # */
+            for (size_t j = ts; j < te; j++)
+                if (s[j] == '|' || s[j] == '#') {
+                    te = j;
+                    break;
+                }
+            while (ts < te && isspace((unsigned char)s[ts]))
+                ts++;
+            while (te > ts && isspace((unsigned char)s[te - 1]))
+                te--;
+            if (te > ts && z - a < 240 && !memmem(s + a + 2, z - a - 4, "[[", 2)) {
+                size_t cl;
+                char *ctx = link_context(s, len, a, z, &cl);
+
+                add_link(n, i, scene, s + ts, te - ts, ctx, cl);
+                free(ctx);
+            }
+            pos = z;
+        }
+    }
+}
+
+static void copy_links(FNode *dst, const FNode *src)
+{
+    for (size_t i = 0; i < src->nlinks; i++)
+        add_link(dst, src->links[i].line, src->links[i].scene, src->links[i].target,
+                 strlen(src->links[i].target), src->links[i].context, strlen(src->links[i].context));
+    set_str(&dst->alies, src->alies);
+}
+
+typedef struct {
+    char   *key;
+    FNode  *node;
+    size_t  seq;
+} KeyEnt;
+
+static int cmp_keys(const void *a, const void *b)
+{
+    const KeyEnt *x = a, *y = b;
+    int r = strcmp(x->key, y->key);
+
+    return r ? r : (x->seq < y->seq ? -1 : x->seq > y->seq);
+}
+
+static int cmp_key_only(const void *a, const void *b)
+{
+    return strcmp(((const KeyEnt *)a)->key, ((const KeyEnt *)b)->key);
+}
+
+static void add_key(KeyEnt **v, size_t *n, size_t *cap, const char *text, FNode *node)
+{
+    char *k = foldstr(text);
+
+    if (!k[0]) {
+        free(k);
+        return;
+    }
+    if (*n == *cap)
+        *v = xrealloc(*v, (*cap = *cap ? *cap * 2 : 64) * sizeof **v);
+    (*v)[*n].key = k;
+    (*v)[*n].node = node;
+    (*v)[*n].seq = *n;
+    (*n)++;
+}
+
+/* Resol cada enllaç a la fitxa o capítol que té aquest nom: primer les
+ * fitxes, i dins de cada una, el títol, el nom del fitxer i els àlies */
+static void resolve_links(Project *p)
+{
+    KeyEnt *v = NULL;
+    size_t n = 0, cap = 0;
+
+    if (!p->top)
+        return;
+    for (int pass = 0; pass < 2; pass++)           /* 0: fitxes; 1: capítols */
+        for (size_t g = 0; g < p->top->nkids; g++)
+            for (size_t i = 0; i < p->top->kids[g]->nkids; i++) {
+                FNode *f = p->top->kids[g]->kids[i];
+                char base[300];
+                size_t bl;
+
+                if ((pass == 0) != (f->kind == FK_CARD))
+                    continue;
+                add_key(&v, &n, &cap, f->title, f);
+                snprintf(base, sizeof base, "%s", f->name);
+                bl = strlen(base);
+                if (bl > 3 && !strcmp(base + bl - 3, ".md"))
+                    base[bl - 3] = '\0';
+                add_key(&v, &n, &cap, base, f);
+                if (f->alies && f->alies[0]) {
+                    char *copy = xstrdup(f->alies), *save = NULL;
+
+                    for (char *t = strtok_r(copy, ",", &save); t; t = strtok_r(NULL, ",", &save)) {
+                        while (*t == ' ')
+                            t++;
+                        add_key(&v, &n, &cap, t, f);
+                    }
+                    free(copy);
+                }
+            }
+    if (n)
+        qsort(v, n, sizeof *v, cmp_keys);
+    for (size_t g = 0; g < p->top->nkids; g++)
+        for (size_t i = 0; i < p->top->kids[g]->nkids; i++) {
+            FNode *f = p->top->kids[g]->kids[i];
+
+            for (size_t k = 0; k < f->nlinks; k++) {
+                KeyEnt probe, *hit;
+
+                probe.key = foldstr(f->links[k].target);
+                hit = n ? bsearch(&probe, v, n, sizeof *v, cmp_key_only) : NULL;
+                f->links[k].to = hit ? hit->node : NULL;
+                free(probe.key);
+            }
+        }
+    for (size_t i = 0; i < n; i++)
+        free(v[i].key);
+    free(v);
+}
+
 /* Còpia de les dades llegides d'un node (per a la memòria cau) */
 static void copy_node_data(FNode *dst, const FNode *src, const Project *p)
 {
@@ -579,6 +811,7 @@ static FNode *load_file(const Project *p, const Project *old, FNode *parent, con
         if (c && c->kind == kind && c->mtime == n->mtime && c->fsize == n->fsize &&
             c->ino == n->ino) {
             copy_node_data(n, c, p);
+            copy_links(n, c);
             for (size_t i = 0; i < c->nkids; i++) {
                 FNode *s = node_new(FK_SCENE, n);
 
@@ -619,6 +852,7 @@ static FNode *load_file(const Project *p, const Project *old, FNode *parent, con
     n->words = prose_words(&b);
 
     outline_build(&b, &o);
+    extract_links(n, &b, &o);
     if (!n->title[0])
         for (size_t k = 0; k < o.n; k++)
             if (o.items[k].level <= 2 && o.items[k].title && o.items[k].title[0]) {
@@ -803,6 +1037,7 @@ static int open_ex(Project *p, const char *dir, const Project *old, char *err, s
         names_free(files, nf);
     }
     names_free(groups, ng);
+    resolve_links(p);
     return 0;
 }
 
@@ -2043,4 +2278,70 @@ int project_set_meta(Project *p, FNode *n, const char *key, const char *value, c
         }
     }
     return 0;
+}
+
+
+/* ---------- consultes d'enllaços ---------- */
+
+size_t project_backlinks(const Project *p, const FNode *target, FBack **out)
+{
+    FBack *v = NULL;
+    size_t n = 0, cap = 0;
+
+    *out = NULL;
+    if (!p->top)
+        return 0;
+    /* primer el manuscrit, després la resta de grups */
+    for (int pass = 0; pass < 2; pass++)
+        for (size_t g = 0; g < p->top->nkids; g++) {
+            const FNode *grp = p->top->kids[g];
+
+            if ((pass == 0) != (grp == p->manuscrit))
+                continue;
+            for (size_t i = 0; i < grp->nkids; i++) {
+                FNode *f = grp->kids[i];
+
+                if (f == target)
+                    continue;
+                for (size_t k = 0; k < f->nlinks; k++)
+                    if (f->links[k].to == target) {
+                        if (n == cap)
+                            v = xrealloc(v, (cap = cap ? cap * 2 : 16) * sizeof *v);
+                        v[n].file = f;
+                        v[n++].link = &f->links[k];
+                    }
+            }
+        }
+    *out = v;
+    return n;
+}
+
+size_t project_broken_links(const Project *p, FBack **out)
+{
+    FBack *v = NULL;
+    size_t n = 0, cap = 0;
+
+    *out = NULL;
+    if (!p->top)
+        return 0;
+    for (int pass = 0; pass < 2; pass++)
+        for (size_t g = 0; g < p->top->nkids; g++) {
+            const FNode *grp = p->top->kids[g];
+
+            if ((pass == 0) != (grp == p->manuscrit))
+                continue;
+            for (size_t i = 0; i < grp->nkids; i++) {
+                FNode *f = grp->kids[i];
+
+                for (size_t k = 0; k < f->nlinks; k++)
+                    if (!f->links[k].to) {
+                        if (n == cap)
+                            v = xrealloc(v, (cap = cap ? cap * 2 : 16) * sizeof *v);
+                        v[n].file = f;
+                        v[n++].link = &f->links[k];
+                    }
+            }
+        }
+    *out = v;
+    return n;
 }

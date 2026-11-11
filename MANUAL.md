@@ -818,6 +818,9 @@ sortir una mica més alt.
 | `e` | canvia l'estat al següent de la llista |
 | Alt+↑ / Alt+↓ (o `<` `>`) | puja o baixa el capítol |
 | Tab | canvia entre l'arbre i la **taula** (outliner) |
+| `u` | **on surt** el capítol o la fitxa: els `[[enllaços]]` d'altres fitxers que hi apunten |
+| `l` | els **enllaços d'aquí** (de l'escena, el capítol o la fitxa) i on van |
+| `t` | els enllaços **trencats** de tot el projecte |
 | `s` | desa una **instantània** del capítol o la fitxa |
 | `v` | **versions** anteriors: llista amb data, paraules i diferència; Retorn en recupera una |
 | Supr | mou a la paperera (pregunta abans) |
@@ -871,6 +874,37 @@ metadades.
 Quan edites una escena, Fàbula escriu el comentari al fitxer (després d'una
 instantània, vegeu més avall); si el fitxer ha canviat des que el va llegir, no
 hi toca res i t'ho diu.
+
+### Enllaços: on surt cada personatge
+
+Al text, i a les fitxes, escriu `[[Anna Puig]]` per referir-te a una fitxa o a
+un capítol; és la sintaxi d'Obsidian, i també valen `[[Anna Puig|l'Anna]]` (amb
+el text que vulguis) i `[[Anna Puig#Aspecte]]` (a una secció). L'enllaç apunta al
+fitxer que **té aquest nom**: pel títol, pel nom del fitxer (`anna-puig`) o per un
+**àlies** de la capçalera de la fitxa:
+
+```yaml
+---
+alies: [Anneta, Anna P.]
+---
+```
+
+No cal distingir majúscules ni accents: `[[anna puig]]`, `[[Cafe]]` i `[[Cafè]]`
+són el mateix. Els enllaços dins d'un bloc de codi, de la capçalera YAML o d'un
+comentari de metadades no compten.
+
+- **`u`, on surt:** posa el cursor en una fitxa (o un capítol) i prem `u`. Veus
+  cada lloc on s'hi fa referència, amb el capítol i l'escena i un tros del
+  paràgraf. Retorn obre el text a Phileas, justament en aquell paràgraf.
+- **`l`, enllaços d'aquí:** els `[[ ]]` de l'escena (o del capítol o de la fitxa)
+  seleccionats i on van. Retorn et porta a la fitxa; si l'enllaç no en té, obre el
+  text on és.
+- **`t`, trencats:** els enllaços que no apunten a res (un nom mal escrit, o un
+  personatge nou que encara no té fitxa), de tot el projecte. Retorn obre el text on
+  és, per corregir-lo; o crea la fitxa amb `n` i desapareix de la llista.
+
+Fàbula no canvia mai els enllaços: només els llegeix, així que Obsidian pot obrir
+el mateix projecte i veure'n el graf i els retroenllaços sense convertir res.
 
 ### Instantànies: marxa enrere
 

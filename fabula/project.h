@@ -20,6 +20,15 @@ typedef enum {
 enum { FK_OWN_POV = 1, FK_OWN_LLOC = 2, FK_OWN_DATA = 4, FK_OWN_PERS = 8, FK_OWN_SINOPSI = 16 };
 
 typedef struct FNode FNode;
+
+/* Enllaç [[Nom]] (també [[Nom|text]] i [[Nom#secció]]) d'un fitxer */
+typedef struct {
+    size_t  line;       /* línia del buffer (0 = la primera) */
+    size_t  scene;      /* escena del capítol on és (1 = la primera), o 0 */
+    char   *target;     /* el nom, sense text ni secció */
+    char   *context;    /* fragment del paràgraf al voltant */
+    FNode  *to;         /* fitxer on apunta (fitxa o capítol), o NULL si és trencat */
+} FLink;
 struct FNode {
     FKind   kind;
     char   *title;
@@ -35,6 +44,9 @@ struct FNode {
     char   *data;       /* AAAA, AAAA-MM o AAAA-MM-DD */
     char   *pers;       /* personatges, separats per comes */
     unsigned own;       /* escenes: quins camps són propis (FK_OWN_*), la resta, heretats */
+    char   *alies;      /* fitxes: àlies de l'YAML, separats per comes */
+    FLink  *links;      /* enllaços [[ ]] del fitxer (capítols i fitxes) */
+    size_t  nlinks;
     size_t  words;      /* paraules; als grups, el total dels fills */
     size_t  line;       /* escenes: línia del buffer de la capçalera */
     FNode  *parent;
@@ -139,6 +151,22 @@ void   project_versions_free(FVersion *v, size_t n);
 /* Posa la versió com a fitxer actual; abans en fa una instantània de
  * l'estat actual (així es pot tornar enrere). */
 int    project_restore(Project *p, FNode *n, const FVersion *v, time_t now, char *err, size_t esz);
+
+/* ---- Enllaços [[ ]] ----
+ * Un enllaç apunta a la fitxa o capítol que té aquest nom: pel títol, pel nom
+ * del fitxer o per un àlies (`alies: [Anneta, Anna P.]` a l'YAML), sense
+ * majúscules ni accents. L'índex es fa en llegir els fitxers. */
+typedef struct {
+    FNode        *file;     /* fitxer on és l'enllaç */
+    const FLink  *link;
+} FBack;
+
+/* On surt un fitxer: els enllaços d'altres fitxers que hi apunten (primer el
+ * manuscrit, per ordre). *out s'allibera amb free. */
+size_t project_backlinks(const Project *p, const FNode *target, FBack **out);
+
+/* Els enllaços sense destí (no hi ha cap fitxa o capítol amb aquest nom) */
+size_t project_broken_links(const Project *p, FBack **out);
 
 /* Canvia un camp de metadades i el desa: key és pov, lloc, data, personatges,
  * sinopsi o estat; value buit el treu. En un capítol o fitxa és la capçalera

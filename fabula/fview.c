@@ -628,19 +628,13 @@ static void act_versions(View *v)
 
 /* Obre l'element a l'editor i, en tornar, refresca el projecte conservant la
  * selecció (pel camí del fitxer i l'ordre de l'escena). */
-static void open_in_editor(View *v, FNode *n)
+static void open_file_line(View *v, FNode *file, size_t line, size_t scene)
 {
-    FNode *file = n->kind == FK_SCENE ? n->parent : n;
-    size_t line = n->kind == FK_SCENE ? n->line + 1 : 0, scene = 0;
     char *path = strdup(file->path), err[200];
     int rc;
 
     if (!path)
         return;
-    if (n->kind == FK_SCENE)
-        for (size_t i = 0; i < file->nkids; i++)
-            if (file->kids[i] == n)
-                scene = i + 1;
     auto_snapshot(v, file);
     v->msg[0] = '\0';
     rc = launch_editor(path, line, err, sizeof err);
@@ -666,6 +660,18 @@ static void open_in_editor(View *v, FNode *n)
     if (rc != 0)
         snprintf(v->msg, sizeof v->msg, "%s", err);
     free(path);
+}
+
+static void open_in_editor(View *v, FNode *n)
+{
+    FNode *file = n->kind == FK_SCENE ? n->parent : n;
+    size_t scene = 0;
+
+    if (n->kind == FK_SCENE)
+        for (size_t i = 0; i < file->nkids; i++)
+            if (file->kids[i] == n)
+                scene = i + 1;
+    open_file_line(v, file, n->kind == FK_SCENE ? n->line + 1 : 0, scene);
 }
 
 /* Línia d'entrada a la barra d'estat. Retorna 1 si s'accepta (Retorn) i 0 si
@@ -868,6 +874,222 @@ static void act_move(View *v, int dir)
     refresh_select(v, path);
 }
 
+/* ---------- enllaços [[ ]] ---------- */
+
+/* Llista desplaçable a pantalla; retorna l'índex triat o -1 */
+static int pick_list(View *v, const char *title, char **lines, size_t n, const char *footer)
+{
+    long sel = 0;
+    int w = COLS - 4 > 100 ? 100 : COLS - 4;
+
+    if (w < 20)
+        w = 20;
+    for (;;) {
+        int x0 = 1, y0 = 2, key, visible = LINES - 7 < (int)n ? LINES - 7 : (int)n;
+        long top;
+
+        if (visible < 1)
+            visible = 1;
+        top = sel >= visible ? sel - visible + 1 : 0;
+        paint(v);
+        attrset(A_NORMAL);
+        attron(ft_attr(FT_DIM));
+        mvaddstr(y0, x0, "┌");
+        for (int c = 0; c < w; c++)
+            addstr("─");
+        addstr("┐");
+        attroff(ft_attr(FT_DIM));
+        put(y0, x0 + 1, title, w, ft_attr(FT_HEAD));
+        for (int r = 0; r < visible; r++) {
+            attr_t a = top + r == sel ? ft_attr(FT_SEL) : 0;
+
+            attron(ft_attr(FT_DIM));
+            mvaddstr(y0 + 1 + r, x0, "│");
+            mvaddstr(y0 + 1 + r, x0 + w + 1, "│");
+            attroff(ft_attr(FT_DIM));
+            attron(a);
+            move(y0 + 1 + r, x0 + 1);
+            for (int c = 0; c < w; c++)
+                addch(' ');
+            attroff(a);
+            put(y0 + 1 + r, x0 + 2, lines[top + r], w - 2, a);
+        }
+        attron(ft_attr(FT_DIM));
+        mvaddstr(y0 + 1 + visible, x0, "└");
+        for (int c = 0; c < w; c++)
+            addstr("─");
+        addstr("┘");
+        attroff(ft_attr(FT_DIM));
+        put(y0 + 2 + visible, x0, footer, COLS - 2, ft_attr(FT_DIM));
+        refresh();
+        key = key_read();
+        if (key < 0 || key == K_FN(KEY_RESIZE))
+            continue;
+        if (key == 27 || key == 'q')
+            return -1;
+        if (key == K_FN(KEY_UP) && sel > 0)
+            sel--;
+        else if (key == K_FN(KEY_DOWN) && sel + 1 < (long)n)
+            sel++;
+        else if (key == K_FN(KEY_HOME))
+            sel = 0;
+        else if (key == K_FN(KEY_END))
+            sel = (long)n - 1;
+        else if (key == K_FN(KEY_PPAGE))
+            sel = sel > 8 ? sel - 8 : 0;
+        else if (key == K_FN(KEY_NPAGE))
+            sel = sel + 8 < (long)n ? sel + 8 : (long)n - 1;
+        else if (key == '\n')
+            return (int)sel;
+    }
+}
+
+/* «Capítol › Escena» o «Fitxa: títol» d'un enllaç */
+static void link_origin(const FBack *b, char *out, size_t sz)
+{
+    const FNode *f = b->file;
+
+    if (f->kind == FK_CHAPTER && b->link->scene && b->link->scene <= f->nkids)
+        snprintf(out, sz, "%s › %s", f->title, f->kids[b->link->scene - 1]->title);
+    else if (f->kind == FK_CHAPTER)
+        snprintf(out, sz, "%s", f->title);
+    else
+        snprintf(out, sz, "%s: %s", f->parent ? f->parent->title : "Fitxa", f->title);
+}
+
+static void free_lines(char **l, size_t n)
+{
+    for (size_t i = 0; i < n; i++)
+        free(l[i]);
+    free(l);
+}
+
+static char **back_lines(const FBack *b, size_t n, int show_target)
+{
+    char **lines = malloc((n ? n : 1) * sizeof *lines);
+
+    for (size_t i = 0; i < n; i++) {
+        char origin[240], buf[500];
+
+        link_origin(&b[i], origin, sizeof origin);
+        if (show_target)
+            snprintf(buf, sizeof buf, "[[%s]]  ·  %s  ·  %s", b[i].link->target, origin, b[i].link->context);
+        else
+            snprintf(buf, sizeof buf, "%s  ·  %s", origin, b[i].link->context);
+        lines[i] = strdup(buf);
+    }
+    return lines;
+}
+
+/* u: on surt el capítol o la fitxa seleccionats (els [[ ]] d'altres fitxers) */
+static void act_where(View *v)
+{
+    FNode *n = cur(v);
+    FBack *b;
+    size_t cnt;
+    char title[200], **lines;
+    int pick;
+
+    if (n && n->kind == FK_SCENE)
+        n = n->parent;
+    if (!n || (n->kind != FK_CHAPTER && n->kind != FK_CARD)) {
+        snprintf(v->msg, sizeof v->msg, "Els enllaços apunten a capítols i fitxes.");
+        return;
+    }
+    cnt = project_backlinks(v->p, n, &b);
+    if (!cnt) {
+        snprintf(v->msg, sizeof v->msg, "Cap [[enllaç]] apunta a «%.60s».", n->title);
+        return;
+    }
+    lines = back_lines(b, cnt, 0);
+    snprintf(title, sizeof title, " On surt «%s» (%zu) ", n->title, cnt);
+    pick = pick_list(v, title, lines, cnt, " Retorn obre el text a Phileas, a la línia · Esc tanca");
+    if (pick >= 0)
+        open_file_line(v, b[pick].file, b[pick].link->line + 1, b[pick].link->scene);
+    free_lines(lines, cnt);
+    free(b);
+}
+
+/* t: els enllaços sense destí de tot el projecte */
+static void act_broken(View *v)
+{
+    FBack *b;
+    size_t cnt = project_broken_links(v->p, &b);
+    char title[120], **lines;
+    int pick;
+
+    if (!cnt) {
+        snprintf(v->msg, sizeof v->msg, "Cap enllaç trencat.");
+        return;
+    }
+    lines = back_lines(b, cnt, 1);
+    snprintf(title, sizeof title, " Enllaços sense fitxa (%zu) ", cnt);
+    pick = pick_list(v, title, lines, cnt, " Retorn obre el text a Phileas, a la línia · Esc tanca");
+    if (pick >= 0)
+        open_file_line(v, b[pick].file, b[pick].link->line + 1, b[pick].link->scene);
+    free_lines(lines, cnt);
+    free(b);
+}
+
+/* l: els enllaços de l'escena, el capítol o la fitxa seleccionats */
+static void act_outgoing(View *v)
+{
+    FNode *n = cur(v), *file;
+    size_t scene = 0, cnt = 0;
+    char **lines, title[200];
+    const FLink **ls;
+    int pick;
+
+    if (!n || n->kind == FK_GROUP) {
+        snprintf(v->msg, sizeof v->msg, "Selecciona una escena, un capítol o una fitxa.");
+        return;
+    }
+    file = n->kind == FK_SCENE ? n->parent : n;
+    if (n->kind == FK_SCENE)
+        for (size_t i = 0; i < file->nkids; i++)
+            if (file->kids[i] == n)
+                scene = i + 1;
+    ls = malloc((file->nlinks ? file->nlinks : 1) * sizeof *ls);
+    for (size_t i = 0; i < file->nlinks; i++)
+        if (!scene || file->links[i].scene == scene)
+            ls[cnt++] = &file->links[i];
+    if (!cnt) {
+        free(ls);
+        snprintf(v->msg, sizeof v->msg, "«%.60s» no té cap [[enllaç]].", n->title);
+        return;
+    }
+    lines = malloc(cnt * sizeof *lines);
+    for (size_t i = 0; i < cnt; i++) {
+        char buf[400];
+
+        if (ls[i]->to)
+            snprintf(buf, sizeof buf, "[[%s]]  →  %s (%s)", ls[i]->target, ls[i]->to->title,
+                     ls[i]->to->kind == FK_CHAPTER ? "capítol" : ls[i]->to->parent ? ls[i]->to->parent->title : "fitxa");
+        else
+            snprintf(buf, sizeof buf, "[[%s]]  →  (sense fitxa)  ·  %s", ls[i]->target, ls[i]->context);
+        lines[i] = strdup(buf);
+    }
+    snprintf(title, sizeof title, " Enllaços de «%s» (%zu) ", n->title, cnt);
+    pick = pick_list(v, title, lines, cnt, " Retorn va a la fitxa (o obre el text si no en té) · Esc tanca");
+    if (pick >= 0) {
+        if (ls[pick]->to) {
+            FNode *to = ls[pick]->to;
+            FNode *g = group_of(to);
+
+            v->mode = 0;
+            if (g)
+                g->open = 1;
+            v->filter[0] = '\0';
+            rebuild(v, to);
+            snprintf(v->msg, sizeof v->msg, "«%.80s»: Retorn l'obre", to->title);
+        } else {
+            open_file_line(v, file, ls[pick]->line + 1, ls[pick]->scene);
+        }
+    }
+    free_lines(lines, cnt);
+    free(ls);
+}
+
 /* Menú de l'Esc: la mateixa acció que cada tecla. Retorna el codi de la tecla
  * de l'acció triada, o -1 si es tanca sense triar. */
 static int menu_run(View *v)
@@ -881,6 +1103,9 @@ static int menu_run(View *v)
         { "Canvia l'estat", "e", 'e' },
         { "Puja el capítol", "Alt+↑", '<' },
         { "Baixa el capítol", "Alt+↓", '>' },
+        { "On surt (on s'usa)", "u", 'u' },
+        { "Enllaços d'aquí", "l", 'l' },
+        { "Enllaços trencats", "t", 't' },
         { "Desa una instantània", "s", 's' },
         { "Versions anteriors", "v", 'v' },
         { "Mou a la paperera", "Supr", K_FN(KEY_DC) },
@@ -964,6 +1189,7 @@ static void help(void)
         "  Retorn                     grups: plega/desplega · la resta: obre a Phileas",
         "  n                          capítol nou (al manuscrit) o fitxa nova (al grup)",
         "  r                          canvia el títol (i el nom del fitxer)",
+        "  u / l / t                  on surt un capítol o fitxa / els seus [[enllaços]] / enllaços trencats",
         "  s / v                      desa una instantània / veu les versions i en recupera una",
         "  Supr                       mou a la paperera (.paperera/); no s'esborra",
         "  Alt+↑ / Alt+↓  (< / >)     puja o baixa el capítol",
@@ -1241,6 +1467,15 @@ void fview_run(Project *p)
             break;
         case 's':
             act_snapshot(&v);
+            break;
+        case 'u':
+            act_where(&v);
+            break;
+        case 'l':
+            act_outgoing(&v);
+            break;
+        case 't':
+            act_broken(&v);
             break;
         case 'v':
             act_versions(&v);
