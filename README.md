@@ -285,12 +285,13 @@ de compilació creuada, vegeu [Desenvolupament](#desenvolupament).
 El paquet inclou **Fàbula**, una eina de consola per organitzar un projecte
 literari: capítols, escenes, personatges, llocs i recerca, tot com a fitxers
 Markdown normals. Mostra l'arbre del projecte amb les paraules, l'estat de cada
-capítol i el progrés cap a l'objectiu; Retorn obre el text a Phileas. Desa instantànies dels fitxers (`.versions/`) i en permet recuperar-les. Tab hi mostra una taula (outliner) amb el POV, el lloc, la data i l'estat de cada escena, que es pot ordenar, filtrar i editar. Entén els enllaços `[[Nom]]` d'Obsidian: mostra on surt cada personatge, els enllaços d'una escena i els que no apunten enlloc.
+capítol i el progrés cap a l'objectiu; Retorn obre el text a Phileas. Desa instantànies dels fitxers (`.versions/`) i en permet recuperar-les. Tab hi mostra una taula (outliner) amb el POV, el lloc, la data i l'estat de cada escena, que es pot ordenar, filtrar i editar. Entén els enllaços `[[Nom]]` d'Obsidian: mostra on surt cada personatge, els enllaços d'una escena i els que no apunten enlloc. Cerca i substitueix text a tot el projecte, amb llista de coincidències, confirmació i una instantània de cada fitxer abans de canviar-lo.
 
 ```bash
 fabula nou "La casa del pou"     # crea el projecte i l'obre
 fabula la-casa-del-pou           # obre un projecte
 fabula --resum la-casa-del-pou   # resum en text, sense pantalla
+fabula --cerca anna la-casa-del-pou   # cerca a tot el projecte, en text
 ```
 
 Les tecles i el format del projecte, al capítol 16 del [manual](MANUAL.md). Es

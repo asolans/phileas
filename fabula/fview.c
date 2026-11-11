@@ -1,6 +1,7 @@
 #include "fview.h"
 #include "flat.h"
 #include "fterm.h"
+#include "find.h"
 #include "launch.h"
 #include "table.h"
 
@@ -876,10 +877,16 @@ static void act_move(View *v, int dir)
 
 /* ---------- enllaços [[ ]] ---------- */
 
-/* Llista desplaçable a pantalla; retorna l'índex triat o -1 */
-static int pick_list(View *v, const char *title, char **lines, size_t n, const char *footer)
+/* Llista desplaçable a pantalla; retorna l'índex triat o -1. hook (opcional)
+ * rep cada tecla abans de la resta: 0 = no la gestiona, 1 = gestionada (es
+ * repinta), 2 = cal tornar a construir la llista (pick_list_ex retorna -2).
+ * *sel és la selecció inicial i final. */
+typedef int (*PickHook)(void *ctx, int key, long sel);
+
+static int pick_list_ex(View *v, const char *title, char **lines, size_t n, const char *footer,
+                        PickHook hook, void *ctx, long *selp)
 {
-    long sel = 0;
+    long sel = selp ? *selp : 0;
     int w = COLS - 4 > 100 ? 100 : COLS - 4;
 
     if (w < 20)
@@ -925,8 +932,21 @@ static int pick_list(View *v, const char *title, char **lines, size_t n, const c
         key = key_read();
         if (key < 0 || key == K_FN(KEY_RESIZE))
             continue;
-        if (key == 27 || key == 'q')
+        if (hook) {
+            int h = hook(ctx, key, sel);
+
+            if (selp)
+                *selp = sel;
+            if (h == 2)
+                return -2;
+            if (h == 1)
+                continue;
+        }
+        if (key == 27 || key == 'q') {
+            if (selp)
+                *selp = sel;
             return -1;
+        }
         if (key == K_FN(KEY_UP) && sel > 0)
             sel--;
         else if (key == K_FN(KEY_DOWN) && sel + 1 < (long)n)
@@ -939,9 +959,17 @@ static int pick_list(View *v, const char *title, char **lines, size_t n, const c
             sel = sel > 8 ? sel - 8 : 0;
         else if (key == K_FN(KEY_NPAGE))
             sel = sel + 8 < (long)n ? sel + 8 : (long)n - 1;
-        else if (key == '\n')
+        else if (key == '\n') {
+            if (selp)
+                *selp = sel;
             return (int)sel;
+        }
     }
+}
+
+static int pick_list(View *v, const char *title, char **lines, size_t n, const char *footer)
+{
+    return pick_list_ex(v, title, lines, n, footer, NULL, NULL, NULL);
 }
 
 /* «Capítol › Escena» o «Fitxa: títol» d'un enllaç */
@@ -1090,6 +1118,160 @@ static void act_outgoing(View *v)
     free(ls);
 }
 
+/* ---------- cerca i substitució al projecte ---------- */
+
+typedef struct {
+    unsigned       *opts;
+    unsigned char  *sel;
+    char          **lines;
+    size_t          n;
+    int             replace;
+} FindCtx;
+
+static int find_hook(void *c, int key, long sel)
+{
+    FindCtx *x = c;
+
+    switch (key) {
+    case 'c': *x->opts ^= FF_ICASE; return 2;
+    case 'w': *x->opts ^= FF_WORD; return 2;
+    case 'm': *x->opts ^= FF_META; return 2;
+    case ' ':
+        if (x->replace && x->n && sel >= 0 && sel < (long)x->n) {
+            x->sel[sel] = !x->sel[sel];
+            x->lines[sel][1] = x->sel[sel] ? 'x' : ' ';
+        }
+        return 1;
+    case 'a':
+        if (x->replace && x->n) {
+            int any = 0;
+
+            for (size_t i = 0; i < x->n; i++)
+                any |= x->sel[i];
+            for (size_t i = 0; i < x->n; i++) {
+                x->sel[i] = !any;
+                x->lines[i][1] = x->sel[i] ? 'x' : ' ';
+            }
+        }
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+/* f: cerca; R: substitueix. */
+static void act_find(View *v, int replace)
+{
+    char needle[200], repl[200] = "", err[240];
+    unsigned opts = replace ? FF_WORD : FF_ICASE;
+
+    if (!prompt_line(replace ? "Substitueix: " : "Cerca al projecte: ", "", needle, sizeof needle) || !needle[0])
+        return;
+    if (replace && !prompt_line("per (buit = esborrar): ", "", repl, sizeof repl))
+        return;
+    for (;;) {
+        FFind f;
+        FindCtx x;
+        char **lines, title[400], footer[400];
+        unsigned char *sel;
+        size_t n;
+        int pick;
+        long selpos = 0;
+
+        if (find_in_project(v->p, needle, opts, &f, err, sizeof err) != 0) {
+            snprintf(v->msg, sizeof v->msg, "%.190s", err);
+            return;
+        }
+        n = f.n;
+        lines = malloc((n ? n : 1) * sizeof *lines);
+        sel = calloc(n ? n : 1, 1);
+        for (size_t i = 0; i < n; i++) {
+            FLink fake;
+            FBack fb;
+            char origin[240], buf[600];
+
+            memset(&fake, 0, sizeof fake);
+            fake.scene = f.hits[i].scene;
+            fb.file = f.hits[i].file;
+            fb.link = &fake;
+            link_origin(&fb, origin, sizeof origin);
+            sel[i] = 1;
+            snprintf(buf, sizeof buf, "%s%s  ·  %s", replace ? "[x] " : "", origin, f.hits[i].context);
+            lines[i] = strdup(buf);
+        }
+        if (!n) {
+            lines[0] = strdup("(cap coincidència amb aquestes opcions)");
+            n = 1;
+        }
+        {
+            char fl[96];
+
+            snprintf(fl, sizeof fl, "c majúscules: %s · w paraules senceres: %s · m metadades: %s",
+                     (opts & FF_ICASE) ? "ignora" : "compten", (opts & FF_WORD) ? "sí" : "no",
+                     (opts & FF_META) ? "inclou" : "no");
+            if (replace) {
+                snprintf(title, sizeof title, " Substitueix «%s» per «%s»: %zu coincidències en %zu fitxers ",
+                         needle, repl, f.n, f.files);
+                snprintf(footer, sizeof footer, " Retorn aplica els marcats · Espai marca · a tots/cap · %s", fl);
+            } else {
+                snprintf(title, sizeof title, " Cerca «%s»: %zu coincidències en %zu fitxers ", needle, f.n, f.files);
+                snprintf(footer, sizeof footer, " Retorn obre a Phileas · %s", fl);
+            }
+        }
+        x.opts = &opts;
+        x.sel = sel;
+        x.lines = lines;
+        x.n = f.n;
+        x.replace = replace;
+        pick = pick_list_ex(v, title, lines, n, footer, find_hook, &x, &selpos);
+        if (pick == -2) {
+            free_lines(lines, n);
+            free(sel);
+            find_free(&f);
+            continue;
+        }
+        if (pick >= 0 && f.n) {
+            if (!replace) {
+                open_file_line(v, f.hits[pick].file, f.hits[pick].line + 1, f.hits[pick].scene);
+            } else {
+                size_t marked = 0, files = 0, count = 0;
+                FNode *last = NULL;
+
+                for (size_t i = 0; i < f.n; i++)
+                    if (sel[i]) {
+                        marked++;
+                        if (f.hits[i].file != last) {
+                            files++;
+                            last = f.hits[i].file;
+                        }
+                    }
+                if (!marked) {
+                    snprintf(v->msg, sizeof v->msg, "No hi ha cap coincidència marcada.");
+                } else {
+                    char q[300];
+
+                    snprintf(q, sizeof q, "Substituir %zu coincidències en %zu fitxers? Se'n fa una instantània abans.",
+                             marked, files);
+                    if (confirm(q)) {
+                        if (find_replace(v->p, &f, sel, repl, time(NULL), &files, &count, err, sizeof err) != 0) {
+                            snprintf(v->msg, sizeof v->msg, "%.190s", err);
+                            refresh_select(v, NULL);
+                            snprintf(v->msg, sizeof v->msg, "%.190s", err);
+                        } else {
+                            refresh_select(v, NULL);
+                            snprintf(v->msg, sizeof v->msg, "%zu substitucions en %zu fitxers (instantànies: v)", count, files);
+                        }
+                    }
+                }
+            }
+        }
+        free_lines(lines, n);
+        free(sel);
+        find_free(&f);
+        return;
+    }
+}
+
 /* Menú de l'Esc: la mateixa acció que cada tecla. Retorna el codi de la tecla
  * de l'acció triada, o -1 si es tanca sense triar. */
 static int menu_run(View *v)
@@ -1106,6 +1288,8 @@ static int menu_run(View *v)
         { "On surt (on s'usa)", "u", 'u' },
         { "Enllaços d'aquí", "l", 'l' },
         { "Enllaços trencats", "t", 't' },
+        { "Cerca al projecte", "f", 'f' },
+        { "Substitueix al projecte", "R", 'R' },
         { "Desa una instantània", "s", 's' },
         { "Versions anteriors", "v", 'v' },
         { "Mou a la paperera", "Supr", K_FN(KEY_DC) },
@@ -1190,6 +1374,7 @@ static void help(void)
         "  n                          capítol nou (al manuscrit) o fitxa nova (al grup)",
         "  r                          canvia el títol (i el nom del fitxer)",
         "  u / l / t                  on surt un capítol o fitxa / els seus [[enllaços]] / enllaços trencats",
+        "  f / R                      cerca / substitueix al projecte (c, w, m: opcions)",
         "  s / v                      desa una instantània / veu les versions i en recupera una",
         "  Supr                       mou a la paperera (.paperera/); no s'esborra",
         "  Alt+↑ / Alt+↓  (< / >)     puja o baixa el capítol",
@@ -1467,6 +1652,12 @@ void fview_run(Project *p)
             break;
         case 's':
             act_snapshot(&v);
+            break;
+        case 'f':
+            act_find(&v, 0);
+            break;
+        case 'R':
+            act_find(&v, 1);
             break;
         case 'u':
             act_where(&v);

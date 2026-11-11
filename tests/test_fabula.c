@@ -1,4 +1,5 @@
 /* Proves de Fàbula (fabula/): make test-fabula */
+#include "find.h"
 #include "flat.h"
 #include "project.h"
 #include "table.h"
@@ -986,6 +987,124 @@ static void test_links(void)
     project_free(&p);
 }
 
+static void test_find(void)
+{
+    Project p;
+    FFind f;
+    char err[300], dir[512], *t;
+    FNode *c1;
+    size_t files, count;
+    unsigned char sel[16];
+
+    snprintf(dir, sizeof dir, "%s/fd", tmpdir);
+    put("fd/projecte.md", "x\n");
+    put("fd/manuscrit/01-a.md",
+        "---\npov: Anna\n---\n\n## Capítol\n\nL'Anna va veure l'ANNA i Annabel.\nAnna torna.\n\n"
+        "### Escena u\n<!-- pov: Anna -->\n\nVa dir: anna, sí. Cafè i cafe.\n\n```\nAnna dins codi\n```\n");
+    put("fd/personatges/anna.md", "# Anna Puig\n\nL'Anna és alta.\n");
+    CHECK(project_open(&p, dir, err, sizeof err) == 0);
+    c1 = p.manuscrit->kids[0];
+
+    /* exacta: majúscules i accents compten; ni YAML ni comentari */
+    CHECK(find_in_project(&p, "Anna", 0, &f, err, sizeof err) == 0);
+    CHECK(f.n == 6 && f.files == 2);                 /* 4 al capítol (amb Annabel i el codi) + 2 a la fitxa (títol i text) */
+    CHECK(f.hits[0].file == c1 && f.hits[0].line == 4 && f.hits[0].scene == 0);
+    CHECK(f.hits[2].line == 4);                      /* «Anna torna.» és el mateix paràgraf del buffer */
+    CHECK(f.hits[3].scene == 1 && f.hits[3].line == 9);
+    CHECK(strstr(f.hits[0].context, "L'«Anna» va veure") != NULL);
+    CHECK(f.hits[4].file == p.top->kids[1]->kids[0] && f.hits[5].file == f.hits[4].file);   /* la fitxa, després del manuscrit */
+    CHECK(!memcmp(slurp("fd/manuscrit/01-a.md") + f.hits[0].start, "Anna", 4));
+    find_free(&f);
+
+    /* paraules senceres */
+    CHECK(find_in_project(&p, "Anna", FF_WORD, &f, err, sizeof err) == 0 && f.n == 5);
+    find_free(&f);
+    /* sense majúscules ni accents */
+    CHECK(find_in_project(&p, "anna", FF_ICASE | FF_WORD, &f, err, sizeof err) == 0 && f.n == 7);
+    find_free(&f);
+    CHECK(find_in_project(&p, "CAFE", FF_ICASE, &f, err, sizeof err) == 0 && f.n == 2);
+    CHECK(strstr(f.hits[0].context, "«Cafè»") != NULL && strstr(f.hits[1].context, "«cafe»") != NULL);
+    find_free(&f);
+    /* metadades: només si es demana */
+    CHECK(find_in_project(&p, "Anna", FF_WORD | FF_META, &f, err, sizeof err) == 0 && f.n == 5 + 2);
+    find_free(&f);
+    CHECK(find_in_project(&p, "pov", 0, &f, err, sizeof err) == 0 && f.n == 0);
+    find_free(&f);
+    CHECK(find_in_project(&p, "pov", FF_META, &f, err, sizeof err) == 0 && f.n == 2);
+    find_free(&f);
+    /* errors */
+    CHECK(find_in_project(&p, "", 0, &f, err, sizeof err) == -1);
+    CHECK(find_in_project(&p, "a\nb", 0, &f, err, sizeof err) == -1);
+    CHECK(find_in_project(&p, "inexistent-xyz", 0, &f, err, sizeof err) == 0 && f.n == 0);
+    find_free(&f);
+
+    /* substituir: només els marcats; la resta del fitxer, intacta; instantània abans */
+    CHECK(find_in_project(&p, "Anna", FF_WORD, &f, err, sizeof err) == 0 && f.n == 5);
+    memset(sel, 1, sizeof sel);
+    sel[1] = 0;                                      /* «Anna torna.», la segona del capítol, no */
+    CHECK(find_replace(&p, &f, sel, "Marta", 1700000000, &files, &count, err, sizeof err) == 0);
+    CHECK(files == 2 && count == 4);
+    t = slurp("fd/manuscrit/01-a.md");
+    CHECK(strstr(t, "L'Marta va veure l'ANNA i Annabel.\nAnna torna.") != NULL);
+    CHECK(strstr(t, "pov: Anna\n") != NULL && strstr(t, "<!-- pov: Anna -->") != NULL);   /* metadades, no */
+    CHECK(strstr(t, "Marta dins codi") != NULL && strstr(t, "Cafè i cafe.") != NULL);
+    CHECK(strstr(slurp("fd/personatges/anna.md"), "L'Marta és alta.") != NULL);
+    CHECK(count_files("fd/.versions/manuscrit") == 1 && count_files("fd/.versions/personatges") == 1);
+    find_free(&f);
+
+    /* un fitxer que ha canviat des de la cerca no es toca */
+    CHECK(project_refresh(&p, err, sizeof err) == 0);
+    CHECK(find_in_project(&p, "Marta", FF_WORD, &f, err, sizeof err) == 0 && f.n >= 2);
+    put("fd/personatges/anna.md", "# Anna Puig\n\nL'Marta ha canviat per fora.\n");
+    CHECK(find_replace(&p, &f, NULL, "Joana", 1700000100, &files, &count, err, sizeof err) == -1);
+    CHECK(strstr(err, "ha canviat") != NULL);
+    CHECK(strstr(slurp("fd/manuscrit/01-a.md"), "L'Joana va veure") != NULL);          /* el del manuscrit sí que es va fer */
+    CHECK(strstr(slurp("fd/personatges/anna.md"), "per fora") != NULL && !strstr(slurp("fd/personatges/anna.md"), "Joana"));
+    find_free(&f);
+
+    /* accents i buits: es substitueix el text original, sense canviar res més */
+    CHECK(project_refresh(&p, err, sizeof err) == 0);
+    CHECK(find_in_project(&p, "cafe", FF_ICASE | FF_WORD, &f, err, sizeof err) == 0 && f.n == 2);
+    CHECK(find_replace(&p, &f, NULL, "te", 1700000200, &files, &count, err, sizeof err) == 0 && count == 2);
+    CHECK(strstr(slurp("fd/manuscrit/01-a.md"), "te i te.") != NULL);
+    find_free(&f);
+    CHECK(project_refresh(&p, err, sizeof err) == 0);
+    CHECK(find_in_project(&p, " i te", 0, &f, err, sizeof err) == 0 && f.n == 1);
+    CHECK(find_replace(&p, &f, NULL, "", 1700000300, NULL, NULL, err, sizeof err) == 0);
+    CHECK(strstr(slurp("fd/manuscrit/01-a.md"), "Va dir: anna, sí. te.") != NULL);
+    CHECK(find_replace(&p, &f, NULL, "a\nb", 1700000400, NULL, NULL, err, sizeof err) == -1);
+    find_free(&f);
+
+    /* lligadures (œ → oe): es troba i es substitueix el caràcter sencer */
+    put("fd/manuscrit/03-lig.md", "## L\n\nEl Cœur batega.\n");
+    CHECK(project_refresh(&p, err, sizeof err) == 0);
+    CHECK(find_in_project(&p, "coeur", FF_ICASE, &f, err, sizeof err) == 0 && f.n == 1);
+    CHECK(f.hits[0].end - f.hits[0].start == 5);                 /* «Cœur»: œ són 2 bytes */
+    CHECK(find_replace(&p, &f, NULL, "Cor", 1700000450, NULL, NULL, err, sizeof err) == 0);
+    CHECK(strstr(slurp("fd/manuscrit/03-lig.md"), "El Cor batega.") != NULL);
+    find_free(&f);
+
+    /* CRLF i línies sense salt final es conserven */
+    put("fd/manuscrit/02-crlf.md", "## C\r\n\r\nDia Anna i Anna.\r\nFi Anna");
+    CHECK(project_refresh(&p, err, sizeof err) == 0);
+    CHECK(find_in_project(&p, "Anna", FF_WORD, &f, err, sizeof err) == 0);
+    {
+        size_t in_crlf = 0;
+
+        for (size_t i = 0; i < f.n; i++)
+            in_crlf += !strcmp(f.hits[i].file->name, "02-crlf.md");
+        CHECK(in_crlf == 3);
+    }
+    CHECK(find_replace(&p, &f, NULL, "Eva", 1700000500, NULL, NULL, err, sizeof err) == 0);
+    {
+        char *c2 = slurp("fd/manuscrit/02-crlf.md");
+
+        CHECK(!strcmp(c2, "## C\r\n\r\nDia Eva i Eva.\r\nFi Eva"));
+    }
+    find_free(&f);
+    project_free(&p);
+}
+
 static void rmtree(const char *dir)
 {
     char cmd[600];
@@ -1013,6 +1132,7 @@ int main(void)
     test_meta();
     test_table();
     test_links();
+    test_find();
     rmtree(tmpdir);
     printf("%d comprovacions, %d errors\n", checks, failures);
     return failures != 0;

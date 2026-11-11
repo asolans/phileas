@@ -821,6 +821,8 @@ sortir una mica més alt.
 | `u` | **on surt** el capítol o la fitxa: els `[[enllaços]]` d'altres fitxers que hi apunten |
 | `l` | els **enllaços d'aquí** (de l'escena, el capítol o la fitxa) i on van |
 | `t` | els enllaços **trencats** de tot el projecte |
+| `f` | **cerca** un text a tot el projecte |
+| `R` | **substitueix** un text a tot el projecte (amb llista i confirmació) |
 | `s` | desa una **instantània** del capítol o la fitxa |
 | `v` | **versions** anteriors: llista amb data, paraules i diferència; Retorn en recupera una |
 | Supr | mou a la paperera (pregunta abans) |
@@ -905,6 +907,34 @@ comentari de metadades no compten.
 
 Fàbula no canvia mai els enllaços: només els llegeix, així que Obsidian pot obrir
 el mateix projecte i veure'n el graf i els retroenllaços sense convertir res.
+
+### Cerca i substitució a tot el projecte
+
+- **`f`, cerca:** escriu el text i veus cada coincidència de tots els capítols
+  i fitxes, amb el capítol, l'escena i un tros del paràgraf (la coincidència va
+  entre `«` i `»`). Retorn obre el text a Phileas, en aquell paràgraf. Per
+  defecte no distingeix majúscules ni accents (`cafe` troba `Cafè`).
+- **`R`, substitueix:** escriu el text a canviar i el text nou (buit = esborrar).
+  Surt la llista amb totes les coincidències **marcades**; amb **Espai**
+  desmarques les que no vols canviar, `a` marca o desmarca totes, i **Retorn** les
+  canvia, després de confirmar. Serveix, per exemple, per canviar el nom d'un
+  personatge a tot el llibre.
+
+Dins de la llista, tres tecles canvien com es busca (i tornen a fer la cerca):
+
+| Tecla | Opció |
+|-------|-------|
+| `c` | majúscules i accents: ignorar o comptar (a la cerca s'ignoren; a la substitució, compten) |
+| `w` | només paraules senceres (a la substitució és activada: «Anna» no toca «Annabel») |
+| `m` | incloure les **metadades** (capçalera YAML i comentaris de sota els títols): per canviar també el `pov: Anna` |
+
+La substitució és literal i només toca els caràcters de cada coincidència: no
+canvia res més del fitxer. **Abans de tocar un fitxer, Fàbula en desa una
+instantània** (tecla `v` per recuperar-la), i si un fitxer ha canviat des de la
+cerca, no el toca i t'ho diu. També es cerquen els enllaços `[[ ]]`, així que
+canviar «Anna Puig» per «Marta Puig» corregeix també els enllaços; un canvi de
+nom de fitxa i els seus enllaços van junts si els marques tots. Des de la línia
+d'ordres, `fabula --cerca TEXT [CARPETA]` mostra les coincidències en text.
 
 ### Instantànies: marxa enrere
 

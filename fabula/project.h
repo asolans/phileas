@@ -183,7 +183,17 @@ const char *project_next_estat(const Project *p, const char *estat);
 /* Utilitats d'ordre i noms (provades) */
 int    fk_match(const char *text, const char *needle);
 int    fk_node_match(const FNode *n, const char *needle);   /* títol, sinopsi i metadades */  /* conté, sense majúscules ni accents */
-void   fk_fmt_num(size_t n, char *out, size_t outsz);  /* 42310 -> «42.310» */
+void   fk_fmt_num(size_t n, char *out, size_t outsz);
+
+/* Minúscules i sense accents amb el mapa cap al text original: f[i] ve dels
+ * bytes [s[i], e[i]) de l'original. El buffer es reaprofita entre crides. */
+typedef struct {
+    char   *f;
+    size_t *s, *e;
+    size_t  n, cap;
+} FoldBuf;
+void   fk_fold_line(FoldBuf *fb, const char *text, size_t len);
+void   fk_foldbuf_free(FoldBuf *fb);  /* 42310 -> «42.310» */
 int    fk_name_cmp(const char *a, const char *b);   /* comparació natural */
 char  *fk_slug(const char *title);                  /* nom de fitxer ASCII, sense extensió */
 

@@ -169,6 +169,72 @@ static char *foldstr(const char *s)
     return out;
 }
 
+void fk_fold_line(FoldBuf *fb, const char *s, size_t len)
+{
+    size_t i = 0, o = 0;
+
+    if (fb->cap < 4 * len + 8) {
+        fb->cap = 4 * len + 8;
+        fb->f = xrealloc(fb->f, fb->cap);
+        fb->s = xrealloc(fb->s, fb->cap * sizeof *fb->s);
+        fb->e = xrealloc(fb->e, fb->cap * sizeof *fb->e);
+    }
+    while (i < len) {
+        wchar_t c;
+        size_t k, from = i, e;
+        const char *rep;
+        char enc[4];
+        size_t el, before = o;
+
+        if ((unsigned char)s[i] < 0x80) {            /* ASCII: el camí ràpid */
+            fb->f[o] = (char)tolower((unsigned char)s[i]);
+            fb->s[o] = i;
+            fb->e[o++] = i + 1;
+            i++;
+            continue;
+        }
+        k = utf8_decode(s, len, i, &c);
+
+        if (!k)
+            k = 1;
+        i += k;
+        e = i;
+        if (c == UTF8_INVALID) {
+            fb->f[o] = s[from];             /* byte invàlid: es conserva tal qual */
+            fb->s[o] = from;
+            fb->e[o++] = e;
+            continue;
+        }
+        c = (wchar_t)towlower((wint_t)c);
+        rep = fold(c);
+        if (rep) {
+            for (; *rep; rep++) {
+                fb->f[o] = *rep;
+                fb->s[o] = from;
+                fb->e[o++] = e;
+            }
+            (void)before;
+        } else {
+            el = utf8_encode(c, enc);
+            for (size_t j = 0; j < el; j++) {
+                fb->f[o] = enc[j];
+                fb->s[o] = from;
+                fb->e[o++] = e;
+            }
+        }
+    }
+    fb->f[o] = '\0';
+    fb->n = o;
+}
+
+void fk_foldbuf_free(FoldBuf *fb)
+{
+    free(fb->f);
+    free(fb->s);
+    free(fb->e);
+    memset(fb, 0, sizeof *fb);
+}
+
 int fk_match(const char *text, const char *needle)
 {
     char *t = foldstr(text), *q = foldstr(needle);
