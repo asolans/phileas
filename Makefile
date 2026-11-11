@@ -90,5 +90,6 @@ clean:
 	rm -rf build phileas dist
 
 -include $(OBJ:.o=.d)
+-include $(wildcard build/fabula_*.d)
 
 .PHONY: test debug clean install install-desktop deb dist manual
