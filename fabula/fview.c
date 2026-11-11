@@ -248,7 +248,8 @@ static int list_rows(void)
     return h < 1 ? 1 : h;
 }
 
-static void draw(View *v)
+/* Pinta tota la pantalla al buffer de ncurses, sense enviar-la al terminal */
+static void paint(View *v)
 {
     int h = list_rows();
 
@@ -276,6 +277,11 @@ static void draw(View *v)
         footer_detail(v, LINES - 3);
     }
     status(v);
+}
+
+static void draw(View *v)
+{
+    paint(v);
     refresh();
 }
 
@@ -567,7 +573,7 @@ static int menu_run(View *v)
     for (;;) {
         int x0 = 1, y0 = 2, key;
 
-        draw(v);
+        paint(v);
         attrset(A_NORMAL);
         for (int i = -1; i <= n; i++) {
             int y = y0 + 1 + i;
