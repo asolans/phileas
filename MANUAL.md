@@ -817,12 +817,28 @@ sortir una mica més alt.
 | `r` | canvia el títol i el nom del fitxer |
 | `e` | canvia l'estat al següent de la llista |
 | Alt+↑ / Alt+↓ (o `<` `>`) | puja o baixa el capítol |
+| `s` | desa una **instantània** del capítol o la fitxa |
+| `v` | **versions** anteriors: llista amb data, paraules i diferència; Retorn en recupera una |
 | Supr | mou a la paperera (pregunta abans) |
 | `/` | filtra pel títol o la sinopsi, sense majúscules ni accents |
 | Esc | esborra el filtre; sense filtre, obre el menú |
 | F1, Ctrl+Q | ajuda, sortir |
 
 Al retornar de Phileas, Fàbula torna a llegir només els fitxers que han canviat.
+
+### Instantànies: marxa enrere
+
+Fàbula desa còpies dels teus capítols i fitxes a `.versions/` (una carpeta
+per grup). Se'n fa una **sola vegada cada hora** per fitxer, **abans** d'obrir-lo
+a Phileas, de canviar-ne l'estat o el títol, i a mà amb `s`. Així, quan acabes
+una sessió d'escriptura, la versió més recent és la que tenies abans de començar.
+
+Amb `v` veus les versions d'un fitxer, de la més nova a la més antiga, amb les
+paraules que tenia i la diferència respecte a ara. Retorn en recupera una: abans
+de posar-la, l'estat actual es desa també com a instantània, així que sempre
+pots desfer la recuperació. Se'n conserven 20 per fitxer; les més antigues passen
+a `.paperera/`, mai no s'esborren. Si dues sessions queden dins la mateixa hora,
+només la primera té instantània prèvia.
 
 ### Coses que cal saber
 

@@ -315,6 +315,159 @@ static void toggle(View *v, FNode *n)
     }
 }
 
+static int confirm(const char *question);
+static void refresh_select(View *v, const char *path);
+
+/* Instantània automàtica abans de tocar un fitxer (com a molt una per hora);
+ * si falla, només es mostra l'avís: no atura el que l'usuari volia fer. */
+static void auto_snapshot(View *v, FNode *n)
+{
+    char err[200];
+
+    if (n && (n->kind == FK_CHAPTER || n->kind == FK_CARD) &&
+        project_snapshot(v->p, n, 0, time(NULL), err, sizeof err) < 0)
+        snprintf(v->msg, sizeof v->msg, "Sense instantània: %.150s", err);
+}
+
+static void act_snapshot(View *v)
+{
+    FNode *n = cur(v);
+    char err[200];
+    int rc;
+
+    if (n && n->kind == FK_SCENE)
+        n = n->parent;
+    if (!n || (n->kind != FK_CHAPTER && n->kind != FK_CARD)) {
+        snprintf(v->msg, sizeof v->msg, "Les instantànies són de capítols i fitxes.");
+        return;
+    }
+    rc = project_snapshot(v->p, n, 1, time(NULL), err, sizeof err);
+    if (rc < 0)
+        snprintf(v->msg, sizeof v->msg, "%s", err);
+    else if (rc == 1)
+        snprintf(v->msg, sizeof v->msg, "Ja hi ha una instantània idèntica a l'actual.");
+    else
+        snprintf(v->msg, sizeof v->msg, "Instantània de «%s» desada (v per veure-les)", n->title);
+}
+
+/* Llista de versions; retorna l'índex triat o -1 */
+static int versions_dialog(View *v, const FNode *n, const FVersion *ver, size_t cnt)
+{
+    char head[200], row[120], num[32];
+    long sel = 0;
+    int w = 52;
+
+    snprintf(head, sizeof head, " Versions de «%s» ", n->title);
+    if (text_width(head) + 2 > w)
+        w = text_width(head) + 2;
+    if (w > COLS - 2)
+        w = COLS - 2;
+    for (;;) {
+        int x0 = 1, y0 = 2, key, visible = LINES - 6 < (int)cnt ? LINES - 6 : (int)cnt;
+        long top = sel >= visible ? sel - visible + 1 : 0;
+
+        if (visible < 1)
+            visible = 1;
+        paint(v);
+        attrset(A_NORMAL);
+        attron(ft_attr(FT_DIM));
+        mvaddstr(y0, x0, "┌");
+        for (int c = 0; c < w; c++)
+            addstr("─");
+        addstr("┐");
+        attroff(ft_attr(FT_DIM));
+        put(y0, x0 + 1, head, w, ft_attr(FT_HEAD));
+        for (int r = 0; r < visible; r++) {
+            const FVersion *e = &ver[top + r];
+            struct tm tm;
+            char when[32];
+            attr_t a = top + r == sel ? ft_attr(FT_SEL) : 0;
+
+            localtime_r(&e->when, &tm);
+            strftime(when, sizeof when, "%Y-%m-%d %H:%M:%S", &tm);
+            fk_fmt_num(e->words, num, sizeof num);
+            snprintf(row, sizeof row, "%s  %8s paraules  (%+ld)", when, num,
+                     (long)e->words - (long)n->words);
+            attron(ft_attr(FT_DIM));
+            mvaddstr(y0 + 1 + r, x0, "│");
+            mvaddstr(y0 + 1 + r, x0 + w + 1, "│");
+            attroff(ft_attr(FT_DIM));
+            attron(a);
+            move(y0 + 1 + r, x0 + 1);
+            for (int c = 0; c < w; c++)
+                addch(' ');
+            attroff(a);
+            put(y0 + 1 + r, x0 + 2, row, w - 2, a);
+        }
+        attron(ft_attr(FT_DIM));
+        mvaddstr(y0 + 1 + visible, x0, "└");
+        for (int c = 0; c < w; c++)
+            addstr("─");
+        addstr("┘");
+        attroff(ft_attr(FT_DIM));
+        put(y0 + 2 + visible, x0, " Retorn recupera la versió · Esc tanca", COLS - 2, ft_attr(FT_DIM));
+        refresh();
+        key = key_read();
+        if (key < 0 || key == K_FN(KEY_RESIZE))
+            continue;
+        if (key == 27 || key == 'q')
+            return -1;
+        if (key == K_FN(KEY_UP) && sel > 0)
+            sel--;
+        else if (key == K_FN(KEY_DOWN) && sel + 1 < (long)cnt)
+            sel++;
+        else if (key == K_FN(KEY_HOME))
+            sel = 0;
+        else if (key == K_FN(KEY_END))
+            sel = (long)cnt - 1;
+        else if (key == K_FN(KEY_PPAGE))
+            sel = sel > 8 ? sel - 8 : 0;
+        else if (key == K_FN(KEY_NPAGE))
+            sel = sel + 8 < (long)cnt ? sel + 8 : (long)cnt - 1;
+        else if (key == '\n')
+            return (int)sel;
+    }
+}
+
+static void act_versions(View *v)
+{
+    FNode *n = cur(v);
+    FVersion *ver;
+    size_t cnt;
+    int pick;
+    char path[600], q[300], err[200], when[32];
+    struct tm tm;
+
+    if (n && n->kind == FK_SCENE)
+        n = n->parent;
+    if (!n || (n->kind != FK_CHAPTER && n->kind != FK_CARD)) {
+        snprintf(v->msg, sizeof v->msg, "Les versions són de capítols i fitxes.");
+        return;
+    }
+    cnt = project_versions(v->p, n, &ver);
+    if (!cnt) {
+        snprintf(v->msg, sizeof v->msg, "Cap versió d'aquest fitxer; amb s en pots desar una.");
+        return;
+    }
+    pick = versions_dialog(v, n, ver, cnt);
+    if (pick >= 0) {
+        localtime_r(&ver[pick].when, &tm);
+        strftime(when, sizeof when, "%Y-%m-%d %H:%M:%S", &tm);
+        snprintf(q, sizeof q, "Recuperar la versió de %s? L'estat actual es desa abans.", when);
+        if (confirm(q)) {
+            snprintf(path, sizeof path, "%s", n->path);
+            if (project_restore(v->p, n, &ver[pick], time(NULL), err, sizeof err) != 0)
+                snprintf(v->msg, sizeof v->msg, "%s", err);
+            else {
+                refresh_select(v, path);
+                if (!v->msg[0])
+                    snprintf(v->msg, sizeof v->msg, "Versió de %s recuperada", when);
+            }
+        }
+    }
+    project_versions_free(ver, cnt);
+}
+
 /* Obre l'element a l'editor i, en tornar, refresca el projecte conservant la
  * selecció (pel camí del fitxer i l'ordre de l'escena). */
 static void open_in_editor(View *v, FNode *n)
@@ -330,6 +483,8 @@ static void open_in_editor(View *v, FNode *n)
         for (size_t i = 0; i < file->nkids; i++)
             if (file->kids[i] == n)
                 scene = i + 1;
+    auto_snapshot(v, file);
+    v->msg[0] = '\0';
     rc = launch_editor(path, line, err, sizeof err);
     if (project_refresh(v->p, v->msg, sizeof v->msg) == 0) {
         FNode *keep = NULL;
@@ -485,6 +640,7 @@ static void act_rename(View *v)
     if (!prompt_line("Títol nou: ", n->title, title, sizeof title))
         return;
     snprintf(oldp, sizeof oldp, "%s", n->path);
+    auto_snapshot(v, n);
     if (project_rename(v->p, n, title, path, sizeof path, err, sizeof err) != 0) {
         snprintf(v->msg, sizeof v->msg, "%s", err);
         refresh_select(v, oldp);
@@ -554,6 +710,8 @@ static int menu_run(View *v)
         { "Canvia l'estat", "e", 'e' },
         { "Puja el capítol", "Alt+↑", '<' },
         { "Baixa el capítol", "Alt+↓", '>' },
+        { "Desa una instantània", "s", 's' },
+        { "Versions anteriors", "v", 'v' },
         { "Mou a la paperera", "Supr", K_FN(KEY_DC) },
         { "Filtra", "/", '/' },
         { "Ajuda", "F1", K_FN(KEY_F(1)) },
@@ -635,6 +793,7 @@ static void help(void)
         "  Retorn                     grups: plega/desplega · la resta: obre a Phileas",
         "  n                          capítol nou (al manuscrit) o fitxa nova (al grup)",
         "  r                          canvia el títol (i el nom del fitxer)",
+        "  s / v                      desa una instantània / veu les versions i en recupera una",
         "  Supr                       mou a la paperera (.paperera/); no s'esborra",
         "  Alt+↑ / Alt+↓  (< / >)     puja o baixa el capítol",
         "  e                          canvia l'estat del capítol o la fitxa",
@@ -665,6 +824,7 @@ static void change_estat(View *v)
     next = project_next_estat(v->p, n->estat);
     if (!next)
         return;
+    auto_snapshot(v, n);
     if (project_set_estat(v->p, n, next) != 0)
         snprintf(v->msg, sizeof v->msg, "No s'ha pogut desar: %s", strerror(errno));
     else
@@ -772,6 +932,12 @@ void fview_run(Project *p)
             break;
         case 'n':
             act_new(&v);
+            break;
+        case 's':
+            act_snapshot(&v);
+            break;
+        case 'v':
+            act_versions(&v);
             break;
         case 'r':
             act_rename(&v);

@@ -629,6 +629,120 @@ static void test_create(void)
     CHECK(project_create(tmpdir, "Buida", out, sizeof out, err, sizeof err) == 0 && has("buida/projecte.md"));
 }
 
+static char *read_file_for_test(const char *path, size_t *len)
+{
+    FILE *f = fopen(path, "rb");
+    char *b = malloc(65536);
+
+    if (!f || !b) {
+        if (f)
+            fclose(f);
+        free(b);
+        return NULL;
+    }
+    *len = fread(b, 1, 65535, f);
+    b[*len] = '\0';
+    fclose(f);
+    return b;
+}
+
+static int count_files(const char *rel)
+{
+    char cmd[700], line[32];
+    FILE *f;
+    int n = 0;
+
+    snprintf(cmd, sizeof cmd, "ls '%s/%s' 2>/dev/null | wc -l", tmpdir, rel);
+    f = popen(cmd, "r");
+    if (f && fgets(line, sizeof line, f))
+        n = atoi(line);
+    if (f)
+        pclose(f);
+    return n;
+}
+
+static void test_versions(void)
+{
+    Project p;
+    char err[300], dir[512], text[200];
+    FVersion *v;
+    size_t cnt;
+    FNode *c, *card;
+    time_t T = 1700000000;
+    char *cur;
+
+    snprintf(dir, sizeof dir, "%s/vs", tmpdir);
+    put("vs/projecte.md", "x\n");
+    put("vs/manuscrit/01-a.md", "## A\n\nuna dues.\n");
+    put("vs/personatges/ana.md", "# Ana\n\nalta.\n");
+    CHECK(project_open(&p, dir, err, sizeof err) == 0);
+    c = p.manuscrit->kids[0];
+    card = p.top->kids[1]->kids[0];
+
+    /* primera instantània; la mateixa no es repeteix */
+    CHECK(project_snapshot(&p, c, 0, T, err, sizeof err) == 0);
+    CHECK(count_files("vs/.versions/manuscrit") == 1);
+    cnt = project_versions(&p, c, &v);
+    CHECK(cnt == 1 && v[0].words == 2 && strlen(v[0].stamp) == 15 && v[0].when == T);
+    project_versions_free(v, cnt);
+    CHECK(project_snapshot(&p, c, 1, T + 5, err, sizeof err) == 1);            /* idèntica */
+    CHECK(count_files("vs/.versions/manuscrit") == 1);
+
+    /* canvis: sense force, només passada una hora */
+    put("vs/manuscrit/01-a.md", "## A\n\nuna dues tres.\n");
+    CHECK(project_snapshot(&p, c, 0, T + 60, err, sizeof err) == 1);
+    CHECK(project_snapshot(&p, c, 1, T + 60, err, sizeof err) == 0);
+    CHECK(count_files("vs/.versions/manuscrit") == 2);
+    put("vs/manuscrit/01-a.md", "## A\n\nuna dues tres quatre.\n");
+    CHECK(project_snapshot(&p, c, 0, T + 60 + 3599, err, sizeof err) == 1);
+    CHECK(project_snapshot(&p, c, 0, T + 60 + 3600, err, sizeof err) == 0);
+    CHECK(count_files("vs/.versions/manuscrit") == 3);
+    /* el mateix segon: no en fa una altra */
+    put("vs/manuscrit/01-a.md", "## A\n\nuna.\n");
+    CHECK(project_snapshot(&p, c, 1, T + 60 + 3600, err, sizeof err) == 1);
+
+    /* ordre i paraules */
+    cnt = project_versions(&p, c, &v);
+    CHECK(cnt == 3 && v[0].when > v[1].when && v[1].when > v[2].when);
+    CHECK(v[0].words == 4 && v[1].words == 3 && v[2].words == 2);
+    project_versions_free(v, cnt);
+
+    /* fitxes: a la seva carpeta, i els errors */
+    CHECK(project_snapshot(&p, card, 0, T, err, sizeof err) == 0 && count_files("vs/.versions/personatges") == 1);
+    CHECK(project_snapshot(&p, p.manuscrit, 1, T, err, sizeof err) == -1);
+    CHECK(project_snapshot(&p, p.top, 1, T, err, sizeof err) == -1);
+
+    /* poda: 20 com a molt; les altres a la paperera, mai esborrades */
+    for (int i = 0; i < 25; i++) {
+        snprintf(text, sizeof text, "## A\n\ncanvi %d paraules d'altres.\n", i);
+        put("vs/manuscrit/01-a.md", text);
+        CHECK(project_snapshot(&p, c, 0, T + 100000 + (time_t)i * 7200, err, sizeof err) == 0);
+    }
+    cnt = project_versions(&p, c, &v);
+    CHECK(cnt == FK_VERSIONS_MAX);
+    CHECK(count_files("vs/.versions/manuscrit") == FK_VERSIONS_MAX);
+    CHECK(count_files("vs/.paperera") == 8);        /* 3 + 25 - 20 */
+    project_versions_free(v, cnt);
+
+    /* recuperar: la versió torna i l'estat anterior es guarda */
+    cnt = project_versions(&p, c, &v);
+    CHECK(project_restore(&p, c, &v[3], T + 100000 + 30 * 7200, err, sizeof err) == 0);
+    cur = slurp("vs/manuscrit/01-a.md");
+    CHECK(strstr(cur, "canvi 21 ") != NULL);        /* v[3] = la quarta més nova: 24, 23, 22, 21 */
+    project_versions_free(v, cnt);
+    cnt = project_versions(&p, c, &v);
+    CHECK(cnt == FK_VERSIONS_MAX);
+    {
+        size_t l = 0;
+        char *newest = read_file_for_test(v[0].path, &l);
+
+        CHECK(newest && strstr(newest, "canvi 24 ") != NULL);   /* l'estat d'abans de recuperar */
+        free(newest);
+    }
+    project_versions_free(v, cnt);
+    project_free(&p);
+}
+
 static void rmtree(const char *dir)
 {
     char cmd[600];
@@ -652,6 +766,7 @@ int main(void)
     test_ops();
     test_move();
     test_create();
+    test_versions();
     rmtree(tmpdir);
     printf("%d comprovacions, %d errors\n", checks, failures);
     return failures != 0;

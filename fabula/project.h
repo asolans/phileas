@@ -104,6 +104,33 @@ int project_trash(Project *p, FNode *n, char *err, size_t esz);
  * noms amb el veí, o renumera tots en passos de 10 si no es pot. */
 int project_move(Project *p, FNode *n, int dir, char *path_out, size_t psz, char *err, size_t esz);
 
+/* ---- Instantànies (.versions/GRUP/nom.AAAAMMDD-HHMMSS.md) ----
+ * Còpies d'un capítol o fitxa. Mai s'esborra res: les que passen de
+ * FK_VERSIONS_MAX van a .paperera/. now és l'hora (per poder-ho provar). */
+#define FK_VERSIONS_MAX 20
+#define FK_SNAPSHOT_GAP 3600   /* segons entre dues instantànies automàtiques */
+
+typedef struct {
+    char   stamp[16];   /* AAAAMMDD-HHMMSS */
+    time_t when;
+    off_t  size;
+    size_t words;       /* paraules de prosa de la versió */
+    char  *path;
+} FVersion;
+
+/* Retorna 0 si n'ha fet una, 1 si no calia (idèntica a la darrera, o, sense
+ * force, la darrera és de fa menys d'una hora) i -1 amb err si falla. */
+int    project_snapshot(Project *p, FNode *n, int force, time_t now, char *err, size_t esz);
+
+/* Les versions d'un fitxer, de la més nova a la més antiga. Retorna el
+ * nombre (0 si no n'hi ha); *v s'ha d'alliberar amb project_versions_free. */
+size_t project_versions(const Project *p, const FNode *n, FVersion **v);
+void   project_versions_free(FVersion *v, size_t n);
+
+/* Posa la versió com a fitxer actual; abans en fa una instantània de
+ * l'estat actual (així es pot tornar enrere). */
+int    project_restore(Project *p, FNode *n, const FVersion *v, time_t now, char *err, size_t esz);
+
 /* Estat següent de la llista del projecte (amb tornada al primer) */
 const char *project_next_estat(const Project *p, const char *estat);
 

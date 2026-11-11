@@ -329,6 +329,25 @@ static const FNode *find_cached(const Project *old, const char *path)
     return NULL;
 }
 
+/* Paraules de prosa: sense la capçalera YAML ni els títols (igual que les
+ * escenes, que surten d'outline) */
+static size_t prose_words(Buffer *b)
+{
+    size_t words = 0;
+
+    buf_scan(b);
+    for (size_t i = 0; i < b->nlines; i++) {
+        int k = MD_BASE(b->lines[i].kind);
+
+        if (k == MD_META || k == MD_HEADING || k == MD_UNDERLINE)
+            continue;
+        if (k == MD_TEXT && i + 1 < b->nlines && MD_BASE(b->lines[i + 1].kind) == MD_UNDERLINE)
+            continue;
+        words += buf_line_words(b, i);
+    }
+    return words;
+}
+
 /* Carrega un fitxer .md com a capítol o fitxa; no falla mai: si no es pot
  * llegir, queda amb 0 paraules. */
 static FNode *load_file(const Project *p, const Project *old, FNode *parent, const char *dir,
@@ -399,18 +418,7 @@ static FNode *load_file(const Project *p, const Project *old, FNode *parent, con
         }
         return n;
     }
-    buf_scan(&b);
-    /* Paraules de prosa: sense la capçalera YAML ni els títols (igual que les
-     * escenes, que ve d'outline) */
-    for (size_t i = 0; i < b.nlines; i++) {
-        int k = MD_BASE(b.lines[i].kind);
-
-        if (k == MD_META || k == MD_HEADING || k == MD_UNDERLINE)
-            continue;
-        if (k == MD_TEXT && i + 1 < b.nlines && MD_BASE(b.lines[i + 1].kind) == MD_UNDERLINE)
-            continue;
-        n->words += buf_line_words(&b, i);
-    }
+    n->words = prose_words(&b);
 
     outline_build(&b, &o);
     if (!n->title[0])
@@ -1046,17 +1054,14 @@ int project_rename(Project *p, FNode *n, const char *title, char *path_out, size
     return 0;
 }
 
-int project_trash(Project *p, FNode *n, char *err, size_t esz)
+/* Mou path a .paperera/AAAAMMDD-HHMMSS-nom (el nom, si cal, amb un número) */
+static int trash_path(const char *root, const char *path, const char *name, char *err, size_t esz)
 {
-    char *tdir, stamp[32], name[400], *dst;
+    char *tdir, stamp[32], tname[400], *dst;
     time_t now = time(NULL);
     struct tm tm;
 
-    if ((n->kind != FK_CHAPTER && n->kind != FK_CARD) || !n->path) {
-        snprintf(err, esz, "Només es mouen a la paperera capítols i fitxes.");
-        return -1;
-    }
-    tdir = join(p->root, ".paperera");
+    tdir = join(root, ".paperera");
     if (mkdir(tdir, 0777) != 0 && errno != EEXIST) {
         fail(err, esz, "No s'ha pogut crear .paperera/");
         free(tdir);
@@ -1066,12 +1071,12 @@ int project_trash(Project *p, FNode *n, char *err, size_t esz)
     strftime(stamp, sizeof stamp, "%Y%m%d-%H%M%S", &tm);
     for (int k = 0; k < 100; k++) {
         if (k)
-            snprintf(name, sizeof name, "%s-%d-%s", stamp, k, n->name);
+            snprintf(tname, sizeof tname, "%s-%d-%s", stamp, k, name);
         else
-            snprintf(name, sizeof name, "%s-%s", stamp, n->name);
-        dst = join(tdir, name);
+            snprintf(tname, sizeof tname, "%s-%s", stamp, name);
+        dst = join(tdir, tname);
         if (!exists(dst)) {
-            int rc = rename(n->path, dst);
+            int rc = rename(path, dst);
 
             free(dst);
             free(tdir);
@@ -1086,6 +1091,15 @@ int project_trash(Project *p, FNode *n, char *err, size_t esz)
     free(tdir);
     snprintf(err, esz, "No s'ha pogut triar un nom a la paperera.");
     return -1;
+}
+
+int project_trash(Project *p, FNode *n, char *err, size_t esz)
+{
+    if ((n->kind != FK_CHAPTER && n->kind != FK_CARD) || !n->path) {
+        snprintf(err, esz, "Només es mouen a la paperera capítols i fitxes.");
+        return -1;
+    }
+    return trash_path(p->root, n->path, n->name, err, esz);
 }
 
 int project_move(Project *p, FNode *n, int dir, char *path_out, size_t psz, char *err, size_t esz)
@@ -1338,5 +1352,239 @@ int project_create(const char *parent, const char *title, char *path_out, size_t
     free(text);
     snprintf(path_out, psz, "%s", dir);
     free(dir);
+    return 0;
+}
+
+/* ---------- instantànies ---------- */
+
+#define STAMP_LEN 15
+
+static void make_stamp(time_t t, char out[16])
+{
+    struct tm tm;
+
+    localtime_r(&t, &tm);
+    strftime(out, 16, "%Y%m%d-%H%M%S", &tm);
+}
+
+static int parse_stamp(const char *s, time_t *out)
+{
+    struct tm tm;
+    int y, mo, d, h, mi, se;
+
+    for (int i = 0; i < STAMP_LEN; i++)
+        if (i == 8 ? s[i] != '-' : !isdigit((unsigned char)s[i]))
+            return 0;
+    if (sscanf(s, "%4d%2d%2d-%2d%2d%2d", &y, &mo, &d, &h, &mi, &se) != 6)
+        return 0;
+    memset(&tm, 0, sizeof tm);
+    tm.tm_year = y - 1900;
+    tm.tm_mon = mo - 1;
+    tm.tm_mday = d;
+    tm.tm_hour = h;
+    tm.tm_min = mi;
+    tm.tm_sec = se;
+    tm.tm_isdst = -1;
+    *out = mktime(&tm);
+    return 1;
+}
+
+/* Carpeta de versions del fitxer, i el seu nom sense .md */
+static char *versions_dir(const Project *p, const FNode *n)
+{
+    char *a = join(p->root, ".versions"), *b = join(a, n->parent ? n->parent->name : "");
+
+    free(a);
+    return b;
+}
+
+static char *base_name(const FNode *n)
+{
+    size_t l = strlen(n->name);
+    char *b = xstrdup(n->name);
+
+    if (l > 3 && !strcmp(b + l - 3, ".md"))
+        b[l - 3] = '\0';
+    return b;
+}
+
+static int cmp_ver_desc(const void *a, const void *b)
+{
+    return strcmp(((const FVersion *)b)->stamp, ((const FVersion *)a)->stamp);
+}
+
+size_t project_versions(const Project *p, const FNode *n, FVersion **out)
+{
+    char *dir, *base;
+    DIR *d;
+    struct dirent *e;
+    FVersion *v = NULL;
+    size_t cnt = 0, cap = 0, bl;
+
+    *out = NULL;
+    if ((n->kind != FK_CHAPTER && n->kind != FK_CARD) || !n->parent)
+        return 0;
+    dir = versions_dir(p, n);
+    base = base_name(n);
+    bl = strlen(base);
+    d = opendir(dir);
+    if (d) {
+        while ((e = readdir(d))) {
+            size_t l = strlen(e->d_name);
+            time_t t;
+
+            if (l != bl + 1 + STAMP_LEN + 3 || strncmp(e->d_name, base, bl) || e->d_name[bl] != '.' ||
+                strcmp(e->d_name + l - 3, ".md") || !parse_stamp(e->d_name + bl + 1, &t))
+                continue;
+            if (cnt == cap)
+                v = xrealloc(v, (cap = cap ? cap * 2 : 8) * sizeof *v);
+            memset(&v[cnt], 0, sizeof v[cnt]);
+            memcpy(v[cnt].stamp, e->d_name + bl + 1, STAMP_LEN);
+            v[cnt].stamp[STAMP_LEN] = '\0';
+            v[cnt].when = t;
+            v[cnt].path = join(dir, e->d_name);
+            cnt++;
+        }
+        closedir(d);
+    }
+    free(dir);
+    free(base);
+    if (cnt)
+        qsort(v, cnt, sizeof *v, cmp_ver_desc);
+    for (size_t i = 0; i < cnt; i++) {
+        struct stat st;
+        Buffer b;
+
+        if (stat(v[i].path, &st) == 0)
+            v[i].size = st.st_size;
+        buf_init(&b);
+        if (buf_load(&b, v[i].path) == 0)
+            v[i].words = prose_words(&b);
+        buf_free(&b);
+    }
+    *out = v;
+    return cnt;
+}
+
+void project_versions_free(FVersion *v, size_t n)
+{
+    for (size_t i = 0; i < n; i++)
+        free(v[i].path);
+    free(v);
+}
+
+static int mkdir_p1(const char *path)
+{
+    return mkdir(path, 0777) != 0 && errno != EEXIST ? -1 : 0;
+}
+
+int project_snapshot(Project *p, FNode *n, int force, time_t now, char *err, size_t esz)
+{
+    FVersion *v;
+    size_t cnt, len = 0;
+    char *cur, *dir, *base, stamp[16], *dst, name[400], *vdata;
+    struct stat st;
+    int rc = -1;
+
+    if ((n->kind != FK_CHAPTER && n->kind != FK_CARD) || !n->path || !n->parent) {
+        snprintf(err, esz, "Només es fan instantànies de capítols i fitxes.");
+        return -1;
+    }
+    cur = read_all(n->path, &len);
+    if (!cur) {
+        fail(err, esz, "No s'ha pogut llegir el fitxer");
+        return -1;
+    }
+    cnt = project_versions(p, n, &v);
+    if (cnt) {
+        size_t vl = 0;
+
+        vdata = read_all(v[0].path, &vl);
+        if (vdata && vl == len && memcmp(vdata, cur, len) == 0) {
+            free(vdata);
+            free(cur);
+            project_versions_free(v, cnt);
+            return 1;                                   /* idèntica a la darrera */
+        }
+        free(vdata);
+        if (!force && now - v[0].when < FK_SNAPSHOT_GAP && now >= v[0].when) {
+            free(cur);
+            project_versions_free(v, cnt);
+            return 1;
+        }
+    }
+    {
+        char *root = join(p->root, ".versions");
+
+        if (mkdir_p1(root) != 0) {
+            fail(err, esz, "No s'ha pogut crear .versions/");
+            free(root);
+            goto out;
+        }
+        free(root);
+    }
+    dir = versions_dir(p, n);
+    if (mkdir_p1(dir) != 0) {
+        fail(err, esz, "No s'ha pogut crear la carpeta de versions");
+        free(dir);
+        goto out;
+    }
+    base = base_name(n);
+    make_stamp(now, stamp);
+    snprintf(name, sizeof name, "%s.%s.md", base, stamp);
+    dst = join(dir, name);
+    free(base);
+    free(dir);
+    if (exists(dst)) {
+        rc = 1;                                          /* ja n'hi ha una d'aquest segon */
+        free(dst);
+        goto out;
+    }
+    if (write_atomic(dst, cur, len) != 0) {
+        fail(err, esz, "No s'ha pogut desar la instantània");
+        free(dst);
+        goto out;
+    }
+    if (stat(n->path, &st) == 0)
+        (void)chmod(dst, st.st_mode & 07777);
+    free(dst);
+    rc = 0;
+
+    /* poda: les més antigues passen de FK_VERSIONS_MAX van a .paperera/ */
+    project_versions_free(v, cnt);
+    cnt = project_versions(p, n, &v);
+    for (size_t i = FK_VERSIONS_MAX; i < cnt; i++) {
+        char e2[200], vn[400];
+        const char *slash = strrchr(v[i].path, '/');
+
+        snprintf(vn, sizeof vn, "versio-%s", slash ? slash + 1 : v[i].path);
+        (void)trash_path(p->root, v[i].path, vn, e2, sizeof e2);
+    }
+out:
+    free(cur);
+    project_versions_free(v, cnt);
+    return rc;
+}
+
+int project_restore(Project *p, FNode *n, const FVersion *ver, time_t now, char *err, size_t esz)
+{
+    size_t len = 0;
+    char *data;
+    int rc, s;
+
+    s = project_snapshot(p, n, 1, now, err, esz);          /* l'actual, per poder tornar enrere */
+    if (s < 0)
+        return -1;
+    data = read_all(ver->path, &len);
+    if (!data) {
+        fail(err, esz, "No s'ha pogut llegir la versió");
+        return -1;
+    }
+    rc = write_atomic(n->path, data, len);
+    free(data);
+    if (rc != 0) {
+        fail(err, esz, "No s'ha pogut recuperar la versió");
+        return -1;
+    }
     return 0;
 }
