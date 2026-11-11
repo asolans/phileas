@@ -13,7 +13,7 @@ ARREL="build/deb/$PAQ"
 
 rm -rf "$ARREL"
 make DESTDIR="$ARREL" PREFIX=/usr install install-desktop
-strip --strip-unneeded "$ARREL/usr/bin/phileas"
+strip --strip-unneeded "$ARREL/usr/bin/phileas" "$ARREL/usr/bin/fabula"
 
 DOC="$ARREL/usr/share/doc/phileas"
 install -D -m 0644 README.md "$DOC/README.md"
@@ -43,6 +43,9 @@ Description: editor de text per a la consola, per escriure prosa en Markdown
  català i castellà amb hunspell, desfer i refer, cerca i substitució,
  autodesat, menús, paleta d'ordres i navegador de fitxers. La interfície
  és en català.
+ .
+ Inclou Fàbula, una eina per organitzar una novel·la: capítols, escenes,
+ personatges, llocs i recerca com a fitxers Markdown, amb estat i progrés.
 EOF
 
 mkdir -p "$SORTIDA"

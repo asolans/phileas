@@ -32,6 +32,29 @@ test: build/test_phileas
 build/test_phileas: tests/test.c $(CORE)
 	$(CC) $(CFLAGS) -Isrc $(LDFLAGS) -o $@ $^
 
+
+# ---- Fàbula (eina companya, fabula/): objectes compartits de src/ i propis ----
+FSHARED = build/utf8.o build/util.o build/md.o build/buffer.o build/undo.o build/outline.o
+FOBJ    = build/fabula_yaml.o build/fabula_project.o
+FUI     = build/fabula_flat.o build/fabula_fterm.o build/fabula_fview.o build/fabula_launch.o build/fabula_main.o
+FSHARED_UI = build/theme.o build/keys.o
+
+.PHONY: fabula test-fabula
+# L'executable és build/fabula (el nom «fabula» és el de la carpeta de fonts)
+fabula: build/fabula
+
+build/fabula: $(FOBJ) $(FUI) $(FSHARED) $(FSHARED_UI)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+
+build/fabula_%.o: fabula/%.c | build
+	$(CC) $(CFLAGS) -Isrc -Ifabula -MMD -MP -c -o $@ $<
+
+build/test_fabula: tests/test_fabula.c $(FOBJ) build/fabula_flat.o $(FSHARED)
+	$(CC) $(CFLAGS) -Isrc -Ifabula $(LDFLAGS) -o $@ $^
+
+test-fabula: build/test_fabula
+	./build/test_fabula
+
 # Compilació de depuració amb sanititzadors: make clean && make debug
 debug: OPT = -O0 -g -fsanitize=address,undefined
 debug: LDFLAGS += -fsanitize=address,undefined
@@ -39,8 +62,9 @@ debug: phileas build/test_phileas
 
 # Instal·lació (també per a un paquet de buildroot: make DESTDIR=... install)
 PREFIX  ?= /usr
-install: phileas
+install: phileas build/fabula
 	install -D -m 0755 phileas $(DESTDIR)$(PREFIX)/bin/phileas
+	install -D -m 0755 build/fabula $(DESTDIR)$(PREFIX)/bin/fabula
 
 # Llançador per als escriptoris (GNOME, KDE...): obre Phileas en un terminal.
 # No forma part d'install perquè la imatge de la BYOK no té escriptori.

@@ -25,7 +25,8 @@ cosa. L'ajuda de dins del programa (**F1**) és un llistat curt de tecles; això
 13. [Configurar Phileas](#13-configurar-phileas)
 14. [A la Raspberry Pi (BYOK)](#14-a-la-raspberry-pi-byok)
 15. [Resolució de problemes](#15-resolució-de-problemes)
-16. [Xuleta de dreceres](#16-xuleta-de-dreceres)
+16. [Fàbula: organitzar una novel·la](#16-fàbula-organitzar-una-novel·la)
+17. [Xuleta de dreceres](#17-xuleta-de-dreceres)
 
 ---
 
@@ -48,8 +49,8 @@ Des d'un terminal:
 phileas                 # un document nou
 phileas capitol1.md     # obre (o crea) un fitxer
 phileas -c 66 nota.md   # amb la columna de text a 66 caràcters
-```
 phileas +40 capitol1.md # amb el cursor al paràgraf 40 (la primera línia és la 1)
+```
 
 Si l'has instal·lat amb el paquet `.deb`, també apareix entre les aplicacions
 de l'escriptori.
@@ -738,7 +739,109 @@ amb l'extensió `.md` per tenir-hi tots els avantatges.
 
 ---
 
-## 16. Xuleta de dreceres
+## 16. Fàbula: organitzar una novel·la
+
+Phileas serveix per escriure. **Fàbula** és l'eina companya per tenir a la vista
+tota la novel·la: els capítols i les escenes, els personatges, els llocs i la
+recerca. No és un editor: quan vols escriure, obre el text a Phileas i, en
+sortir-ne, torna a Fàbula. També és de consola i corre a la Raspberry Pi.
+
+### Un projecte és una carpeta
+
+Cada projecte és una carpeta de fitxers Markdown normals, que pots obrir amb
+qualsevol editor o amb Obsidian:
+
+```
+la-casa-del-pou/
+  projecte.md        títol, objectiu de paraules, data límit i estats
+  manuscrit/         un fitxer per capítol: 01-comencament.md, 02-el-pou.md…
+  personatges/       una fitxa per personatge
+  llocs/  recerca/  notes/
+  plantilles/        (opcional) les teves plantilles de fitxa
+  .paperera/         el que retires; mai no s'esborra
+```
+
+Dins d'un capítol, **cada escena és una secció `###`**. Per això Phileas ja la
+mou (Alt+↑/↓ a l'esquema, F2) i la compta. Un capítol i una fitxa poden
+començar amb una capçalera YAML:
+
+```yaml
+---
+estat: revisat
+sinopsi: L'Anna arriba al mas i troba el pou tapat.
+---
+```
+
+`projecte.md` té aquests camps:
+
+| Camp | Què és |
+|------|--------|
+| `titol` | el nom del projecte |
+| `objectiu` | paraules que ha de tenir el manuscrit (0 = sense objectiu) |
+| `data-limit` | `AAAA-MM-DD`; Fàbula en treu les paraules diàries que et calen |
+| `estats` | la llista d'estats, p. ex. `[esborrany, revisat, final]` |
+
+### Començar
+
+```bash
+fabula nou "La casa del pou"      # crea la carpeta i l'obre
+fabula la-casa-del-pou            # obre un projecte existent
+fabula                            # obre el de la carpeta actual
+fabula --resum la-casa-del-pou    # el resum en text, sense pantalla
+```
+
+Fàbula agafa el tema (`tema =` al `phileasrc`) de Phileas. Si vols un altre
+editor, defineix `FABULA_EDITOR` (ordre i arguments separats per espais).
+
+### La pantalla
+
+A dalt, el títol i el progrés: «42.310 / 80.000 (53 %) · 118/dia fins 30-06».
+A sota, l'arbre: els grups, els capítols amb les paraules i l'estat, i les
+escenes quan desplegues un capítol. Amb la pantalla vertical de la Pi (75
+columnes) hi cap tot; en una pantalla de 30 files o més, a baix hi ha la
+sinopsi de l'element seleccionat.
+
+Les paraules de Fàbula són de **prosa**: no hi compten la capçalera YAML ni els
+títols, així que el total d'un capítol és la suma de les seves escenes. La
+barra d'estat de Phileas compta tot el fitxer, per això el mateix capítol hi pot
+sortir una mica més alt.
+
+### Tecles
+
+| Tecla | Acció |
+|-------|-------|
+| ↑ ↓ RePàg AvPàg Inici Fi | moure's |
+| → / Espai, ← | desplegar i plegar |
+| **Retorn** | obre el capítol, l'escena (amb el cursor a la seva capçalera) o la fitxa a Phileas; en un grup, el plega o desplega |
+| `n` | **nou**: capítol (al manuscrit) o fitxa (a un altre grup) |
+| `r` | canvia el títol i el nom del fitxer |
+| `e` | canvia l'estat al següent de la llista |
+| Alt+↑ / Alt+↓ (o `<` `>`) | puja o baixa el capítol |
+| Supr | mou a la paperera (pregunta abans) |
+| `/` | filtra pel títol o la sinopsi, sense majúscules ni accents |
+| Esc | esborra el filtre; sense filtre, obre el menú |
+| F1, Ctrl+Q | ajuda, sortir |
+
+Al retornar de Phileas, Fàbula torna a llegir només els fitxers que han canviat.
+
+### Coses que cal saber
+
+- **Reanomenar** (`r`) posa `titol:` a la capçalera i canvia el nom del fitxer;
+  **no toca el text**, així que el `## títol` de dins del capítol continua com
+  estava. Si vols que coincideixi, canvia'l a Phileas.
+- **Reordenar** intercanvia els números dels noms amb el capítol veí
+  (`02-b` ↔ `10-c`); si els números són iguals o falten, renumera tots en passos
+  de 10. No cal que els renumeris tu.
+- Les **escenes** i els grups es canvien a Phileas, no a Fàbula.
+- Les **plantilles** de fitxa són al projecte, a `plantilles/` (`capitol.md`,
+  `personatge.md`, `lloc.md`, `recerca.md`, `nota.md`); admeten `{{titol}}` i
+  `{{data}}`.
+- **A la Raspberry Pi** l'ordre és la mateixa (`fabula`); els projectes viuen a
+  `/data/textos` i `envia` els copia a l'ordinador amb la resta de textos.
+
+---
+
+## 17. Xuleta de dreceres
 
 ### Fitxer
 

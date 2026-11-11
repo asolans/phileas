@@ -280,6 +280,23 @@ Aquesta imatge no forma part d'aquest repositori.
 Per compilar Phileas per a una altra imatge de Buildroot o amb una cadena
 de compilació creuada, vegeu [Desenvolupament](#desenvolupament).
 
+## Fàbula (organitzar una novel·la)
+
+El paquet inclou **Fàbula**, una eina de consola per organitzar un projecte
+literari: capítols, escenes, personatges, llocs i recerca, tot com a fitxers
+Markdown normals. Mostra l'arbre del projecte amb les paraules, l'estat de cada
+capítol i el progrés cap a l'objectiu; Retorn obre el text a Phileas.
+
+```bash
+fabula nou "La casa del pou"     # crea el projecte i l'obre
+fabula la-casa-del-pou           # obre un projecte
+fabula --resum la-casa-del-pou   # resum en text, sense pantalla
+```
+
+Les tecles i el format del projecte, al capítol 16 del [manual](MANUAL.md). Es
+compila amb `make fabula` (executable a `build/fabula`) i les proves són a
+`make test-fabula`.
+
 ## Ús
 
 ```
@@ -291,6 +308,7 @@ phileas [-c COLUMNES] [-a SEGONS] [-d IDIOMA] [+LÍNIA] [FITXER]
 | `-c N` | amplada del text en columnes (per defecte 72) |
 | `-a N` | autodesat després de N segons sense escriure; `0` el desactiva |
 | `-d ID` | activa l'ortografia amb aquest diccionari (`ca`, `es`, `en_US`…) |
+| `+N` | obre el document amb el cursor a la línia (paràgraf) N, la primera és la 1; va davant de la posició recordada |
 | `--config` | escriu la configuració completa amb els valors actuals |
 | `-h`, `-v` | ajuda i versió (dins Phileas, Esc → Ajuda i configuració → Quant a Phileas) |
 
@@ -308,7 +326,6 @@ de recordar tres tecles: **Esc** (menús), **F1** (ajuda) i **Ctrl+P**
 | Ctrl+Q | sortir (demana confirmació si hi ha canvis) |
 | Ctrl+Z / Ctrl+Y | desfer / refer |
 | Ctrl+X / Ctrl+C / Ctrl+V | tallar / copiar / enganxar (a l'escriptori, amb el porta-retalls del sistema) |
-| `+N` | obre el document amb el cursor a la línia (paràgraf) N, la primera és la 1; va davant de la posició recordada |
 | Ctrl+A, Ctrl+Espai, Maj+fletxes | seleccionar tot / començar la selecció / ampliar-la |
 | Ctrl+W / Alt+D | esborrar la paraula anterior / la següent |
 | Alt+↑ / Alt+↓ | pujar / baixar el paràgraf (a l'esquema, la secció) |
@@ -443,6 +460,7 @@ cadena musl de Buildroot.
 | `menu.c`, `complete.c`, `help.c` | menús, autocompleció de la paleta i ajuda |
 | `search.c`, `undo.c`, `autosave.c` | cerca, desfer/refer i autodesat |
 | `spell.c` | ortografia amb hunspell, carregat amb `dlopen` |
+| `palette.h`, `theme.c` | colors i temes (compartits amb Fàbula) |
 | `filebrowser.c`, `dirlist.c` | navegador de fitxers |
 | `outline.c`, `outlineview.c` | esquema: capçaleres i paraules per secció, i el seu diàleg |
 | `footnote.c` | notes al peu: inserir, anar i tornar, renumerar |
@@ -450,6 +468,8 @@ cadena musl de Buildroot.
 | `history.c`, `recentview.c` | historial: posició del cursor per document i documents recents |
 | `config.c` | fitxers de configuració |
 | `utf8.c`, `util.c` | UTF-8 i utilitats |
+
+Fàbula és a `fabula/` (`project.c` el projecte i els fitxers, `yaml.c` la capçalera, `flat.c` les files de l'arbre, `fview.c` la pantalla, `fterm.c` el terminal, `launch.c` l'editor) i reutilitza `buffer`, `outline`, `md`, `utf8`, `keys` i `theme` de `src/`. Les proves són a `tests/test_fabula.c`.
 
 Els mòduls que no depenen de ncurses es proven a `tests/test.c`. A `tools/`
 hi ha eines per a les proves interactives: `ptyrun.c` (executa Phileas en un

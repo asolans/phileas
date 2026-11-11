@@ -1,0 +1,803 @@
+#include "fview.h"
+#include "flat.h"
+#include "fterm.h"
+#include "launch.h"
+
+#include "keys.h"
+#include "utf8.h"
+#include "util.h"
+
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define K_FN(k) (KEY_FLAG_FN | (k))
+
+typedef struct {
+    Project *p;
+    Flat     flat;
+    char     filter[128];
+    int      editing;       /* s'escriu el filtre */
+    long     sel;
+    long     top;
+    char     msg[200];
+} View;
+
+/* ---------- dibuix ---------- */
+
+/* Escriu s a (y, x) sense passar de maxw columnes; si s'ha de tallar, acaba en
+ * «…». Retorna les columnes ocupades. */
+static int put(int y, int x, const char *s, int maxw, attr_t a)
+{
+    size_t n = strlen(s), i = 0, end = 0;
+    int w = 0, wend = 0;
+
+    if (maxw <= 0)
+        return 0;
+    while (i < n) {
+        wchar_t c;
+        size_t k = utf8_decode(s, n, i, &c);
+        int cw = c == UTF8_INVALID ? 1 : utf8_width(c, w);
+
+        if (w + cw > maxw)
+            break;
+        w += cw;
+        i += k ? k : 1;
+        if (w <= maxw - 1) {
+            end = i;
+            wend = w;
+        }
+    }
+    attron(a);
+    if (i >= n) {
+        mvaddnstr(y, x, s, (int)n);
+    } else {
+        mvaddnstr(y, x, s, (int)end);
+        mvaddstr(y, x + wend, "…");
+        w = wend + 1;
+    }
+    attroff(a);
+    return w;
+}
+
+static int text_width(const char *s)
+{
+    size_t n = strlen(s), i = 0;
+    int w = 0;
+
+    while (i < n) {
+        wchar_t c;
+        size_t k = utf8_decode(s, n, i, &c);
+
+        w += c == UTF8_INVALID ? 1 : utf8_width(c, w);
+        i += k ? k : 1;
+    }
+    return w;
+}
+
+static void fill(int y, attr_t a)
+{
+    attron(a);
+    move(y, 0);
+    for (int x = 0; x < COLS; x++)
+        addch(' ');
+    attroff(a);
+}
+
+static void hrule(int y)
+{
+    attron(ft_attr(FT_DIM));
+    move(y, 0);
+    for (int x = 0; x < COLS; x++)
+        addstr("─");
+    attroff(ft_attr(FT_DIM));
+}
+
+static void header(const Project *p)
+{
+    char w[32], o[32], right[160], left[160], date[8] = "";
+    long daily = project_daily_needed(p, time(NULL));
+    int lw;
+
+    fill(0, ft_attr(FT_BAR));
+    snprintf(left, sizeof left, " %s", p->titol);
+    fk_fmt_num(project_words(p), w, sizeof w);
+    if (p->objectiu > 0) {
+        fk_fmt_num((size_t)p->objectiu, o, sizeof o);
+        snprintf(right, sizeof right, "%s / %s (%ld %%)", w, o,
+                 (long)(100.0 * (double)project_words(p) / (double)p->objectiu + 0.5));
+        if (p->data_limit[0] && strlen(p->data_limit) >= 10) {
+            snprintf(date, sizeof date, "%.2s-%.2s", p->data_limit + 8, p->data_limit + 5);
+            if (daily == 0)
+                strncat(right, " · assolit", sizeof right - strlen(right) - 1);
+            else if (daily > 0) {
+                char extra[64];
+
+                snprintf(extra, sizeof extra, " · %ld/dia fins %s", daily, date);
+                strncat(right, extra, sizeof right - strlen(right) - 1);
+            }
+        }
+    } else {
+        snprintf(right, sizeof right, "%s paraules", w);
+    }
+    lw = text_width(left);
+    if (lw + text_width(right) + 3 > COLS) {      /* sense el ritme diari */
+        char *dot = strstr(right, " · ");
+
+        if (dot)
+            *dot = '\0';
+    }
+    if (lw + text_width(right) + 3 > COLS && p->objectiu > 0)
+        snprintf(right, sizeof right, "%ld %%",
+                 (long)(100.0 * (double)project_words(p) / (double)p->objectiu + 0.5));
+    {
+        int rw = text_width(right);
+
+        put(0, 0, left, COLS - rw - 2, ft_attr(FT_BAR) | A_BOLD);
+        if (rw + 1 < COLS)
+            put(0, COLS - rw - 1, right, rw, ft_attr(FT_BAR));
+    }
+}
+
+static void draw_row(const View *v, long i, int y)
+{
+    const FRow *r = &v->flat.rows[i];
+    const FNode *n = r->node;
+    int selected = i == v->sel, show_estat = COLS >= 50 && n->kind == FK_CHAPTER;
+    int estat_w = show_estat ? 11 : 0, words_w = 8;
+    int words_x = COLS - estat_w - words_w, x = 1 + 2 * r->depth, title_w;
+    attr_t base = selected ? ft_attr(FT_SEL) : n->kind == FK_GROUP ? ft_attr(FT_HEAD) : 0;
+    char buf[200], num[32];
+    const char *mark = n->nkids ? (n->open || v->filter[0] ? "▾ " : "▸ ") : "  ";
+
+    if (selected)
+        fill(y, base);
+    else
+        attrset(A_NORMAL);
+    if (x >= COLS)
+        return;
+    attron(base);
+    mvaddstr(y, x, mark);
+    attroff(base);
+    x += 2;
+    title_w = words_x - x - 1;
+    if (title_w < 4)
+        title_w = COLS - x - 1;
+    if (n->kind == FK_GROUP && n != v->p->manuscrit)
+        snprintf(buf, sizeof buf, "%s (%zu)", n->title, n->nkids);
+    else
+        snprintf(buf, sizeof buf, "%s", n->title);
+    put(y, x, buf, title_w, base);
+    if (n->kind != FK_GROUP || n == v->p->manuscrit) {
+        fk_fmt_num(n->words, num, sizeof num);
+        if (words_x > x + 4)
+            put(y, words_x + words_w - 1 - text_width(num), num, words_w - 1, base);
+    }
+    if (show_estat && n->estat)
+        put(y, COLS - estat_w + 1, n->estat, estat_w - 2,
+            selected ? base : n->estat_set ? 0 : ft_attr(FT_DIM));
+}
+
+/* Sinopsi (o resum) de l'element seleccionat, en dues línies */
+static void footer_detail(const View *v, int y0)
+{
+    const FNode *n = v->flat.n ? v->flat.rows[v->sel].node : NULL;
+    char line[2][256];
+    const char *s;
+    size_t len;
+    int maxw = COLS - 2;
+
+    line[0][0] = line[1][0] = '\0';
+    if (n && n->sinopsi && n->sinopsi[0]) {
+        s = n->sinopsi;
+        len = strlen(s);
+        if (text_width(s) <= maxw) {
+            snprintf(line[0], sizeof line[0], "%s", s);
+        } else {
+            /* talla per l'últim espai que hi cap */
+            size_t cut = 0, i = 0;
+            int w = 0;
+
+            while (i < len) {
+                wchar_t c;
+                size_t k = utf8_decode(s, len, i, &c);
+
+                w += c == UTF8_INVALID ? 1 : utf8_width(c, w);
+                if (w > maxw)
+                    break;
+                if (s[i] == ' ')
+                    cut = i;
+                i += k ? k : 1;
+            }
+            if (!cut)
+                cut = i;
+            snprintf(line[0], sizeof line[0], "%.*s", (int)cut, s);
+            snprintf(line[1], sizeof line[1], "%s", s + cut + (s[cut] == ' '));
+        }
+        put(y0, 1, line[0], maxw, 0);
+        if (line[1][0])
+            put(y0 + 1, 1, line[1], maxw, 0);
+    } else if (n) {
+        put(y0, 1, "(sense sinopsi)", maxw, ft_attr(FT_DIM));
+    }
+}
+
+static void status(const View *v)
+{
+    char buf[256];
+
+    fill(LINES - 1, ft_attr(FT_BAR));
+    if (v->editing) {
+        snprintf(buf, sizeof buf, " Filtra: %s_   (Retorn accepta · Esc esborra)", v->filter);
+    } else if (v->msg[0]) {
+        snprintf(buf, sizeof buf, " %s", v->msg);
+    } else if (v->filter[0]) {
+        snprintf(buf, sizeof buf, " Filtre «%s» · / canvia · Esc l'esborra", v->filter);
+    } else {
+        snprintf(buf, sizeof buf, " n nou · r reanomena · e estat · / filtra · F1 ajuda · Ctrl+Q surt");
+    }
+    put(LINES - 1, 0, buf, COLS, ft_attr(FT_BAR));
+}
+
+static int list_rows(void)
+{
+    int h = (LINES >= 30 ? LINES - 5 : LINES - 2) - 2 + 1;
+
+    return h < 1 ? 1 : h;
+}
+
+static void draw(View *v)
+{
+    int h = list_rows();
+
+    erase();
+    header(v->p);
+    hrule(1);
+    if (v->sel >= (long)v->flat.n)
+        v->sel = (long)v->flat.n - 1;
+    if (v->sel < 0)
+        v->sel = 0;
+    if (v->sel < v->top)
+        v->top = v->sel;
+    if (v->sel >= v->top + h)
+        v->top = v->sel - h + 1;
+    if (v->top < 0)
+        v->top = 0;
+    if (!v->flat.n) {
+        put(3, 2, v->filter[0] ? "Cap resultat." : "El projecte és buit.", COLS - 3, ft_attr(FT_DIM));
+    } else {
+        for (int r = 0; r < h && v->top + r < (long)v->flat.n; r++)
+            draw_row(v, v->top + r, 2 + r);
+    }
+    if (LINES >= 30) {
+        hrule(LINES - 4);
+        footer_detail(v, LINES - 3);
+    }
+    status(v);
+    refresh();
+}
+
+/* ---------- accions ---------- */
+
+static void rebuild(View *v, const FNode *keep)
+{
+    long k;
+
+    flat_free(&v->flat);
+    flat_build(&v->flat, v->p, v->filter);
+    k = keep ? flat_find(&v->flat, keep) : -1;
+    if (k >= 0)
+        v->sel = k;
+    if (v->sel >= (long)v->flat.n)
+        v->sel = (long)v->flat.n - 1;
+    if (v->sel < 0)
+        v->sel = 0;
+}
+
+static FNode *cur(const View *v)
+{
+    return v->flat.n ? v->flat.rows[v->sel].node : NULL;
+}
+
+static void toggle(View *v, FNode *n)
+{
+    if (n->nkids) {
+        n->open = !n->open;
+        rebuild(v, n);
+    }
+}
+
+/* Obre l'element a l'editor i, en tornar, refresca el projecte conservant la
+ * selecció (pel camí del fitxer i l'ordre de l'escena). */
+static void open_in_editor(View *v, FNode *n)
+{
+    FNode *file = n->kind == FK_SCENE ? n->parent : n;
+    size_t line = n->kind == FK_SCENE ? n->line + 1 : 0, scene = 0;
+    char *path = strdup(file->path), err[200];
+    int rc;
+
+    if (!path)
+        return;
+    if (n->kind == FK_SCENE)
+        for (size_t i = 0; i < file->nkids; i++)
+            if (file->kids[i] == n)
+                scene = i + 1;
+    rc = launch_editor(path, line, err, sizeof err);
+    if (project_refresh(v->p, v->msg, sizeof v->msg) == 0) {
+        FNode *keep = NULL;
+
+        for (size_t g = 0; g < v->p->top->nkids && !keep; g++)
+            for (size_t i = 0; i < v->p->top->kids[g]->nkids; i++) {
+                FNode *c = v->p->top->kids[g]->kids[i];
+
+                if (!strcmp(c->path, path)) {
+                    keep = scene && scene <= c->nkids ? c->kids[scene - 1] : c;
+                    if (keep != c && c->nkids)
+                        c->open = 1;
+                    break;
+                }
+            }
+        rebuild(v, keep);
+    } else {
+        flat_free(&v->flat);
+        flat_build(&v->flat, v->p, v->filter);
+    }
+    if (rc != 0)
+        snprintf(v->msg, sizeof v->msg, "%s", err);
+    free(path);
+}
+
+/* Línia d'entrada a la barra d'estat. Retorna 1 si s'accepta (Retorn) i 0 si
+ * es cancel·la (Esc); buf conserva el text. */
+static int prompt_line(const char *label, const char *initial, char *buf, size_t sz)
+{
+    size_t l;
+
+    snprintf(buf, sz, "%s", initial ? initial : "");
+    l = strlen(buf);
+    for (;;) {
+        char shown[400];
+        int col;
+        int key;
+
+        snprintf(shown, sizeof shown, " %s%s", label, buf);
+        fill(LINES - 1, ft_attr(FT_BAR));
+        put(LINES - 1, 0, shown, COLS, ft_attr(FT_BAR));
+        col = text_width(shown);
+        curs_set(1);
+        move(LINES - 1, col < COLS ? col : COLS - 1);
+        refresh();
+        key = key_read();
+        if (key < 0 || key == K_FN(KEY_RESIZE))
+            continue;
+        if (key == '\n') {
+            curs_set(0);
+            return 1;
+        } else if (key == 27) {
+            curs_set(0);
+            return 0;
+        } else if (key == 21) {                         /* Ctrl+U */
+            buf[l = 0] = '\0';
+        } else if (key == K_FN(KEY_BACKSPACE) || key == 127 || key == 8) {
+            while (l && ((unsigned char)buf[l - 1] & 0xC0) == 0x80)
+                l--;
+            if (l)
+                buf[--l] = '\0';
+        } else if (key >= 32 && !(key & (KEY_FLAG_FN | KEY_FLAG_ALT))) {
+            char enc[4];
+            size_t k = utf8_encode((wchar_t)key, enc);
+
+            if (l + k < sz) {
+                memcpy(buf + l, enc, k);
+                buf[l += k] = '\0';
+            }
+        }
+    }
+}
+
+static int confirm(const char *question)
+{
+    char shown[400];
+    int key;
+
+    snprintf(shown, sizeof shown, " %s (s/n) ", question);
+    fill(LINES - 1, ft_attr(FT_BAR));
+    put(LINES - 1, 0, shown, COLS, ft_attr(FT_BAR));
+    refresh();
+    do
+        key = key_read();
+    while (key < 0 || key == K_FN(KEY_RESIZE));
+    return key == 's' || key == 'S' || key == 'y' || key == 'Y';
+}
+
+/* Torna a llegir el projecte després d'un canvi als fitxers i selecciona el
+ * fitxer del camí (si n'hi ha), desplegant-ne el grup. */
+static void refresh_select(View *v, const char *path)
+{
+    FNode *keep = NULL;
+    char err[200];
+
+    if (project_refresh(v->p, err, sizeof err) != 0) {
+        snprintf(v->msg, sizeof v->msg, "%s", err);
+        flat_free(&v->flat);
+        flat_build(&v->flat, v->p, v->filter);
+        return;
+    }
+    for (size_t g = 0; path && g < v->p->top->nkids && !keep; g++)
+        for (size_t i = 0; i < v->p->top->kids[g]->nkids; i++)
+            if (!strcmp(v->p->top->kids[g]->kids[i]->path, path)) {
+                keep = v->p->top->kids[g]->kids[i];
+                v->p->top->kids[g]->open = 1;
+                break;
+            }
+    rebuild(v, keep);
+}
+
+static FNode *group_of(const FNode *n)
+{
+    if (!n)
+        return NULL;
+    if (n->kind == FK_GROUP)
+        return (FNode *)n;
+    if (n->kind == FK_SCENE)
+        n = n->parent;
+    return n && n->parent && n->parent->kind == FK_GROUP ? n->parent : NULL;
+}
+
+static void act_new(View *v)
+{
+    FNode *g = group_of(cur(v));
+    char title[200], label[120], path[600], err[200];
+    int chapter = !g || g == v->p->manuscrit;
+
+    snprintf(label, sizeof label, chapter ? "Títol del nou capítol: " : "Títol de la nova fitxa (%s): ",
+             g ? g->title : "");
+    if (!prompt_line(label, "", title, sizeof title))
+        return;
+    if (project_new_item(v->p, g, title, path, sizeof path, err, sizeof err) != 0) {
+        snprintf(v->msg, sizeof v->msg, "%s", err);
+        return;
+    }
+    refresh_select(v, path);
+    if (!v->msg[0])
+        snprintf(v->msg, sizeof v->msg, "Creat %s · Retorn per obrir-lo", strrchr(path, '/') + 1);
+}
+
+static void act_rename(View *v)
+{
+    FNode *n = cur(v);
+    char title[200], path[600], err[200], oldp[600];
+
+    if (!n || (n->kind != FK_CHAPTER && n->kind != FK_CARD)) {
+        snprintf(v->msg, sizeof v->msg, n && n->kind == FK_SCENE ?
+                 "Les escenes es reanomenen a Phileas (la capçalera ###)." :
+                 "Només es reanomenen capítols i fitxes.");
+        return;
+    }
+    if (!prompt_line("Títol nou: ", n->title, title, sizeof title))
+        return;
+    snprintf(oldp, sizeof oldp, "%s", n->path);
+    if (project_rename(v->p, n, title, path, sizeof path, err, sizeof err) != 0) {
+        snprintf(v->msg, sizeof v->msg, "%s", err);
+        refresh_select(v, oldp);
+        snprintf(v->msg, sizeof v->msg, "%s", err);
+        return;
+    }
+    refresh_select(v, path);
+}
+
+static void act_trash(View *v)
+{
+    FNode *n = cur(v);
+    char q[300], err[200];
+    long keep;
+
+    if (!n || (n->kind != FK_CHAPTER && n->kind != FK_CARD)) {
+        snprintf(v->msg, sizeof v->msg, "Només es mouen a la paperera capítols i fitxes.");
+        return;
+    }
+    snprintf(q, sizeof q, "Moure «%s» a la paperera?", n->title);
+    if (!confirm(q))
+        return;
+    keep = v->sel;
+    if (project_trash(v->p, n, err, sizeof err) != 0) {
+        snprintf(v->msg, sizeof v->msg, "%s", err);
+        return;
+    }
+    refresh_select(v, NULL);
+    v->sel = keep < (long)v->flat.n ? keep : (long)v->flat.n - 1;
+    if (v->sel < 0)
+        v->sel = 0;
+    if (!v->msg[0])
+        snprintf(v->msg, sizeof v->msg, "Mogut a .paperera/ (no s'ha esborrat)");
+}
+
+static void act_move(View *v, int dir)
+{
+    FNode *n = cur(v);
+    char path[600], err[200];
+
+    if (!n || n->kind != FK_CHAPTER) {
+        snprintf(v->msg, sizeof v->msg, n && n->kind == FK_SCENE ?
+                 "Les escenes es mouen a Phileas (Alt+↑/↓ a l'esquema, F2)." :
+                 "Només es reordenen els capítols.");
+        return;
+    }
+    if (v->filter[0]) {
+        snprintf(v->msg, sizeof v->msg, "Esborra el filtre (Esc) abans de reordenar.");
+        return;
+    }
+    if (project_move(v->p, n, dir, path, sizeof path, err, sizeof err) != 0) {
+        snprintf(v->msg, sizeof v->msg, "%s", err);
+        return;
+    }
+    refresh_select(v, path);
+}
+
+/* Menú de l'Esc: la mateixa acció que cada tecla. Retorna el codi de la tecla
+ * de l'acció triada, o -1 si es tanca sense triar. */
+static int menu_run(View *v)
+{
+    static const struct { const char *label, *hint; int key; } items[] = {
+        { "Obre a Phileas", "Retorn", '\n' },
+        { "Desplega o plega", "Espai", ' ' },
+        { "Nou capítol o fitxa", "n", 'n' },
+        { "Canvia el títol", "r", 'r' },
+        { "Canvia l'estat", "e", 'e' },
+        { "Puja el capítol", "Alt+↑", '<' },
+        { "Baixa el capítol", "Alt+↓", '>' },
+        { "Mou a la paperera", "Supr", K_FN(KEY_DC) },
+        { "Filtra", "/", '/' },
+        { "Ajuda", "F1", K_FN(KEY_F(1)) },
+        { "Surt", "Ctrl+Q", 17 },
+    };
+    const int n = (int)(sizeof items / sizeof *items);
+    int sel = 0, w = 0;
+
+    for (int i = 0; i < n; i++) {
+        int lw = text_width(items[i].label) + 2 + text_width(items[i].hint) + 4;
+
+        if (lw > w)
+            w = lw;
+    }
+    if (w > COLS - 2)
+        w = COLS - 2;
+    for (;;) {
+        int x0 = 1, y0 = 2, key;
+
+        draw(v);
+        attrset(A_NORMAL);
+        for (int i = -1; i <= n; i++) {
+            int y = y0 + 1 + i;
+
+            if (y >= LINES - 1)
+                break;
+            if (i < 0 || i == n) {
+                attron(ft_attr(FT_DIM));
+                mvaddstr(y, x0, i < 0 ? "┌" : "└");
+                for (int c = 0; c < w; c++)
+                    addstr("─");
+                addstr(i < 0 ? "┐" : "┘");
+                attroff(ft_attr(FT_DIM));
+            } else {
+                attr_t a = i == sel ? ft_attr(FT_SEL) : 0;
+                int lw = text_width(items[i].label), hw = text_width(items[i].hint);
+
+                attron(ft_attr(FT_DIM));
+                mvaddstr(y, x0, "│");
+                mvaddstr(y, x0 + w + 1, "│");
+                attroff(ft_attr(FT_DIM));
+                attron(a);
+                move(y, x0 + 1);
+                for (int c = 0; c < w; c++)
+                    addch(' ');
+                attroff(a);
+                put(y, x0 + 2, items[i].label, w - 2, a);
+                put(y, x0 + w - hw - 1, items[i].hint, hw, a ? a : ft_attr(FT_DIM));
+                (void)lw;
+            }
+        }
+        refresh();
+        key = key_read();
+        if (key < 0 || key == K_FN(KEY_RESIZE))
+            continue;
+        if (key == 27 || key == K_FN(KEY_F(10)))
+            return -1;
+        if (key == K_FN(KEY_UP))
+            sel = (sel + n - 1) % n;
+        else if (key == K_FN(KEY_DOWN))
+            sel = (sel + 1) % n;
+        else if (key == K_FN(KEY_HOME))
+            sel = 0;
+        else if (key == K_FN(KEY_END))
+            sel = n - 1;
+        else if (key == '\n')
+            return items[sel].key;
+    }
+}
+
+static void help(void)
+{
+    static const char *const lines[] = {
+        "Fàbula · ajuda",
+        "",
+        "  ↑ ↓ RePàg AvPàg Inici Fi   moure's",
+        "  → / Espai                  desplegar (o entrar al primer fill)",
+        "  ←                          plegar (o anar al pare)",
+        "  Retorn                     grups: plega/desplega · la resta: obre a Phileas",
+        "  n                          capítol nou (al manuscrit) o fitxa nova (al grup)",
+        "  r                          canvia el títol (i el nom del fitxer)",
+        "  Supr                       mou a la paperera (.paperera/); no s'esborra",
+        "  Alt+↑ / Alt+↓  (< / >)     puja o baixa el capítol",
+        "  e                          canvia l'estat del capítol o la fitxa",
+        "  /                          filtra pel títol o la sinopsi",
+        "  Esc                        esborra el filtre; sense filtre, el menú",
+        "  Ctrl+L                     redibuixa",
+        "  Ctrl+Q / q                 surt",
+        "",
+        "  Premeu una tecla per tornar.",
+    };
+
+    erase();
+    for (size_t i = 0; i < sizeof lines / sizeof *lines && (int)i < LINES; i++)
+        put((int)i, 1, lines[i], COLS - 2, i == 0 ? ft_attr(FT_HEAD) : 0);
+    refresh();
+    key_read();
+}
+
+static void change_estat(View *v)
+{
+    FNode *n = cur(v);
+    const char *next;
+
+    if (!n || (n->kind != FK_CHAPTER && n->kind != FK_CARD)) {
+        snprintf(v->msg, sizeof v->msg, "L'estat només es canvia en capítols i fitxes.");
+        return;
+    }
+    next = project_next_estat(v->p, n->estat);
+    if (!next)
+        return;
+    if (project_set_estat(v->p, n, next) != 0)
+        snprintf(v->msg, sizeof v->msg, "No s'ha pogut desar: %s", strerror(errno));
+    else
+        snprintf(v->msg, sizeof v->msg, "%s: %s", n->title, next);
+}
+
+static void filter_key(View *v, int key)
+{
+    size_t l = strlen(v->filter);
+
+    if (key == '\n') {
+        v->editing = 0;
+    } else if (key == 27) {
+        v->filter[0] = '\0';
+        v->editing = 0;
+        rebuild(v, cur(v));
+    } else if (key == K_FN(KEY_BACKSPACE) || key == 127 || key == 8) {
+        while (l && ((unsigned char)v->filter[l - 1] & 0xC0) == 0x80)
+            l--;
+        if (l)
+            v->filter[l - 1] = '\0';
+        rebuild(v, NULL);
+        v->sel = 0;
+    } else if (key >= 32 && !(key & (KEY_FLAG_FN | KEY_FLAG_ALT)) && key != 127) {
+        char enc[4];
+        size_t k = utf8_encode((wchar_t)key, enc);
+
+        if (l + k < sizeof v->filter) {
+            memcpy(v->filter + l, enc, k);
+            v->filter[l + k] = '\0';
+            rebuild(v, NULL);
+            v->sel = 0;
+        }
+    }
+}
+
+void fview_run(Project *p)
+{
+    View v;
+    int pending = 0;
+
+    memset(&v, 0, sizeof v);
+    v.p = p;
+    rebuild(&v, NULL);
+    for (;;) {
+        int key, page;
+        FNode *n;
+
+        ft_sync_size();
+        draw(&v);
+        if (pending) {
+            key = pending;
+            pending = 0;
+        } else {
+            key = key_read();
+        }
+        if (key < 0 || key == K_FN(KEY_RESIZE))
+            continue;
+        v.msg[0] = '\0';
+        if (v.editing) {
+            filter_key(&v, key);
+            continue;
+        }
+        page = list_rows() - 1;
+        n = cur(&v);
+        switch (key) {
+        case 17: case 'q':                 /* Ctrl+Q */
+            flat_free(&v.flat);
+            return;
+        case 12:                           /* Ctrl+L */
+            clearok(curscr, TRUE);
+            break;
+        case K_FN(KEY_UP):    if (v.sel > 0) v.sel--; break;
+        case K_FN(KEY_DOWN):  if (v.sel + 1 < (long)v.flat.n) v.sel++; break;
+        case K_FN(KEY_PPAGE): v.sel = v.sel > page ? v.sel - page : 0; break;
+        case K_FN(KEY_NPAGE): v.sel = v.sel + page < (long)v.flat.n ? v.sel + page : (long)v.flat.n - 1; break;
+        case K_FN(KEY_HOME):  v.sel = 0; break;
+        case K_FN(KEY_END):   v.sel = (long)v.flat.n - 1; break;
+        case K_FN(KEY_RIGHT): case ' ':
+            if (n && n->nkids) {
+                if (!n->open && !v.filter[0])
+                    toggle(&v, n);
+                else if (v.sel + 1 < (long)v.flat.n)
+                    v.sel++;
+            }
+            break;
+        case K_FN(KEY_LEFT):
+            if (n && n->nkids && n->open && !v.filter[0]) {
+                toggle(&v, n);
+            } else if (n && n->parent && n->parent->kind != FK_ROOT) {
+                long k = flat_find(&v.flat, n->parent);
+
+                if (k >= 0)
+                    v.sel = k;
+            }
+            break;
+        case '\n':
+            if (n && n->kind == FK_GROUP)
+                toggle(&v, n);
+            else if (n)
+                open_in_editor(&v, n);
+            break;
+        case 'e':
+            change_estat(&v);
+            break;
+        case 'n':
+            act_new(&v);
+            break;
+        case 'r':
+            act_rename(&v);
+            break;
+        case K_FN(KEY_DC):
+            act_trash(&v);
+            break;
+        case KEY_MODIFIED(KB_UP, 3): case '<':
+            act_move(&v, -1);
+            break;
+        case KEY_MODIFIED(KB_DOWN, 3): case '>':
+            act_move(&v, 1);
+            break;
+        case '/':
+            v.editing = 1;
+            break;
+        case 27:
+            if (v.filter[0]) {
+                v.filter[0] = '\0';
+                rebuild(&v, n);
+                break;
+            }
+            key = menu_run(&v);
+            if (key < 0)
+                break;
+            pending = key;
+            break;
+        case K_FN(KEY_F(1)):
+            help();
+            break;
+        default:
+            break;
+        }
+    }
+}
