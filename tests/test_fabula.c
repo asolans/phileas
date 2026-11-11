@@ -1,4 +1,5 @@
 /* Proves de Fàbula (fabula/): make test-fabula */
+#include "compile.h"
 #include "find.h"
 #include "flat.h"
 #include "project.h"
@@ -1105,6 +1106,107 @@ static void test_find(void)
     project_free(&p);
 }
 
+static char *compile_to_string(const Project *p, const CompileOpts *o, CompileStats *st, char *err)
+{
+    static char buf[16384];
+    FILE *f = tmpfile();
+    size_t n;
+
+    if (!f)
+        return NULL;
+    if (project_compile(p, o, f, st, err, 300) != 0) {
+        fclose(f);
+        return NULL;
+    }
+    rewind(f);
+    n = fread(buf, 1, sizeof buf - 1, f);
+    buf[n] = '\0';
+    fclose(f);
+    return buf;
+}
+
+static void test_compile(void)
+{
+    Project p;
+    CompileOpts o;
+    CompileStats st;
+    char err[300], dir[512], *t;
+
+    snprintf(dir, sizeof dir, "%s/cp", tmpdir);
+    put("cp/projecte.md", "---\ntitol: \"La casa: del pou\"\nautor: A. Solans\nidioma: ca\n---\n");
+    put("cp/manuscrit/01-a.md",
+        "---\nestat: final\npov: Anna\n---\n\n## Comencament\n\nUna dues %%nota meva%% tres.\n\n"
+        "### Escena u\n<!-- pov: Neus; lloc: Pou -->\n\nQuatre [[Anna Puig|l'Anna]] cinc [[Neus]] i [[Pou#Història]] TODO revisar.\n\n\n\n"
+        "```\n### No és escena %%ni nota%% TODO\n```\n\n### Escena dos\n\nSis [?] set.\n");
+    put("cp/manuscrit/02-b.md", "\xEF\xBB\xBF## Final\r\n\r\nVuit nou.\r\n\r\n### Només\r\n\r\nDeu.\r\n");
+    put("cp/personatges/anna.md", "# Anna\n\nNo va al llibre.\n");
+    CHECK(project_open(&p, dir, err, sizeof err) == 0);
+
+    /* per defecte: títols tal com són, notes fora, metadades fora, codi intacte */
+    memset(&o, 0, sizeof o);
+    t = compile_to_string(&p, &o, &st, err);
+    CHECK(t != NULL);
+    CHECK(!strncmp(t, "---\ntitle: \"La casa: del pou\"\nauthor: \"A. Solans\"\nlang: \"ca\"\n---\n\n## Comencament\n\nUna dues tres.\n", 95));
+    CHECK(strstr(t, "### Escena u\n\nQuatre l'Anna cinc Neus i Pou TODO revisar.\n") != NULL);   /* sense el comentari ni els claudàtors */
+    CHECK(strstr(t, "```\n### No és escena %%ni nota%% TODO\n```\n") != NULL);          /* el codi, tal qual */
+    CHECK(strstr(t, "### Escena dos\n\nSis [?] set.\n\n## Final\n\nVuit nou.\n\n### Només\n\nDeu.\n") != NULL);
+    CHECK(!strstr(t, "estat: final") && !strstr(t, "pov: Anna") && !strstr(t, "nota meva") && !strstr(t, "<!--"));
+    CHECK(!strstr(t, "\r") && !strstr(t, "\xEF\xBB\xBF") && !strstr(t, "No va al llibre"));
+    CHECK(strstr(t, "\n\n\n") == NULL);                                                /* sense blocs de línies en blanc */
+    CHECK(st.chapters == 2 && st.words == p.manuscrit->words && st.pending == 2);       /* TODO i [?]; el del codi no */
+
+    /* amb notes */
+    o.keep_notes = 1;
+    t = compile_to_string(&p, &o, &st, err);
+    CHECK(strstr(t, "Una dues %%nota meva%% tres.") != NULL);
+    o.keep_links = 1;
+    t = compile_to_string(&p, &o, &st, err);
+    CHECK(strstr(t, "Quatre [[Anna Puig|l'Anna]] cinc [[Neus]] i [[Pou#Història]]") != NULL);
+
+    /* puja un nivell els títols (el codi no) i separa les escenes */
+    memset(&o, 0, sizeof o);
+    o.promote = 1;
+    t = compile_to_string(&p, &o, &st, err);
+    CHECK(strstr(t, "\n# Comencament\n") && strstr(t, "\n## Escena u\n") && strstr(t, "\n# Final\n"));
+    CHECK(strstr(t, "```\n### No és escena") != NULL);
+    o.scene_sep = 1;
+    t = compile_to_string(&p, &o, &st, err);
+    CHECK(strstr(t, "# Comencament\n\nUna dues tres.\n\n* * *\n\nQuatre l'Anna cinc Neus i Pou TODO revisar.\n") != NULL);
+    CHECK(!strstr(t, "Escena u") && !strstr(t, "Escena dos") && strstr(t, "\n# Final\n\nVuit nou.\n\n* * *\n\nDeu.\n") != NULL);
+
+    /* un format que no coneixem no s'envia a pandoc */
+    {
+        char out[600];
+
+        snprintf(out, sizeof out, "%s/cp/projecte.md", tmpdir);
+        CHECK(project_compile_file(&p, &o, out, &st, err, sizeof err) == -1 && strstr(err, "No es pot"));
+        CHECK(strstr(slurp("cp/projecte.md"), "A. Solans") != NULL);                  /* intacte */
+        snprintf(out, sizeof out, "%s/cp/manuscrit/llibre.md", tmpdir);
+        CHECK(project_compile_file(&p, &o, out, &st, err, sizeof err) == -1 && !has("cp/manuscrit/llibre.md"));
+        snprintf(out, sizeof out, "%s/cp/.paperera/llibre.md", tmpdir);
+        CHECK(project_compile_file(&p, &o, out, &st, err, sizeof err) == -1);
+        snprintf(out, sizeof out, "%s/cp/x.xyz", tmpdir);
+        CHECK(project_compile_file(&p, &o, out, &st, err, sizeof err) == -1 && strstr(err, "Format desconegut"));
+        CHECK(!has("cp/x.xyz"));
+        snprintf(out, sizeof out, "%s/cp/llibre.md", tmpdir);
+        CHECK(project_compile_file(&p, &o, out, &st, err, sizeof err) == 0 && has("cp/llibre.md"));
+        project_free(&p);
+        CHECK(project_open(&p, dir, err, sizeof err) == 0 && p.top->nkids == 2);      /* el .md de l'arrel no és un grup */
+    }
+
+    /* formats: només .md es fa sense pandoc */
+    CHECK(!compile_needs_pandoc("llibre.md") && !compile_needs_pandoc("x/y.MARKDOWN"));
+    CHECK(compile_needs_pandoc("llibre.docx") && compile_needs_pandoc("llibre.epub") && compile_needs_pandoc("a.pdf"));
+
+    /* sense manuscrit */
+    put("cp2/projecte.md", "x\n");
+    project_free(&p);
+    snprintf(dir, sizeof dir, "%s/cp2", tmpdir);
+    CHECK(project_open(&p, dir, err, sizeof err) == 0);
+    CHECK(compile_to_string(&p, &o, &st, err) == NULL && strstr(err, "buit"));
+    project_free(&p);
+}
+
 static void rmtree(const char *dir)
 {
     char cmd[600];
@@ -1133,6 +1235,7 @@ int main(void)
     test_table();
     test_links();
     test_find();
+    test_compile();
     rmtree(tmpdir);
     printf("%d comprovacions, %d errors\n", checks, failures);
     return failures != 0;

@@ -1,6 +1,7 @@
 #include "fview.h"
 #include "flat.h"
 #include "fterm.h"
+#include "compile.h"
 #include "find.h"
 #include "launch.h"
 #include "table.h"
@@ -1210,11 +1211,11 @@ static void act_find(View *v, int replace)
                      (opts & FF_ICASE) ? "ignora" : "compten", (opts & FF_WORD) ? "sí" : "no",
                      (opts & FF_META) ? "inclou" : "no");
             if (replace) {
-                snprintf(title, sizeof title, " Substitueix «%s» per «%s»: %zu coincidències en %zu fitxers ",
+                snprintf(title, sizeof title, " Substitueix «%.60s» per «%.60s»: %zu coincidències en %zu fitxers ",
                          needle, repl, f.n, f.files);
                 snprintf(footer, sizeof footer, " Retorn aplica els marcats · Espai marca · a tots/cap · %s", fl);
             } else {
-                snprintf(title, sizeof title, " Cerca «%s»: %zu coincidències en %zu fitxers ", needle, f.n, f.files);
+                snprintf(title, sizeof title, " Cerca «%.100s»: %zu coincidències en %zu fitxers ", needle, f.n, f.files);
                 snprintf(footer, sizeof footer, " Retorn obre a Phileas · %s", fl);
             }
         }
@@ -1272,6 +1273,33 @@ static void act_find(View *v, int replace)
     }
 }
 
+/* C: compila el manuscrit a un fitxer (.md, o .docx/.epub/.pdf amb pandoc) */
+static void act_compile(View *v)
+{
+    char name[300], path[700], err[240], *slug = fk_slug(v->p->titol), initial[200];
+    CompileOpts o;
+    CompileStats st;
+
+    snprintf(initial, sizeof initial, "%s.md", slug);
+    free(slug);
+    if (!prompt_line("Compila a (.md, .docx, .epub, .pdf…): ", initial, name, sizeof name) || !name[0])
+        return;
+    if (name[0] == '/' || name[0] == '.' || strchr(name, '/'))
+        snprintf(path, sizeof path, "%s", name);
+    else
+        snprintf(path, sizeof path, "%s/%s", v->p->root, name);
+    memset(&o, 0, sizeof o);
+    if (project_compile_file(v->p, &o, path, &st, err, sizeof err) != 0) {
+        snprintf(v->msg, sizeof v->msg, "%.190s", err);
+        return;
+    }
+    if (st.pending)
+        snprintf(v->msg, sizeof v->msg, "Compilat: %zu capítols, %zu paraules → %.60s (%zu pendents TODO/[?])",
+                 st.chapters, st.words, name, st.pending);
+    else
+        snprintf(v->msg, sizeof v->msg, "Compilat: %zu capítols, %zu paraules → %.80s", st.chapters, st.words, name);
+}
+
 /* Menú de l'Esc: la mateixa acció que cada tecla. Retorna el codi de la tecla
  * de l'acció triada, o -1 si es tanca sense triar. */
 static int menu_run(View *v)
@@ -1289,6 +1317,7 @@ static int menu_run(View *v)
         { "Enllaços d'aquí", "l", 'l' },
         { "Enllaços trencats", "t", 't' },
         { "Cerca al projecte", "f", 'f' },
+        { "Compila el manuscrit", "C", 'C' },
         { "Substitueix al projecte", "R", 'R' },
         { "Desa una instantània", "s", 's' },
         { "Versions anteriors", "v", 'v' },
@@ -1375,6 +1404,7 @@ static void help(void)
         "  r                          canvia el títol (i el nom del fitxer)",
         "  u / l / t                  on surt un capítol o fitxa / els seus [[enllaços]] / enllaços trencats",
         "  f / R                      cerca / substitueix al projecte (c, w, m: opcions)",
+        "  C                          compila el manuscrit en un sol fitxer (.md, .docx, .epub…)",
         "  s / v                      desa una instantània / veu les versions i en recupera una",
         "  Supr                       mou a la paperera (.paperera/); no s'esborra",
         "  Alt+↑ / Alt+↓  (< / >)     puja o baixa el capítol",
@@ -1655,6 +1685,9 @@ void fview_run(Project *p)
             break;
         case 'f':
             act_find(&v, 0);
+            break;
+        case 'C':
+            act_compile(&v);
             break;
         case 'R':
             act_find(&v, 1);

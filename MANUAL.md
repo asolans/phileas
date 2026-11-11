@@ -823,6 +823,7 @@ sortir una mica més alt.
 | `t` | els enllaços **trencats** de tot el projecte |
 | `f` | **cerca** un text a tot el projecte |
 | `R` | **substitueix** un text a tot el projecte (amb llista i confirmació) |
+| `C` | **compila** el manuscrit en un sol fitxer (`.md`, `.docx`, `.epub`…) |
 | `s` | desa una **instantània** del capítol o la fitxa |
 | `v` | **versions** anteriors: llista amb data, paraules i diferència; Retorn en recupera una |
 | Supr | mou a la paperera (pregunta abans) |
@@ -935,6 +936,39 @@ cerca, no el toca i t'ho diu. També es cerquen els enllaços `[[ ]]`, així que
 canviar «Anna Puig» per «Marta Puig» corregeix també els enllaços; un canvi de
 nom de fitxa i els seus enllaços van junts si els marques tots. Des de la línia
 d'ordres, `fabula --cerca TEXT [CARPETA]` mostra les coincidències en text.
+
+### Compilar el manuscrit
+
+Amb **`C`** (o `fabula compila`) el manuscrit se't converteix en **un sol
+document**, amb els capítols en ordre. Et demana el nom del fitxer, i l'extensió
+tria el format:
+
+- **`.md`**: un Markdown ben net, que no necessita res més.
+- **`.docx`, `.odt`, `.epub`, `.pdf`, `.html`…**: Fàbula prepara el Markdown i
+  el passa per **pandoc** (cal tenir-lo instal·lat; a la Raspberry Pi, passa el
+  `.md` a l'ordinador amb `envia` i converteix-lo allà).
+
+El document compilat comença amb el títol, l'autor i l'idioma del projecte, i
+després porta cada capítol **sense** el que és de treball:
+
+- la capçalera YAML del capítol i els comentaris de metadades de sota els títols;
+- les notes `%%així%%`;
+- els claudàtors dels enllaços: `[[Anna Puig|l'Anna]]` surt com a «l'Anna» i
+  `[[Neus]]`, com a «Neus».
+
+Els `TODO` i els `[?]` **no** s'esborren (és text teu), però en acabar Fàbula
+t'avisa de quants en queden. Les opcions de la línia d'ordres:
+
+```bash
+fabula compila -o llibre.docx         # al format de l'extensió
+fabula compila -o llibre.md --puja    # ## → # (els capítols passen a nivell 1)
+fabula compila --separa-escenes       # cada ### es converteix en «* * *»
+fabula compila --amb-notes --amb-enllacos   # conserva %%notes%% i [[enllaços]]
+```
+
+Sense `-o`, el document surt per la sortida estàndard. El fitxer es crea a la
+carpeta del projecte si només en dius el nom, i **mai** a dins de `manuscrit/`,
+de les fitxes ni sobre `projecte.md`: Fàbula ho refusa. No canvia res del projecte.
 
 ### Instantànies: marxa enrere
 

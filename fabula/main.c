@@ -1,6 +1,7 @@
 #include "fterm.h"
 #include "fview.h"
 #include "project.h"
+#include "compile.h"
 #include "find.h"
 #include "flat.h"
 #include "version.h"
@@ -80,6 +81,55 @@ static int search_cli(const char *needle, const char *dir)
     return f.n ? 0 : 1;
 }
 
+/* fabula compila [-o FITXER] [--puja] [--separa-escenes] [--amb-notes] [CARPETA] */
+static int compile_cli(int argc, char **argv)
+{
+    CompileOpts o;
+    CompileStats st;
+    Project p;
+    const char *outpath = NULL, *dir = ".";
+    char err[400];
+    int rc;
+
+    memset(&o, 0, sizeof o);
+    for (int i = 0; i < argc; i++) {
+        if (!strcmp(argv[i], "-o") && i + 1 < argc)
+            outpath = argv[++i];
+        else if (!strcmp(argv[i], "--puja"))
+            o.promote = 1;
+        else if (!strcmp(argv[i], "--separa-escenes"))
+            o.scene_sep = 1;
+        else if (!strcmp(argv[i], "--amb-notes"))
+            o.keep_notes = 1;
+        else if (!strcmp(argv[i], "--amb-enllacos"))
+            o.keep_links = 1;
+        else if (argv[i][0] == '-' && argv[i][1]) {
+            fprintf(stderr, "fabula compila: opció desconeguda: %s\n", argv[i]);
+            return 2;
+        } else
+            dir = argv[i];
+    }
+    if (project_open(&p, dir, err, sizeof err) != 0) {
+        fprintf(stderr, "fabula: %s\n", err);
+        return 1;
+    }
+    if (outpath && strcmp(outpath, "-"))
+        rc = project_compile_file(&p, &o, outpath, &st, err, sizeof err);
+    else
+        rc = project_compile(&p, &o, stdout, &st, err, sizeof err);
+    if (rc != 0) {
+        fprintf(stderr, "fabula: %s\n", err);
+        project_free(&p);
+        return 1;
+    }
+    fprintf(stderr, "Compilat: %zu capítols, %zu paraules%s%s\n", st.chapters, st.words,
+            outpath && strcmp(outpath, "-") ? " → " : "", outpath && strcmp(outpath, "-") ? outpath : "");
+    if (st.pending)
+        fprintf(stderr, "Atenció: al text queden %zu pendents (TODO o [?]).\n", st.pending);
+    project_free(&p);
+    return 0;
+}
+
 static void quit_hook(int sig)
 {
     ft_end();
@@ -132,7 +182,9 @@ int main(int argc, char **argv)
         puts("Ús: fabula [CARPETA]\n"
              "     fabula nou \"TÍTOL\" [DIRECTORI]\n"
              "     fabula --resum [CARPETA]    el projecte en text, sense pantalla\n"
-             "     fabula --cerca TEXT [CARPETA]   cerca (sense majúscules ni accents), en text\n\n"
+             "     fabula --cerca TEXT [CARPETA]   cerca (sense majúscules ni accents), en text\n"
+             "     fabula compila [-o FITXER] [--puja] [--separa-escenes] [--amb-notes] [--amb-enllacos] [CARPETA]\n"
+             "                     el manuscrit en un sol document (.md, o .docx/.epub/.pdf amb pandoc)\n\n"
              "Obre el projecte literari de CARPETA (la que té projecte.md; per defecte, la\n"
              "carpeta actual). «nou» crea la carpeta del projecte (TÍTOL en minúscules i amb\n"
              "guions) dins de DIRECTORI (per defecte, l'actual) i l'obre.\n\n"
@@ -140,6 +192,8 @@ int main(int argc, char **argv)
              "El tema es llegeix del phileasrc de Phileas. F1 mostra les tecles.");
         return 0;
     }
+    if (argc > 1 && !strcmp(argv[1], "compila"))
+        return compile_cli(argc - 2, argv + 2);
     if (argc > 2 && !strcmp(argv[1], "--cerca"))
         return search_cli(argv[2], argc > 3 ? argv[3] : ".");
     if (argc > 1 && !strcmp(argv[1], "--resum"))
