@@ -43,7 +43,7 @@ static void quit_on_signal(int sig)
 
 static void usage(FILE *f)
 {
-    fputs("Ús: phileas [-c COLUMNES] [-a SEGONS] [-d IDIOMA] [FITXER]\n"
+    fputs("Ús: phileas [-c COLUMNES] [-a SEGONS] [-d IDIOMA] [+LÍNIA] [FITXER]\n"
           "     phileas --config\n"
           "\n"
           "Si FITXER no existeix i no té extensió, es crea amb .md (nota → nota.md).\n"
@@ -56,6 +56,8 @@ static void usage(FILE *f)
           "  --config  escriu la configuració completa amb els valors actuals (no la\n"
           "            redirigiu al mateix phileasrc: el shell el buida abans de llegir-lo;\n"
           "            per desar-la, dins Phileas, Ctrl+P desar-configuracio)\n"
+          "  +LÍNIA    obre el document amb el cursor a la línia (paràgraf) LÍNIA, la\n"
+          "            primera és la 1; va davant de la posició recordada\n"
           "  -h        mostra aquesta ajuda\n"
           "  -v        mostra la versió\n"
           "\n"
@@ -90,6 +92,8 @@ int main(int argc, char **argv)
     Editor e;
     char cfg_msg[256];
     int opt, cfg_errors;
+    unsigned long goto_line = 0;   /* +N, 1 = primera línia */
+    const char *open_arg = NULL;
 
     setlocale(LC_ALL, "");
     /* La configuració completa amb els valors actuals (els del sistema i
@@ -129,9 +133,30 @@ int main(int argc, char **argv)
             return 2;
         }
     }
-    if (argc - optind > 1) {
-        fputs("phileas: només es pot obrir un document alhora\n", stderr);
-        return 2;
+    /* +N (com a vi): obre el document amb el cursor a la línia (paràgraf) N.
+     * Pot anar abans o després del nom del fitxer. */
+    {
+        char *files[2];
+        int nfiles = 0;
+
+        for (int i = optind; i < argc; i++) {
+            char *end;
+            unsigned long n;
+
+            if (argv[i][0] == '+' && argv[i][1] >= '0' && argv[i][1] <= '9' &&
+                (n = strtoul(argv[i] + 1, &end, 10), *end == '\0')) {
+                goto_line = n;
+            } else if (nfiles < 2) {
+                files[nfiles++] = argv[i];
+            } else {
+                nfiles++;
+            }
+        }
+        if (nfiles > 1) {
+            fputs("phileas: només es pot obrir un document alhora\n", stderr);
+            return 2;
+        }
+        open_arg = nfiles ? files[0] : NULL;
     }
 
     ed_init(&e, DEFAULT_COLUMNS);
@@ -141,10 +166,10 @@ int main(int argc, char **argv)
     cfg_errors = config_load(&e, CONFIG_SYSTEM, NULL, cfg_msg, sizeof cfg_msg);
     calaix_state_load(&e.cstate);
 
-    if (optind < argc) {
+    if (open_arg) {
         char path[PATH_MAX];
 
-        buf_new_path(argv[optind], path, sizeof path);
+        buf_new_path(open_arg, path, sizeof path);
 
         if (ed_open(&e, path) < 0) {
             fprintf(stderr, "phileas: %s: %s\n", path, strerror(errno));
@@ -152,6 +177,8 @@ int main(int argc, char **argv)
             return 1;
         }
         history_restore(&e);
+        if (goto_line)
+            ed_goto_line(&e, goto_line);
         history_remember(&e);
     }
     if (strcmp(nl_langinfo(CODESET), "UTF-8") != 0)

@@ -985,3 +985,9 @@ void ed_select(Editor *e, Pos a, Pos z)
     ed_sel_start(e, SEL_SHIFT);
     set_cursor(e, z);
 }
+
+void theme_apply(Editor *e, const Theme *t)
+{
+    theme_palette(t, e->palette);
+    e->theme = theme_index(t);
+}

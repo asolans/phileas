@@ -3,6 +3,8 @@
 
 #include "buffer.h"
 #include "calaix.h"
+#include "palette.h"
+#include "theme.h"
 
 /* Accions que s'agrupen en un sol pas de desfer si es repeteixen seguides */
 enum {
@@ -32,13 +34,6 @@ enum {
     SEL_MARK,   /* Ctrl+Espai: els moviments l'amplien fins que es cancel·la */
 };
 
-/* Elements amb color configurable (temes: theme.c). Els de la barra, la
- * selecció i els menús, si no tenen cap color, van en vídeo invers (barra i
- * selecció) o amb els colors del text (menús). */
-enum { PAL_H1, PAL_H2, PAL_H3, PAL_CODE, PAL_QUOTE, PAL_ERROR, PAL_MARK,
-       PAL_TEXT, PAL_BG, PAL_BAR, PAL_BAR_BG, PAL_SEL, PAL_SEL_BG,
-       PAL_MENU, PAL_MENU_BG, PAL_N };
-#define PAL_DEFAULT (-1)   /* el color normal del terminal */
 
 #define MAX_LANGS 4
 
@@ -197,5 +192,8 @@ void  ed_select(Editor *e, Pos a, Pos z);
 size_t ed_copy(Editor *e);
 size_t ed_cut(Editor *e);
 size_t ed_paste(Editor *e);
+
+/* Copia els colors del tema a e->palette i el deixa com a tema actual. */
+void theme_apply(Editor *e, const Theme *t);
 
 #endif

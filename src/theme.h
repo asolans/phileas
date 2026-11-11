@@ -1,7 +1,7 @@
 #ifndef PHILEAS_THEME_H
 #define PHILEAS_THEME_H
 
-#include "editor.h"
+#include "palette.h"
 
 #include <stddef.h>
 
@@ -22,8 +22,9 @@ size_t       theme_count(void);
 const Theme *theme_at(size_t i);
 const Theme *theme_find(const char *name);   /* NULL si no existeix */
 
-/* Copia els colors del tema a e->palette i el deixa com a tema actual. */
-void         theme_apply(Editor *e, const Theme *t);
+/* Copia els colors del tema a pal; i l'índex del tema (theme_at). */
+void         theme_palette(const Theme *t, short pal[PAL_N]);
+int          theme_index(const Theme *t);
 
 /* Color pel nom: 0-15, PAL_DEFAULT per a «cap» o -2 si no existeix; i el
  * nom d'un color. */

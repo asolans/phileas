@@ -283,7 +283,7 @@ de compilació creuada, vegeu [Desenvolupament](#desenvolupament).
 ## Ús
 
 ```
-phileas [-c COLUMNES] [-a SEGONS] [-d IDIOMA] [FITXER]
+phileas [-c COLUMNES] [-a SEGONS] [-d IDIOMA] [+LÍNIA] [FITXER]
 ```
 
 | Opció | Efecte |
@@ -308,6 +308,7 @@ de recordar tres tecles: **Esc** (menús), **F1** (ajuda) i **Ctrl+P**
 | Ctrl+Q | sortir (demana confirmació si hi ha canvis) |
 | Ctrl+Z / Ctrl+Y | desfer / refer |
 | Ctrl+X / Ctrl+C / Ctrl+V | tallar / copiar / enganxar (a l'escriptori, amb el porta-retalls del sistema) |
+| `+N` | obre el document amb el cursor a la línia (paràgraf) N, la primera és la 1; va davant de la posició recordada |
 | Ctrl+A, Ctrl+Espai, Maj+fletxes | seleccionar tot / començar la selecció / ampliar-la |
 | Ctrl+W / Alt+D | esborrar la paraula anterior / la següent |
 | Alt+↑ / Alt+↓ | pujar / baixar el paràgraf (a l'esquema, la secció) |

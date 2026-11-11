@@ -98,10 +98,14 @@ const Theme *theme_find(const char *name)
     return NULL;
 }
 
-void theme_apply(Editor *e, const Theme *t)
+void theme_palette(const Theme *t, short pal[PAL_N])
 {
-    memcpy(e->palette, t->pal, sizeof e->palette);
-    e->theme = (int)(t - themes);
+    memcpy(pal, t->pal, sizeof t->pal);
+}
+
+int theme_index(const Theme *t)
+{
+    return (int)(t - themes);
 }
 
 static const char *const color_names[16] = {

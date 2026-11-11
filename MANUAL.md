@@ -49,6 +49,7 @@ phileas                 # un document nou
 phileas capitol1.md     # obre (o crea) un fitxer
 phileas -c 66 nota.md   # amb la columna de text a 66 caràcters
 ```
+phileas +40 capitol1.md # amb el cursor al paràgraf 40 (la primera línia és la 1)
 
 Si l'has instal·lat amb el paquet `.deb`, també apareix entre les aplicacions
 de l'escriptori.
