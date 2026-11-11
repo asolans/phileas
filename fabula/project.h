@@ -17,6 +17,8 @@ typedef enum {
     FK_CARD,      /* fitxa */
 } FKind;
 
+enum { FK_OWN_POV = 1, FK_OWN_LLOC = 2, FK_OWN_DATA = 4, FK_OWN_PERS = 8, FK_OWN_SINOPSI = 16 };
+
 typedef struct FNode FNode;
 struct FNode {
     FKind   kind;
@@ -26,6 +28,13 @@ struct FNode {
     char   *estat;      /* estat (capítols i fitxes); sempre n'hi ha si el projecte té estats */
     int     estat_set;  /* l'estat és escrit al fitxer, no és el per defecte */
     char   *sinopsi;    /* pot ser buit */
+    /* Metadades (capítols i fitxes: YAML; escenes: comentari sota la capçalera,
+     * i si no en tenen en prenen les del capítol). Mai NULL. */
+    char   *pov;
+    char   *lloc;
+    char   *data;       /* AAAA, AAAA-MM o AAAA-MM-DD */
+    char   *pers;       /* personatges, separats per comes */
+    unsigned own;       /* escenes: quins camps són propis (FK_OWN_*), la resta, heretats */
     size_t  words;      /* paraules; als grups, el total dels fills */
     size_t  line;       /* escenes: línia del buffer de la capçalera */
     FNode  *parent;
@@ -131,11 +140,21 @@ void   project_versions_free(FVersion *v, size_t n);
  * l'estat actual (així es pot tornar enrere). */
 int    project_restore(Project *p, FNode *n, const FVersion *v, time_t now, char *err, size_t esz);
 
+/* Canvia un camp de metadades i el desa: key és pov, lloc, data, personatges,
+ * sinopsi o estat; value buit el treu. En un capítol o fitxa és la capçalera
+ * YAML; en una escena, el comentari `<!-- pov: Anna; lloc: Mas -->` just sota
+ * la capçalera ### (es crea si no hi és). L'escena es busca per l'ordre i es
+ * comprova pel títol: si el fitxer ha canviat, no es toca res. Escriptura
+ * atòmica; l'arbre en memòria no canvia (cal project_refresh). */
+int    project_set_meta(Project *p, FNode *n, const char *key, const char *value,
+                        char *err, size_t esz);
+
 /* Estat següent de la llista del projecte (amb tornada al primer) */
 const char *project_next_estat(const Project *p, const char *estat);
 
 /* Utilitats d'ordre i noms (provades) */
-int    fk_match(const char *text, const char *needle);  /* conté, sense majúscules ni accents */
+int    fk_match(const char *text, const char *needle);
+int    fk_node_match(const FNode *n, const char *needle);   /* títol, sinopsi i metadades */  /* conté, sense majúscules ni accents */
 void   fk_fmt_num(size_t n, char *out, size_t outsz);  /* 42310 -> «42.310» */
 int    fk_name_cmp(const char *a, const char *b);   /* comparació natural */
 char  *fk_slug(const char *title);                  /* nom de fitxer ASCII, sense extensió */

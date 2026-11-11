@@ -817,6 +817,7 @@ sortir una mica més alt.
 | `r` | canvia el títol i el nom del fitxer |
 | `e` | canvia l'estat al següent de la llista |
 | Alt+↑ / Alt+↓ (o `<` `>`) | puja o baixa el capítol |
+| Tab | canvia entre l'arbre i la **taula** (outliner) |
 | `s` | desa una **instantània** del capítol o la fitxa |
 | `v` | **versions** anteriors: llista amb data, paraules i diferència; Retorn en recupera una |
 | Supr | mou a la paperera (pregunta abans) |
@@ -825,6 +826,51 @@ sortir una mica més alt.
 | F1, Ctrl+Q | ajuda, sortir |
 
 Al retornar de Phileas, Fàbula torna a llegir només els fitxers que han canviat.
+
+### L'outliner: la taula del manuscrit
+
+Amb **Tab** l'arbre passa a una taula: una fila per capítol i, a sota, les
+seves escenes, amb una columna per cada metadada: **Títol, POV, Lloc, Data,
+Estat i Paraules**. Serveix per veure d'un cop d'ull qui explica cada escena,
+on passa, quan i en quin estat és.
+
+Les metadades d'un **capítol** són a la capçalera YAML:
+
+```yaml
+---
+estat: revisat
+pov: Anna
+lloc: Mas Roig
+data: 1936-07-18
+personatges: [Anna, Neus]
+---
+```
+
+A una **escena** (una secció `###`) van en un comentari d'una línia **just sota
+la capçalera**. És Markdown normal: no es veu i no compta com a paraules.
+
+```markdown
+### L'arribada
+<!-- pov: Neus; lloc: El pou; data: 1936-07-19; estat: esborrany -->
+```
+
+Els camps són `pov`, `lloc`, `data` (`AAAA`, `AAAA-MM` o `AAAA-MM-DD`),
+`personatges`, `sinopsi` i `estat`, separats per `;`. **Una escena hereta del
+seu capítol** tot el que no diu (a la taula es veu atenuat). Un comentari sota
+la capçalera que no sigui `clau: valor` es respecta i no es pren com a
+metadades.
+
+| Tecla (a la taula) | Acció |
+|--------------------|-------|
+| ← → | columna actual |
+| `o` | **ordena** per la columna: ascendent ▲, descendent ▼ i, un tercer cop, torna a l'ordre del llibre. Ordenada, la taula és plana (només escenes, amb el capítol al títol) i els buits van sempre al final |
+| `m` | **edita** la metadada de la columna (buit la treu); l'estat canvia al següent de la llista |
+| `/` | filtra per qualsevol camp: `neus` troba el POV Neus, el lloc, el títol o la sinopsi; `revisat` mostra el que té aquest estat |
+| Retorn | obre l'escena a Phileas, a la seva capçalera |
+
+Quan edites una escena, Fàbula escriu el comentari al fitxer (després d'una
+instantània, vegeu més avall); si el fitxer ha canviat des que el va llegir, no
+hi toca res i t'ho diu.
 
 ### Instantànies: marxa enrere
 

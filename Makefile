@@ -36,7 +36,7 @@ build/test_phileas: tests/test.c $(CORE)
 # ---- Fàbula (eina companya, fabula/): objectes compartits de src/ i propis ----
 FSHARED = build/utf8.o build/util.o build/md.o build/buffer.o build/undo.o build/outline.o
 FOBJ    = build/fabula_yaml.o build/fabula_project.o
-FUI     = build/fabula_flat.o build/fabula_fterm.o build/fabula_fview.o build/fabula_launch.o build/fabula_main.o
+FUI     = build/fabula_flat.o build/fabula_table.o build/fabula_fterm.o build/fabula_fview.o build/fabula_launch.o build/fabula_main.o
 FSHARED_UI = build/theme.o build/keys.o
 
 .PHONY: fabula test-fabula
@@ -49,7 +49,7 @@ build/fabula: $(FOBJ) $(FUI) $(FSHARED) $(FSHARED_UI)
 build/fabula_%.o: fabula/%.c | build
 	$(CC) $(CFLAGS) -Isrc -Ifabula -MMD -MP -c -o $@ $<
 
-build/test_fabula: tests/test_fabula.c $(FOBJ) build/fabula_flat.o $(FSHARED)
+build/test_fabula: tests/test_fabula.c $(FOBJ) build/fabula_flat.o build/fabula_table.o $(FSHARED)
 	$(CC) $(CFLAGS) -Isrc -Ifabula $(LDFLAGS) -o $@ $^
 
 test-fabula: build/test_fabula

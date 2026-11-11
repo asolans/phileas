@@ -15,7 +15,7 @@ static void add(Flat *f, FNode *n, int depth)
 
 static int self_match(const FNode *n, const char *filter)
 {
-    return fk_match(n->title, filter) || (n->sinopsi && n->sinopsi[0] && fk_match(n->sinopsi, filter));
+    return fk_node_match(n, filter);
 }
 
 /* El node o algun descendent compleix el filtre */

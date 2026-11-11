@@ -1,6 +1,7 @@
 /* Proves de Fàbula (fabula/): make test-fabula */
 #include "flat.h"
 #include "project.h"
+#include "table.h"
 #include "yaml.h"
 
 #include <errno.h>
@@ -743,6 +744,167 @@ static void test_versions(void)
     project_free(&p);
 }
 
+static void test_meta(void)
+{
+    Project p;
+    char err[300], dir[512];
+    FNode *c, *s0, *s1, *s2, *card;
+    char *t;
+
+    snprintf(dir, sizeof dir, "%s/mt", tmpdir);
+    put("mt/projecte.md", "x\n");
+    put("mt/manuscrit/01-a.md",
+        "---\nestat: revisat\npov: Anna\nlloc: Mas Roig\ndata: 1936-07-18\npersonatges: [Anna, Neus]\n---\n\n"
+        "## A\n\nUna dues.\n\n"
+        "### Arribada\n<!-- pov: Neus; data: 1936-07-19; sinopsi: La Neus mira; estat: final -->\n\ncinc sis set.\n\n"
+        "### Pou\n\nvuit nou.\n\n"
+        "```\n### No és escena\n```\n\n"
+        "### Silenci\n<!-- nota meva -->\n\ndeu.\n");
+    put("mt/personatges/anna.md", "---\npov: Anna\n---\n\n# Anna\n\nx\n");
+    CHECK(project_open(&p, dir, err, sizeof err) == 0);
+    c = p.manuscrit->kids[0];
+    CHECK(c->nkids == 3);
+    s0 = c->kids[0], s1 = c->kids[1], s2 = c->kids[2];
+
+    /* capítol: de l'YAML */
+    CHECK(!strcmp(c->pov, "Anna") && !strcmp(c->lloc, "Mas Roig") && !strcmp(c->data, "1936-07-18"));
+    CHECK(!strcmp(c->pers, "Anna, Neus") && !strcmp(c->estat, "revisat"));
+    /* escena amb comentari: camps propis, la resta heretats; estat i sinopsi propis */
+    CHECK(!strcmp(s0->pov, "Neus") && !strcmp(s0->data, "1936-07-19") && !strcmp(s0->lloc, "Mas Roig"));
+    CHECK((s0->own & FK_OWN_POV) && (s0->own & FK_OWN_DATA) && !(s0->own & FK_OWN_LLOC));
+    CHECK(!strcmp(s0->sinopsi, "La Neus mira") && !strcmp(s0->estat, "final") && s0->estat_set);
+    CHECK(!strcmp(s0->pers, "Anna, Neus"));
+    /* sense comentari: tot heretat */
+    CHECK(!strcmp(s1->pov, "Anna") && s1->own == 0 && !strcmp(s1->estat, "revisat") && !s1->estat_set);
+    /* un comentari sense camps no compta com a metadades */
+    CHECK(!strcmp(s2->pov, "Anna") && s2->own == 0);
+    /* el comentari no compta com a paraules (ni a l'escena ni al capítol) */
+    CHECK(s0->words == 3 && s1->words == 5 && s2->words >= 1);      /* s1 inclou les 3 paraules del bloc de codi */
+    CHECK(c->words == 2 + 3 + 5 + 1 && s2->words == 1);   /* intro + escenes; els comentaris de sota els títols no compten */
+    CHECK(!strcmp(p.top->kids[1]->kids[0]->pov, "Anna"));                      /* fitxa */
+
+    /* editar una escena: es crea o es canvia la línia; es conserven els altres camps */
+    CHECK(project_set_meta(&p, s1, "lloc", "El pou", err, sizeof err) == 0);
+    t = slurp("mt/manuscrit/01-a.md");
+    CHECK(strstr(t, "### Pou\n<!-- lloc: El pou -->\n\nvuit nou.") != NULL);
+    CHECK(project_refresh(&p, err, sizeof err) == 0);
+    c = p.manuscrit->kids[0];
+    CHECK(!strcmp(c->kids[1]->lloc, "El pou") && (c->kids[1]->own & FK_OWN_LLOC) && c->kids[1]->words == 5);
+    CHECK(project_set_meta(&p, c->kids[1], "pov", "Neus", err, sizeof err) == 0);
+    CHECK(project_set_meta(&p, c->kids[1], "data", "1936-08", err, sizeof err) == 0);
+    t = slurp("mt/manuscrit/01-a.md");
+    CHECK(strstr(t, "### Pou\n<!-- lloc: El pou; pov: Neus; data: 1936-08 -->\n") != NULL);
+    /* canviar-ne un de l'escena 0 respecta l'ordre i els camps propis */
+    CHECK(project_refresh(&p, err, sizeof err) == 0);
+    c = p.manuscrit->kids[0];
+    CHECK(project_set_meta(&p, c->kids[0], "pov", "Anna; amb punt i coma", err, sizeof err) == 0);
+    t = slurp("mt/manuscrit/01-a.md");
+    CHECK(strstr(t, "<!-- pov: Anna, amb punt i coma; data: 1936-07-19; sinopsi: La Neus mira; estat: final -->") != NULL);
+    /* treure un camp; treure l'últim treu el comentari */
+    CHECK(project_set_meta(&p, c->kids[1], "lloc", "", err, sizeof err) == 0);
+    CHECK(project_set_meta(&p, c->kids[1], "pov", "", err, sizeof err) == 0);
+    CHECK(project_set_meta(&p, c->kids[1], "data", "", err, sizeof err) == 0);
+    t = slurp("mt/manuscrit/01-a.md");
+    CHECK(strstr(t, "### Pou\n\nvuit nou.") != NULL);
+    /* comentari aliè sota la capçalera: s'hi afegeix el nostre al davant, sense perdre'l */
+    CHECK(project_refresh(&p, err, sizeof err) == 0);
+    c = p.manuscrit->kids[0];
+    CHECK(project_set_meta(&p, c->kids[2], "pov", "Joan", err, sizeof err) == 0);
+    t = slurp("mt/manuscrit/01-a.md");
+    CHECK(strstr(t, "### Silenci\n<!-- pov: Joan -->\n<!-- nota meva -->\n") != NULL);
+    /* el bloc de codi no compta com a escena */
+    CHECK(strstr(t, "```\n### No és escena\n```") != NULL);
+
+    /* capítol i fitxa: YAML */
+    CHECK(project_refresh(&p, err, sizeof err) == 0);
+    c = p.manuscrit->kids[0];
+    CHECK(project_set_meta(&p, c, "lloc", "Barcelona", err, sizeof err) == 0);
+    CHECK(project_set_meta(&p, c, "estat", "final", err, sizeof err) == 0);
+    t = slurp("mt/manuscrit/01-a.md");
+    CHECK(strstr(t, "lloc: Barcelona\n") && strstr(t, "estat: final\n") && strstr(t, "pov: Anna\n"));
+    card = p.top->kids[1]->kids[0];
+    CHECK(project_set_meta(&p, card, "personatges", "Neus, Joan", err, sizeof err) == 0);
+    CHECK(project_refresh(&p, err, sizeof err) == 0);
+    c = p.manuscrit->kids[0];
+    CHECK(!strcmp(c->lloc, "Barcelona") && !strcmp(p.top->kids[1]->kids[0]->pers, "Neus, Joan"));
+    CHECK(!strcmp(c->kids[2]->lloc, "Barcelona"));      /* l'escena sense lloc propi l'hereta */
+
+    /* errors */
+    CHECK(project_set_meta(&p, c->kids[0], "data", "18/07/1936", err, sizeof err) == -1 && strstr(err, "Data"));
+    CHECK(project_set_meta(&p, c->kids[0], "color", "blau", err, sizeof err) == -1);
+    CHECK(project_set_meta(&p, p.manuscrit, "pov", "x", err, sizeof err) == -1);
+    /* si el fitxer ha canviat (una escena menys), no es toca */
+    put("mt/manuscrit/01-a.md", "## A\n\n### Altra\n\nx.\n");
+    CHECK(project_set_meta(&p, c->kids[0], "pov", "Z", err, sizeof err) == -1 && strstr(err, "ha canviat"));
+    CHECK(strstr(slurp("mt/manuscrit/01-a.md"), "<!--") == NULL);
+    project_free(&p);
+}
+
+static void test_table(void)
+{
+    Project p;
+    Table t;
+    char err[300], dir[512], buf[200];
+
+    snprintf(dir, sizeof dir, "%s/tb", tmpdir);
+    put("tb/projecte.md", "x\n");
+    put("tb/manuscrit/01-a.md", "---\npov: Anna\nlloc: Mas\nestat: revisat\n---\n\n## A\n\n### Uns\n<!-- data: 1936-07-20 -->\n\ncinc paraules per aqui.\n\n### Dos\n<!-- pov: Neus; data: 1936-07-18; lloc: Pou -->\n\ndues paraules.\n");
+    put("tb/manuscrit/02-b.md", "---\npov: Joan\n---\n\n## B\n\nsense escenes aqui.\n");
+    put("tb/manuscrit/03-c.md", "## C\n\n### Tres\n\nuna dues tres quatre cinc sis.\n");
+    CHECK(project_open(&p, dir, err, sizeof err) == 0);
+
+    /* jeràrquica: cada capítol amb les seves escenes */
+    table_build(&t, &p, NULL, TC_NONE, 0);
+    CHECK(!t.flat && t.n == 3 + 3);
+    CHECK(t.rows[0].depth == 0 && t.rows[1].depth == 1 && t.rows[2].depth == 1 && t.rows[3].depth == 0);
+    CHECK(!strcmp(table_cell(&t, t.rows[1].node, TC_TITLE, buf, sizeof buf), "Uns"));
+    CHECK(!strcmp(table_cell(&t, t.rows[1].node, TC_POV, buf, sizeof buf), "Anna"));    /* heretat */
+    CHECK(!strcmp(table_cell(&t, t.rows[2].node, TC_POV, buf, sizeof buf), "Neus"));
+    CHECK(!strcmp(table_cell(&t, t.rows[2].node, TC_WORDS, buf, sizeof buf), "2"));
+    CHECK(table_find(&t, p.manuscrit->kids[2]) == 4 && table_find(&t, p.top) == -1);
+    table_free(&t);
+
+    /* filtre per metadades: sense majúscules; capítol amb escenes que coincideixen */
+    table_build(&t, &p, "NEUS", TC_NONE, 0);
+    CHECK(t.n == 2 && t.rows[0].node->kind == FK_CHAPTER && t.rows[1].node->kind == FK_SCENE);
+    table_free(&t);
+    table_build(&t, &p, "joan", TC_NONE, 0);
+    CHECK(t.n == 1 && !strcmp(t.rows[0].node->title, "B"));
+    table_free(&t);
+    table_build(&t, &p, "revisat", TC_NONE, 0);
+    CHECK(t.n >= 1 && !strcmp(t.rows[0].node->title, "A"));     /* l'estat del capítol */
+    table_free(&t);
+    table_build(&t, &p, "cap-resultat-xyz", TC_NONE, 0);
+    CHECK(t.n == 0);
+    table_free(&t);
+
+    /* plana i ordenada: només fulles (escenes, i capítols sense escenes) */
+    table_build(&t, &p, NULL, TC_WORDS, 1);                      /* paraules, de més a menys */
+    CHECK(t.flat && t.n == 4);
+    CHECK(!strcmp(t.rows[0].node->title, "Tres") && t.rows[0].depth == 0);          /* 6 */
+    CHECK(!strcmp(t.rows[1].node->title, "Uns") && !strcmp(t.rows[3].node->title, "Dos"));
+    CHECK(!strcmp(table_cell(&t, t.rows[0].node, TC_TITLE, buf, sizeof buf), "C › Tres"));
+    table_free(&t);
+    table_build(&t, &p, NULL, TC_DATA, 0);                       /* per data; els buits, al final */
+    CHECK(!strcmp(t.rows[0].node->title, "Dos") && !strcmp(t.rows[1].node->title, "Uns"));
+    CHECK(!t.rows[2].node->data[0] && !t.rows[3].node->data[0]);
+    CHECK(!strcmp(t.rows[2].node->title, "B") || !strcmp(t.rows[2].node->title, "Tres"));   /* estables */
+    table_free(&t);
+    table_build(&t, &p, NULL, TC_DATA, 1);                       /* inversa: els buits, encara al final */
+    CHECK(!strcmp(t.rows[0].node->title, "Uns") && !strcmp(t.rows[1].node->title, "Dos") && !t.rows[3].node->data[0]);
+    table_free(&t);
+    table_build(&t, &p, NULL, TC_POV, 0);
+    CHECK(!strcmp(t.rows[0].node->pov, "Anna") && !strcmp(t.rows[1].node->pov, "Joan") && !t.rows[t.n - 1].node->pov[0]);
+    table_free(&t);
+    table_build(&t, &p, "anna", TC_TITLE, 0);                    /* filtre i ordre alhora */
+    CHECK(t.n == 1 && !strcmp(t.rows[0].node->title, "Uns"));
+    table_free(&t);
+
+    CHECK(!strcmp(table_col_name(TC_POV), "POV") && !strcmp(table_col_key(TC_ESTAT), "estat"));
+    CHECK(table_col_key(TC_TITLE) == NULL && table_col_key(TC_WORDS) == NULL);
+    project_free(&p);
+}
+
 static void rmtree(const char *dir)
 {
     char cmd[600];
@@ -767,6 +929,8 @@ int main(void)
     test_move();
     test_create();
     test_versions();
+    test_meta();
+    test_table();
     rmtree(tmpdir);
     printf("%d comprovacions, %d errors\n", checks, failures);
     return failures != 0;

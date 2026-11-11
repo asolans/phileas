@@ -2,6 +2,7 @@
 #include "flat.h"
 #include "fterm.h"
 #include "launch.h"
+#include "table.h"
 
 #include "keys.h"
 #include "utf8.h"
@@ -23,6 +24,12 @@ typedef struct {
     long     sel;
     long     top;
     char     msg[200];
+    int      mode;          /* 0 arbre, 1 taula (outliner) */
+    Table    tab;
+    long     tsel, ttop;
+    int      tcol;          /* columna actual */
+    int      sortcol;       /* TC_NONE o la columna d'ordre */
+    int      sortdesc;
 } View;
 
 /* ---------- dibuix ---------- */
@@ -180,10 +187,12 @@ static void draw_row(const View *v, long i, int y)
             selected ? base : n->estat_set ? 0 : ft_attr(FT_DIM));
 }
 
+static FNode *cur(const View *v);
+
 /* Sinopsi (o resum) de l'element seleccionat, en dues línies */
 static void footer_detail(const View *v, int y0)
 {
-    const FNode *n = v->flat.n ? v->flat.rows[v->sel].node : NULL;
+    const FNode *n = cur(v);
     char line[2][256];
     const char *s;
     size_t len;
@@ -235,8 +244,10 @@ static void status(const View *v)
         snprintf(buf, sizeof buf, " %s", v->msg);
     } else if (v->filter[0]) {
         snprintf(buf, sizeof buf, " Filtre «%s» · / canvia · Esc l'esborra", v->filter);
+    } else if (v->mode) {
+        snprintf(buf, sizeof buf, " Tab arbre · ←→ columna · o ordre · m edita · / filtra · F1 ajuda");
     } else {
-        snprintf(buf, sizeof buf, " n nou · r reanomena · e estat · / filtra · F1 ajuda · Ctrl+Q surt");
+        snprintf(buf, sizeof buf, " n nou · r reanomena · e estat · Tab taula · / filtra · F1 ajuda");
     }
     put(LINES - 1, 0, buf, COLS, ft_attr(FT_BAR));
 }
@@ -248,11 +259,144 @@ static int list_rows(void)
     return h < 1 ? 1 : h;
 }
 
+/* ---------- vista de taula (outliner) ---------- */
+
+typedef struct {
+    int col[TC_N];     /* x de cada columna, o -1 si no hi cap */
+    int w[TC_N];
+} Layout;
+
+static Layout table_layout(void)
+{
+    static const int fixed[TC_N] = { 0, 10, 12, 10, 10, 10 };
+    Layout l;
+    int avail = COLS - 2, used = 0, x = 1;
+
+    for (int c = 0; c < TC_N; c++)
+        l.col[c] = -1, l.w[c] = 0;
+    for (int c = TC_POV; c < TC_N; c++) {
+        int drop = (c == TC_DATA && COLS < 70) || (c == TC_LLOC && COLS < 58) || (c == TC_POV && COLS < 44);
+
+        if (!drop) {
+            l.w[c] = fixed[c];
+            used += fixed[c] + 1;
+        }
+    }
+    l.w[TC_TITLE] = avail - used;
+    if (l.w[TC_TITLE] < 8)
+        l.w[TC_TITLE] = 8;
+    for (int c = 0; c < TC_N; c++)
+        if (l.w[c]) {
+            l.col[c] = x;
+            x += l.w[c] + 1;
+        }
+    return l;
+}
+
+static void table_header(const View *v, const Layout *l)
+{
+    int y = 2;
+
+    fill(y, 0);
+    for (int c = 0; c < TC_N; c++) {
+        char name[48];
+
+        if (l->col[c] < 0)
+            continue;
+        snprintf(name, sizeof name, "%s%s", table_col_name(c),
+                 c == v->sortcol ? (v->sortdesc ? " ▼" : " ▲") : "");
+        put(y, l->col[c], name, l->w[c],
+            c == v->tcol ? ft_attr(FT_HEAD) | A_UNDERLINE : ft_attr(FT_DIM));
+    }
+}
+
+static void table_row(const View *v, long i, int y, const Layout *l)
+{
+    const TRow *r = &v->tab.rows[i];
+    const FNode *n = r->node;
+    int selected = i == v->tsel;
+    char buf[300];
+
+    if (selected)
+        fill(y, ft_attr(FT_SEL));
+    for (int c = 0; c < TC_N; c++) {
+        attr_t a = selected ? ft_attr(FT_SEL) : 0;
+        int x, w, tw;
+        int own = 1;
+
+        if (l->col[c] < 0)
+            continue;
+        table_cell(&v->tab, n, c, buf, sizeof buf);
+        x = l->col[c];
+        w = l->w[c];
+        if (c == TC_TITLE) {
+            x += 2 * r->depth;
+            w -= 2 * r->depth;
+            if (n->kind == FK_CHAPTER && !selected)
+                a = ft_attr(FT_HEAD);
+        } else if (n->kind == FK_SCENE) {
+            own = c == TC_POV ? n->own & FK_OWN_POV : c == TC_LLOC ? n->own & FK_OWN_LLOC :
+                  c == TC_DATA ? n->own & FK_OWN_DATA : c == TC_ESTAT ? (unsigned)n->estat_set : 1u;
+            if (!own && !selected)
+                a = ft_attr(FT_DIM);                  /* heretat del capítol */
+        }
+        if (c == v->tcol)
+            a |= A_UNDERLINE;
+        if (c == TC_WORDS) {
+            tw = text_width(buf);
+            put(y, x + w - tw, buf, tw < w ? tw : w, a);
+        } else {
+            put(y, x, buf, w, a);
+        }
+    }
+}
+
+static int table_body_rows(void)
+{
+    return list_rows() - 1 < 1 ? 1 : list_rows() - 1;
+}
+
+static void paint_table(View *v)
+{
+    Layout l = table_layout();
+    int h = table_body_rows();
+
+    erase();
+    header(v->p);
+    hrule(1);
+    if (v->tsel >= (long)v->tab.n)
+        v->tsel = (long)v->tab.n - 1;
+    if (v->tsel < 0)
+        v->tsel = 0;
+    if (v->tsel < v->ttop)
+        v->ttop = v->tsel;
+    if (v->tsel >= v->ttop + h)
+        v->ttop = v->tsel - h + 1;
+    if (v->ttop < 0)
+        v->ttop = 0;
+    table_header(v, &l);
+    if (!v->tab.n) {
+        put(4, 2, v->filter[0] ? "Cap resultat." : "El manuscrit és buit.", COLS - 3, ft_attr(FT_DIM));
+    } else {
+        for (int r = 0; r < h && v->ttop + r < (long)v->tab.n; r++)
+            table_row(v, v->ttop + r, 3 + r, &l);
+    }
+    if (LINES >= 30) {
+        hrule(LINES - 4);
+        footer_detail(v, LINES - 3);
+    }
+    status(v);
+}
+
 /* Pinta tota la pantalla al buffer de ncurses, sense enviar-la al terminal */
 static void paint(View *v)
 {
     int h = list_rows();
 
+    if (v->mode) {
+        paint_table(v);
+        return;
+    }
     erase();
     header(v->p);
     hrule(1);
@@ -300,10 +444,24 @@ static void rebuild(View *v, const FNode *keep)
         v->sel = (long)v->flat.n - 1;
     if (v->sel < 0)
         v->sel = 0;
+
+    table_free(&v->tab);
+    table_build(&v->tab, v->p, v->filter, v->sortcol, v->sortdesc);
+    k = keep ? table_find(&v->tab, keep) : -1;
+    if (k < 0 && keep && keep->kind == FK_CHAPTER && keep->nkids)
+        k = table_find(&v->tab, keep->kids[0]);
+    if (k >= 0)
+        v->tsel = k;
+    if (v->tsel >= (long)v->tab.n)
+        v->tsel = (long)v->tab.n - 1;
+    if (v->tsel < 0)
+        v->tsel = 0;
 }
 
 static FNode *cur(const View *v)
 {
+    if (v->mode)
+        return v->tab.n ? v->tab.rows[v->tsel].node : NULL;
     return v->flat.n ? v->flat.rows[v->sel].node : NULL;
 }
 
@@ -575,7 +733,9 @@ static int confirm(const char *question)
 
 /* Torna a llegir el projecte després d'un canvi als fitxers i selecciona el
  * fitxer del camí (si n'hi ha), desplegant-ne el grup. */
-static void refresh_select(View *v, const char *path)
+/* Torna a llegir el projecte i selecciona el fitxer del camí i, si scene > 0,
+ * la seva escena número scene (1 = la primera) */
+static void refresh_select_scene(View *v, const char *path, size_t scene)
 {
     FNode *keep = NULL;
     char err[200];
@@ -587,13 +747,23 @@ static void refresh_select(View *v, const char *path)
         return;
     }
     for (size_t g = 0; path && g < v->p->top->nkids && !keep; g++)
-        for (size_t i = 0; i < v->p->top->kids[g]->nkids; i++)
-            if (!strcmp(v->p->top->kids[g]->kids[i]->path, path)) {
-                keep = v->p->top->kids[g]->kids[i];
+        for (size_t i = 0; i < v->p->top->kids[g]->nkids; i++) {
+            FNode *c = v->p->top->kids[g]->kids[i];
+
+            if (!strcmp(c->path, path)) {
+                keep = scene && scene <= c->nkids ? c->kids[scene - 1] : c;
                 v->p->top->kids[g]->open = 1;
+                if (keep != c)
+                    c->open = 1;
                 break;
             }
+        }
     rebuild(v, keep);
+}
+
+static void refresh_select(View *v, const char *path)
+{
+    refresh_select_scene(v, path, 0);
 }
 
 static FNode *group_of(const FNode *n)
@@ -704,6 +874,7 @@ static int menu_run(View *v)
 {
     static const struct { const char *label, *hint; int key; } items[] = {
         { "Obre a Phileas", "Retorn", '\n' },
+        { "Canvia de vista (arbre/taula)", "Tab", 9 },
         { "Desplega o plega", "Espai", ' ' },
         { "Nou capítol o fitxa", "n", 'n' },
         { "Canvia el títol", "r", 'r' },
@@ -798,6 +969,8 @@ static void help(void)
         "  Alt+↑ / Alt+↓  (< / >)     puja o baixa el capítol",
         "  e                          canvia l'estat del capítol o la fitxa",
         "  /                          filtra pel títol o la sinopsi",
+        "  Tab                        canvia entre l'arbre i la taula (outliner)",
+        "  Taula: ← →  columna · o  ordena (▲ ▼ i res) · m  edita la metadada de la columna",
         "  Esc                        esborra el filtre; sense filtre, el menú",
         "  Ctrl+L                     redibuixa",
         "  Ctrl+Q / q                 surt",
@@ -812,23 +985,79 @@ static void help(void)
     key_read();
 }
 
+static size_t scene_ordinal(const FNode *n)
+{
+    if (n->kind != FK_SCENE || !n->parent)
+        return 0;
+    for (size_t i = 0; i < n->parent->nkids; i++)
+        if (n->parent->kids[i] == n)
+            return i + 1;
+    return 0;
+}
+
+/* Canvia un camp de metadades de l'element actual (capítol, escena o fitxa) i
+ * refresca; value buit el treu. */
+static void set_meta_current(View *v, FNode *n, const char *key, const char *value)
+{
+    FNode *file = n->kind == FK_SCENE ? n->parent : n;
+    size_t scene = scene_ordinal(n);
+    char path[600], err[240];
+
+    snprintf(path, sizeof path, "%s", file->path);
+    auto_snapshot(v, file);
+    v->msg[0] = '\0';
+    if (project_set_meta(v->p, n, key, value, err, sizeof err) != 0) {
+        snprintf(v->msg, sizeof v->msg, "%.190s", err);
+        return;
+    }
+    refresh_select_scene(v, path, scene);
+}
+
 static void change_estat(View *v)
 {
     FNode *n = cur(v);
     const char *next;
+    char what[200];
 
-    if (!n || (n->kind != FK_CHAPTER && n->kind != FK_CARD)) {
-        snprintf(v->msg, sizeof v->msg, "L'estat només es canvia en capítols i fitxes.");
+    if (!n || (n->kind != FK_CHAPTER && n->kind != FK_CARD && n->kind != FK_SCENE)) {
+        snprintf(v->msg, sizeof v->msg, "L'estat només es canvia en capítols, escenes i fitxes.");
         return;
     }
     next = project_next_estat(v->p, n->estat);
     if (!next)
         return;
-    auto_snapshot(v, n);
-    if (project_set_estat(v->p, n, next) != 0)
-        snprintf(v->msg, sizeof v->msg, "No s'ha pogut desar: %s", strerror(errno));
-    else
-        snprintf(v->msg, sizeof v->msg, "%s: %s", n->title, next);
+    snprintf(what, sizeof what, "%s: %s", n->title, next);
+    set_meta_current(v, n, "estat", next);
+    if (!v->msg[0])
+        snprintf(v->msg, sizeof v->msg, "%s", what);
+}
+
+/* m: edita la metadada de la columna actual de la taula */
+static void edit_column(View *v)
+{
+    FNode *n = cur(v);
+    const char *key = table_col_key(v->tcol);
+    char value[200], label[80], cell[200];
+
+    if (!n)
+        return;
+    if (v->tcol == TC_ESTAT) {
+        change_estat(v);
+        return;
+    }
+    if (!key) {
+        snprintf(v->msg, sizeof v->msg, v->tcol == TC_TITLE ?
+                 "El títol es canvia amb r." : "Aquesta columna es calcula, no s'edita.");
+        return;
+    }
+    if (n->kind == FK_GROUP) {
+        return;
+    }
+    table_cell(&v->tab, n, v->tcol, cell, sizeof cell);
+    snprintf(label, sizeof label, "%s de «%.40s» (buit = treure'l): ", table_col_name(v->tcol), n->title);
+    if (!prompt_line(label, cell, value, sizeof value))
+        return;
+    set_meta_current(v, n, key, value);
 }
 
 static void filter_key(View *v, int key)
@@ -861,6 +1090,76 @@ static void filter_key(View *v, int key)
     }
 }
 
+static void toggle_mode(View *v)
+{
+    FNode *n = cur(v);
+
+    v->mode = !v->mode;
+    if (!v->mode && n) {                       /* a l'arbre, s'ha de poder veure */
+        FNode *g = group_of(n);
+
+        if (n->kind == FK_SCENE)
+            n->parent->open = 1;
+        if (g)
+            g->open = 1;
+    }
+    rebuild(v, n);
+}
+
+/* Columna visible més pròxima en la direcció dir */
+static void move_column(View *v, int dir)
+{
+    Layout l = table_layout();
+
+    for (int c = v->tcol + dir; c >= 0 && c < TC_N; c += dir)
+        if (l.col[c] >= 0) {
+            v->tcol = c;
+            return;
+        }
+}
+
+/* Tecles de la taula; retorna 1 si les ha gestionades */
+static int table_key(View *v, int key)
+{
+    long page = table_body_rows() - 1, n = (long)v->tab.n;
+    Layout l = table_layout();
+    FNode *node = cur(v);
+
+    if (l.col[v->tcol] < 0)
+        v->tcol = TC_TITLE;
+    switch (key) {
+    case K_FN(KEY_UP):    if (v->tsel > 0) v->tsel--; return 1;
+    case K_FN(KEY_DOWN):  if (v->tsel + 1 < n) v->tsel++; return 1;
+    case K_FN(KEY_PPAGE): v->tsel = v->tsel > page ? v->tsel - page : 0; return 1;
+    case K_FN(KEY_NPAGE): v->tsel = v->tsel + page < n ? v->tsel + page : n - 1; return 1;
+    case K_FN(KEY_HOME):  v->tsel = 0; return 1;
+    case K_FN(KEY_END):   v->tsel = n - 1; return 1;
+    case K_FN(KEY_LEFT):  move_column(v, -1); return 1;
+    case K_FN(KEY_RIGHT): case ' ': move_column(v, 1); return 1;
+    case 'o':
+        if (v->sortcol != v->tcol) {
+            v->sortcol = v->tcol;
+            v->sortdesc = 0;
+        } else if (!v->sortdesc) {
+            v->sortdesc = 1;
+        } else {
+            v->sortcol = TC_NONE;
+            v->sortdesc = 0;
+        }
+        rebuild(v, node);
+        return 1;
+    case 'm':
+        edit_column(v);
+        return 1;
+    case '\n':
+        if (node)
+            open_in_editor(v, node);
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 void fview_run(Project *p)
 {
     View v;
@@ -868,6 +1167,7 @@ void fview_run(Project *p)
 
     memset(&v, 0, sizeof v);
     v.p = p;
+    v.sortcol = TC_NONE;
     rebuild(&v, NULL);
     for (;;) {
         int key, page;
@@ -890,10 +1190,16 @@ void fview_run(Project *p)
         }
         page = list_rows() - 1;
         n = cur(&v);
+        if (v.mode && table_key(&v, key))
+            continue;
         switch (key) {
         case 17: case 'q':                 /* Ctrl+Q */
             flat_free(&v.flat);
+            table_free(&v.tab);
             return;
+        case 9:                            /* Tab */
+            toggle_mode(&v);
+            break;
         case 12:                           /* Ctrl+L */
             clearok(curscr, TRUE);
             break;

@@ -179,6 +179,16 @@ int fk_match(const char *text, const char *needle)
     return r;
 }
 
+int fk_node_match(const FNode *n, const char *needle)
+{
+    const char *f[] = { n->title, n->sinopsi, n->pov, n->lloc, n->data, n->pers, n->estat };
+
+    for (size_t i = 0; i < sizeof f / sizeof *f; i++)
+        if (f[i] && f[i][0] && fk_match(f[i], needle))
+            return 1;
+    return 0;
+}
+
 void fk_fmt_num(size_t n, char *out, size_t outsz)
 {
     char tmp[32], res[48];
@@ -261,6 +271,10 @@ static FNode *node_new(FKind kind, FNode *parent)
     n->kind = kind;
     n->parent = parent;
     n->title = xstrdup("");
+    n->pov = xstrdup("");
+    n->lloc = xstrdup("");
+    n->data = xstrdup("");
+    n->pers = xstrdup("");
     if (parent) {
         parent->kids = xrealloc(parent->kids, (parent->nkids + 1) * sizeof *parent->kids);
         parent->kids[parent->nkids++] = n;
@@ -278,6 +292,10 @@ static void node_free(FNode *n)
     free(n->path);
     free(n->estat);
     free(n->sinopsi);
+    free(n->pov);
+    free(n->lloc);
+    free(n->data);
+    free(n->pers);
     free(n);
 }
 
@@ -329,23 +347,208 @@ static const FNode *find_cached(const Project *old, const char *path)
     return NULL;
 }
 
-/* Paraules de prosa: sense la capçalera YAML ni els títols (igual que les
- * escenes, que surten d'outline) */
+/* ---------- metadades ---------- */
+
+/* Camps `clau: valor` d'un comentari `<!-- a: b; c: d -->` */
+typedef struct {
+    char  *key[10];
+    char  *val[10];
+    int    n;
+} Fields;
+
+static void fields_free(Fields *f)
+{
+    for (int i = 0; i < f->n; i++) {
+        free(f->key[i]);
+        free(f->val[i]);
+    }
+    f->n = 0;
+}
+
+static const char *fields_get(const Fields *f, const char *key)
+{
+    for (int i = 0; i < f->n; i++)
+        if (!strcmp(f->key[i], key))
+            return f->val[i];
+    return NULL;
+}
+
+/* El text sense <!-- i -->, o NULL si la línia no és un comentari d'una línia */
+static int comment_body(const char *s, size_t len, size_t *a, size_t *z)
+{
+    size_t i = 0, e = len;
+
+    while (i < e && (s[i] == ' ' || s[i] == '\t'))
+        i++;
+    while (e > i && (s[e - 1] == ' ' || s[e - 1] == '\t' || s[e - 1] == '\r'))
+        e--;
+    if (e - i < 7 || strncmp(s + i, "<!--", 4) || strncmp(s + e - 3, "-->", 3))
+        return 0;
+    *a = i + 4;
+    *z = e - 3;
+    return 1;
+}
+
+static void fields_parse(const char *s, size_t len, Fields *f)
+{
+    size_t a, z;
+
+    f->n = 0;
+    if (!comment_body(s, len, &a, &z))
+        return;
+    for (size_t i = a; i < z && f->n < 10;) {
+        size_t e = i, c;
+
+        while (e < z && s[e] != ';')
+            e++;
+        for (c = i; c < e && s[c] != ':'; c++)
+            ;
+        if (c < e) {
+            size_t ks = i, ke = c, vs = c + 1, ve = e;
+
+            while (ks < ke && isspace((unsigned char)s[ks]))
+                ks++;
+            while (ke > ks && isspace((unsigned char)s[ke - 1]))
+                ke--;
+            while (vs < ve && isspace((unsigned char)s[vs]))
+                vs++;
+            while (ve > vs && isspace((unsigned char)s[ve - 1]))
+                ve--;
+            if (ke > ks) {
+                char *k = xmalloc(ke - ks + 1), *v = xmalloc(ve - vs + 1);
+
+                for (size_t j = 0; j < ke - ks; j++)
+                    k[j] = (char)tolower((unsigned char)s[ks + j]);
+                k[ke - ks] = '\0';
+                memcpy(v, s + vs, ve - vs);
+                v[ve - vs] = '\0';
+                f->key[f->n] = k;
+                f->val[f->n++] = v;
+            }
+        }
+        i = e + 1;
+    }
+}
+
+/* Paraules de prosa d'una línia: sense la capçalera YAML, els títols ni el
+ * comentari de metadades de sota d'un títol */
+static size_t prose_line_words(Buffer *b, size_t i)
+{
+    int k = MD_BASE(b->lines[i].kind);
+
+    if (k == MD_META || k == MD_HEADING || k == MD_UNDERLINE)
+        return 0;
+    if (k == MD_TEXT && i + 1 < b->nlines && MD_BASE(b->lines[i + 1].kind) == MD_UNDERLINE)
+        return 0;
+    if (k == MD_HTML && i > 0) {
+        int pk = MD_BASE(b->lines[i - 1].kind);
+        size_t a, z;
+
+        if ((pk == MD_HEADING || pk == MD_UNDERLINE) &&
+            comment_body(b->lines[i].text, b->lines[i].len, &a, &z))
+            return 0;
+    }
+    return buf_line_words(b, i);
+}
+
 static size_t prose_words(Buffer *b)
 {
     size_t words = 0;
 
     buf_scan(b);
-    for (size_t i = 0; i < b->nlines; i++) {
-        int k = MD_BASE(b->lines[i].kind);
-
-        if (k == MD_META || k == MD_HEADING || k == MD_UNDERLINE)
-            continue;
-        if (k == MD_TEXT && i + 1 < b->nlines && MD_BASE(b->lines[i + 1].kind) == MD_UNDERLINE)
-            continue;
-        words += buf_line_words(b, i);
-    }
+    for (size_t i = 0; i < b->nlines; i++)
+        words += prose_line_words(b, i);
     return words;
+}
+
+static void meta_from_yaml(FNode *n, const char *head, size_t hl)
+{
+    char tmp[512];
+
+    if (!head)
+        return;
+    if (yaml_get(head, hl, "pov", tmp, sizeof tmp))
+        set_str(&n->pov, tmp);
+    if (yaml_get(head, hl, "lloc", tmp, sizeof tmp))
+        set_str(&n->lloc, tmp);
+    if (yaml_get(head, hl, "data", tmp, sizeof tmp))
+        set_str(&n->data, tmp);
+    if (yaml_get(head, hl, "personatges", tmp, sizeof tmp)) {
+        char **items;
+        size_t cnt = yaml_list(tmp, &items);
+
+        if (cnt) {
+            char joined[512] = "";
+
+            for (size_t i = 0; i < cnt; i++) {
+                if (i)
+                    strncat(joined, ", ", sizeof joined - strlen(joined) - 1);
+                strncat(joined, items[i], sizeof joined - strlen(joined) - 1);
+            }
+            set_str(&n->pers, joined);
+            yaml_list_free(items, cnt);
+        } else {
+            set_str(&n->pers, tmp);
+        }
+    }
+}
+
+/* Metadades d'una escena: el comentari de la línia següent a la capçalera, i
+ * el que no hi diu s'hereta del capítol */
+static void scene_meta(FNode *s, const FNode *ch, Buffer *b, size_t heading, const Project *p)
+{
+    Fields f;
+    const char *v;
+
+    memset(&f, 0, sizeof f);
+    if (heading + 1 < b->nlines && MD_BASE(b->lines[heading + 1].kind) == MD_HTML)
+        fields_parse(b->lines[heading + 1].text, b->lines[heading + 1].len, &f);
+    set_str(&s->pov, (v = fields_get(&f, "pov")) ? v : ch->pov);
+    if (v) s->own |= FK_OWN_POV;
+    set_str(&s->lloc, (v = fields_get(&f, "lloc")) ? v : ch->lloc);
+    if (v) s->own |= FK_OWN_LLOC;
+    set_str(&s->data, (v = fields_get(&f, "data")) ? v : ch->data);
+    if (v) s->own |= FK_OWN_DATA;
+    set_str(&s->pers, (v = fields_get(&f, "personatges")) ? v : ch->pers);
+    if (v) s->own |= FK_OWN_PERS;
+    if ((v = fields_get(&f, "sinopsi"))) {
+        set_str(&s->sinopsi, v);
+        s->own |= FK_OWN_SINOPSI;
+    } else {
+        set_str(&s->sinopsi, "");
+    }
+    if ((v = fields_get(&f, "estat")) && v[0]) {
+        set_str(&s->estat, v);
+        s->estat_set = 1;
+    } else if (ch->estat) {
+        set_str(&s->estat, ch->estat);
+        s->estat_set = 0;
+    } else if (p->nestats) {
+        s->estat = xstrdup(p->estats[0]);
+    }
+    fields_free(&f);
+}
+
+/* Còpia de les dades llegides d'un node (per a la memòria cau) */
+static void copy_node_data(FNode *dst, const FNode *src, const Project *p)
+{
+    set_str(&dst->title, src->title);
+    set_str(&dst->sinopsi, src->sinopsi ? src->sinopsi : "");
+    set_str(&dst->pov, src->pov);
+    set_str(&dst->lloc, src->lloc);
+    set_str(&dst->data, src->data);
+    set_str(&dst->pers, src->pers);
+    dst->own = src->own;
+    dst->words = src->words;
+    dst->line = src->line;
+    if (src->estat_set) {
+        set_str(&dst->estat, src->estat);
+        dst->estat_set = 1;
+    } else if (src->kind == FK_SCENE && src->estat) {
+        set_str(&dst->estat, src->estat);    /* heretat: el capítol ja el tindrà */
+    } else if (p->nestats) {
+        set_str(&dst->estat, p->estats[0]);
+    }
 }
 
 /* Carrega un fitxer .md com a capítol o fitxa; no falla mai: si no es pot
@@ -375,21 +578,15 @@ static FNode *load_file(const Project *p, const Project *old, FNode *parent, con
 
         if (c && c->kind == kind && c->mtime == n->mtime && c->fsize == n->fsize &&
             c->ino == n->ino) {
-            set_str(&n->title, c->title);
-            set_str(&n->sinopsi, c->sinopsi ? c->sinopsi : "");
-            n->words = c->words;
-            if (c->estat_set) {
-                set_str(&n->estat, c->estat);
-                n->estat_set = 1;
-            } else if (p->nestats) {
-                n->estat = xstrdup(p->estats[0]);
-            }
+            copy_node_data(n, c, p);
             for (size_t i = 0; i < c->nkids; i++) {
                 FNode *s = node_new(FK_SCENE, n);
 
-                set_str(&s->title, c->kids[i]->title);
-                s->words = c->kids[i]->words;
-                s->line = c->kids[i]->line;
+                copy_node_data(s, c->kids[i], p);
+                if (!c->kids[i]->estat_set) {            /* hereta l'estat del capítol */
+                    free(s->estat);
+                    s->estat = n->estat ? xstrdup(n->estat) : NULL;
+                }
             }
             return n;
         }
@@ -407,6 +604,7 @@ static FNode *load_file(const Project *p, const Project *old, FNode *parent, con
         set_str(&n->sinopsi, "");
     if (head && yaml_get(head, hl, "titol", tmp, sizeof tmp) && tmp[0])
         set_str(&n->title, tmp);
+    meta_from_yaml(n, head, hl);
     free(head);
 
     buf_init(&b);
@@ -435,10 +633,13 @@ static FNode *load_file(const Project *p, const Project *old, FNode *parent, con
         for (size_t k = 0; k < o.n; k++)
             if (o.items[k].level == 3) {
                 FNode *s = node_new(FK_SCENE, n);
+                size_t end = outline_end(&o, k, b.nlines);
 
                 set_str(&s->title, o.items[k].title ? o.items[k].title : "");
-                s->words = o.items[k].words;
                 s->line = o.items[k].line;
+                for (size_t i = s->line + 1; i < end; i++)
+                    s->words += prose_line_words(&b, i);
+                scene_meta(s, n, &b, s->line, p);
             }
     outline_free(&o);
     buf_free(&b);
@@ -1585,6 +1786,261 @@ int project_restore(Project *p, FNode *n, const FVersion *ver, time_t now, char 
     if (rc != 0) {
         fail(err, esz, "No s'ha pogut recuperar la versió");
         return -1;
+    }
+    return 0;
+}
+
+/* ---------- edició de metadades ---------- */
+
+static int valid_date(const char *s)
+{
+    size_t l = strlen(s);
+
+    if (l == 0)
+        return 1;
+    if (l != 4 && l != 7 && l != 10)
+        return 0;
+    for (size_t i = 0; i < l; i++)
+        if (i == 4 || i == 7 ? s[i] != '-' : !isdigit((unsigned char)s[i]))
+            return 0;
+    if (l >= 7 && (atoi(s + 5) < 1 || atoi(s + 5) > 12))
+        return 0;
+    if (l == 10 && (atoi(s + 8) < 1 || atoi(s + 8) > 31))
+        return 0;
+    return 1;
+}
+
+/* Valor net per a un comentari: una línia, sense «;» ni «-->» */
+static void comment_value(const char *in, char *out, size_t osz)
+{
+    size_t o = 0;
+
+    while (*in && isspace((unsigned char)*in))
+        in++;
+    for (; *in && o + 1 < osz; in++) {
+        if (*in == '\n' || *in == '\r' || *in == '\t')
+            out[o++] = ' ';
+        else if (*in == ';')
+            out[o++] = ',';
+        else if (!strncmp(in, "-->", 3))
+            in += 2;
+        else
+            out[o++] = *in;
+    }
+    while (o && out[o - 1] == ' ')
+        o--;
+    out[o] = '\0';
+}
+
+static int is_fence_line(const char *s, size_t len)
+{
+    size_t i = 0;
+
+    while (i < len && i < 3 && s[i] == ' ')
+        i++;
+    return len - i >= 3 && (!strncmp(s + i, "```", 3) || !strncmp(s + i, "~~~", 3));
+}
+
+/* Posa o treu un camp del comentari de l'escena `ordinal` (la n-èsima secció ###) */
+static char *scene_edit(const char *text, size_t len, size_t ordinal, const char *title,
+                        const char *key, const char *value, size_t *outlen, char *err, size_t esz)
+{
+    size_t pos = 0, count = 0, hs = (size_t)-1, he = 0;
+    int fence = 0;
+
+    /* salta la capçalera YAML */
+    if (len >= 4 && !strncmp(text, "---", 3) && (text[3] == '\n' || text[3] == '\r')) {
+        size_t i = 3;
+
+        while (i < len && text[i] != '\n')
+            i++;
+        i++;
+        while (i < len) {
+            size_t e = i;
+
+            while (e < len && text[e] != '\n')
+                e++;
+            if ((e - i == 3 || (e - i == 4 && text[e - 1] == '\r')) &&
+                (!strncmp(text + i, "---", 3) || !strncmp(text + i, "...", 3))) {
+                pos = e < len ? e + 1 : e;
+                break;
+            }
+            i = e < len ? e + 1 : e;
+        }
+    }
+    while (pos < len) {
+        size_t e = pos, sp = 0;
+
+        while (e < len && text[e] != '\n')
+            e++;
+        if (is_fence_line(text + pos, e - pos)) {
+            fence = !fence;
+        } else if (!fence) {
+            while (pos + sp < e && sp < 3 && text[pos + sp] == ' ')
+                sp++;
+            if (e - pos - sp >= 3 && !strncmp(text + pos + sp, "###", 3) &&
+                (e - pos - sp == 3 || text[pos + sp + 3] == ' ' || text[pos + sp + 3] == '\t')) {
+                if (count++ == ordinal) {
+                    hs = pos;
+                    he = e;
+                    break;
+                }
+            }
+        }
+        pos = e < len ? e + 1 : e;
+    }
+    if (hs == (size_t)-1) {
+        snprintf(err, esz, "No trobo l'escena al fitxer (ha canviat?); torna a llegir el projecte.");
+        return NULL;
+    }
+    {
+        /* comprova el títol */
+        size_t a = hs, z = he;
+        char heading[300];
+
+        while (a < z && text[a] == ' ')
+            a++;
+        a += 3;
+        while (a < z && (text[a] == ' ' || text[a] == '\t'))
+            a++;
+        while (z > a && (text[z - 1] == '\r' || text[z - 1] == ' ' || text[z - 1] == '#' || text[z - 1] == '\t'))
+            z--;
+        snprintf(heading, sizeof heading, "%.*s", (int)(z - a), text + a);
+        if (strcmp(heading, title)) {
+            snprintf(err, esz, "L'escena «%s» ha canviat al fitxer; torna a llegir el projecte.", title);
+            return NULL;
+        }
+    }
+    {
+        int crlf = he > hs && text[he - 1] == '\r';
+        const char *eol = crlf ? "\r\n" : "\n";
+        size_t hend = he < len ? he + 1 : he;           /* després del salt de la capçalera */
+        size_t ne = hend, ce = hend;
+        Fields f;
+        char line[1024], cv[512], *res;
+        int have = 0, found = 0;
+        size_t o = 0;
+
+        memset(&f, 0, sizeof f);
+        if (hend < len) {
+            while (ne < len && text[ne] != '\n')
+                ne++;
+            fields_parse(text + hend, ne - hend, &f);
+            if (f.n > 0) {
+                have = 1;
+                ce = ne < len ? ne + 1 : ne;
+            }
+        }
+        comment_value(value, cv, sizeof cv);
+        /* reconstrueix: es conserva l'ordre i els camps que no entenem */
+        o = (size_t)snprintf(line, sizeof line, "<!--");
+        for (int i = 0; i < f.n; i++) {
+            if (!strcmp(f.key[i], key)) {
+                found = 1;
+                if (!cv[0])
+                    continue;
+                o += (size_t)snprintf(line + o, sizeof line - o, "%s %s: %s", o > 4 ? ";" : "", key, cv);
+            } else {
+                o += (size_t)snprintf(line + o, sizeof line - o, "%s %s: %s", o > 4 ? ";" : "", f.key[i], f.val[i]);
+            }
+            if (o >= sizeof line - 8)
+                break;
+        }
+        if (!found && cv[0])
+            o += (size_t)snprintf(line + o, sizeof line - o, "%s %s: %s", o > 4 ? ";" : "", key, cv);
+        fields_free(&f);
+        res = xmalloc(len + sizeof line + 16);
+        memcpy(res, text, hend);
+        o = hend;
+        if (he >= len)                                  /* el fitxer acaba a la capçalera */
+            o += (size_t)sprintf(res + o, "%s", eol);
+        {
+            size_t ll = strlen(line);
+
+            if (ll > 4) {                               /* queda algun camp */
+                memcpy(res + o, line, ll);
+                o += ll;
+                o += (size_t)sprintf(res + o, " -->%s", eol);
+            }
+        }
+        {
+            size_t rest = have ? ce : hend;
+
+            memcpy(res + o, text + rest, len - rest);
+            o += len - rest;
+        }
+        res[o] = '\0';
+        *outlen = o;
+        return res;
+    }
+}
+
+int project_set_meta(Project *p, FNode *n, const char *key, const char *value, char *err, size_t esz)
+{
+    static const char *const keys[] = { "pov", "lloc", "data", "personatges", "sinopsi", "estat" };
+    char clean[512], *text, *res;
+    size_t len, rl;
+    int ok = 0, rc;
+
+    (void)p;
+    for (size_t i = 0; i < sizeof keys / sizeof *keys; i++)
+        ok |= !strcmp(key, keys[i]);
+    if (!ok) {
+        snprintf(err, esz, "Camp desconegut: %s", key);
+        return -1;
+    }
+    if (n->kind != FK_CHAPTER && n->kind != FK_CARD && n->kind != FK_SCENE) {
+        snprintf(err, esz, "Les metadades són de capítols, escenes i fitxes.");
+        return -1;
+    }
+    if (n->kind == FK_SCENE && !n->parent) {
+        snprintf(err, esz, "Escena sense capítol.");
+        return -1;
+    }
+    {
+        size_t o = 0;
+        const char *s = value;
+
+        while (*s && isspace((unsigned char)*s))
+            s++;
+        for (; *s && o + 1 < sizeof clean; s++)
+            clean[o++] = (*s == '\n' || *s == '\r' || *s == '\t') ? ' ' : *s;
+        while (o && clean[o - 1] == ' ')
+            o--;
+        clean[o] = '\0';
+    }
+    if (!strcmp(key, "data") && !valid_date(clean)) {
+        snprintf(err, esz, "Data no vàlida: ha de ser AAAA, AAAA-MM o AAAA-MM-DD.");
+        return -1;
+    }
+    {
+        const char *path = n->kind == FK_SCENE ? n->parent->path : n->path;
+
+        text = read_all(path, &len);
+        if (!text) {
+            fail(err, esz, "No s'ha pogut llegir el fitxer");
+            return -1;
+        }
+        if (n->kind == FK_SCENE) {
+            size_t ord = 0;
+
+            for (size_t i = 0; i < n->parent->nkids; i++)
+                if (n->parent->kids[i] == n)
+                    ord = i;
+            res = scene_edit(text, len, ord, n->title, key, clean, &rl, err, esz);
+            free(text);
+            if (!res)
+                return -1;
+        } else {
+            res = yaml_set(text, len, key, clean, 0, &rl);
+            free(text);
+        }
+        rc = write_atomic(path, res, rl);
+        free(res);
+        if (rc != 0) {
+            fail(err, esz, "No s'ha pogut desar");
+            return -1;
+        }
     }
     return 0;
 }
