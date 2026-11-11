@@ -541,9 +541,86 @@ Llista oberta: l'usuari hi afegeix, en treu i n'ordena la prioritat.
 
 **C17 i el Markdown.** Escriure «—», «», «…» o «’» deixa al fitxer el caràcter Unicode, que per a Markdown és text normal: el fitxer continua sent Markdown estàndard i, de fet, es veu igual a tot arreu, mentre que `--` només es converteix amb extensions com `smart` de pandoc (CommonMark el deixa com a `--`). A més, «—» a l'inici de paràgraf no és marca de llista, i «- » sí. Condicions de la implementació: (a) no substituir dins de codi (en línia i blocs), a les línies fetes només de guions (`---`: separador, subratllat de capçalera, YAML) ni a les taules; (b) Ctrl+Z just després torna a deixar el `--`; (c) opció al phileasrc, per idioma, desactivada per defecte; (d) cercar `'` ha de trobar `’` (i a l'inrevés), i cal comprovar que el corrector accepta `l’home` amb els diccionaris ca i es.
 
+### Cap a un processador de creació literària (proposta del 2026-11-11, per prioritzar)
+
+Valoració exhaustiva de què falta a Phileas per acompanyar un projecte literari llarg (novel·la, contes, poesia, assaig) sense deixar de ser un editor de prosa per a la consola. Continuen valent els criteris de C7–C26 (anàlisi a demanda, res a cada tecla, cap dependència obligatòria). **Cost:** B = baix (un parell de dies o menys), M = mitjà, A = alt. **Àmbit:** Pi = viable a la Pi 1B; PC = necessita eines de l'ordinador (pandoc, etc.).
+
+**A. Estructura i projecte llarg** (reaprofiten C7 i C9, que són la base)
+
+| # | Millora | Àmbit | Cost | Notes |
+|---|---------|-------|------|-------|
+| C28 | Estat i sinopsi per secció | Pi | B | Comentari sota la capçalera: `<!-- estat: esborrany; sinopsi: … -->`. L'esquema (F2) els mostra i filtra per estat (esborrany / revisat / final) i totalitza paraules per estat. |
+| C29 | Cerca al projecte | Pi | M | Cerca a tots els capítols de la carpeta (C9); llista de resultats amb context i salt. Sense indexar: lectura seqüencial. |
+| C30 | Substituir al projecte | Pi | M | Canvi de nom d'un personatge a tots els fitxers, amb llista prèvia i confirmació; entra a les instantànies (C10) abans de tocar res. |
+| C31 | Compilació de manuscrit | PC | M | Estén `compila` (C9): ordre dels capítols, salts, portada, filtre de comentaris, `TODO` i notes `%%`; plantilla de lliurament (reference.docx) per a pandoc. |
+| C32 | Bíblia de la història | Pi | B | Carpeta `_fitxes/` (personatges, llocs, cronologia). `fitxa nom` les obre en un diàleg de només lectura amb desplaçament, sense deixar el capítol (alternativa barata a C27). |
+| C33 | Índex de noms propis | Pi | M | A demanda: paraules en majúscula no inicials amb freqüència i capítols; detecta variants (Jaume/Jaumet) per a la coherència. |
+| C34 | Línia temporal | Pi | M | Etiqueta `@1923-05-04` en una escena; ordre cronològic vs. narratiu; avís si dues escenes es contradiuen. |
+| C35 | Marques de revisió | Pi | M | Sintaxi CriticMarkup (`{++afegit++}`, `{--esborrat--}`, `{>>comentari<<}`) pintada i ordres acceptar/rebutjar; es pot convertir amb pandoc. Permet revisar sense seguiment de canvis. |
+| C36 | Capítol bloquejat | Pi | B | Marca `<!-- final -->` que fa la secció de només lectura (avís en teclejar-hi) per no tocar per error el que ja és tancat. |
+| C37 | Numeració automàtica | PC | B | `# Capítol` numerat en compilar (no al fitxer), amb part i apèndix. |
+
+**B. Llengua i estil** (a demanda; res no es corregeix sol)
+
+| # | Millora | Àmbit | Cost | Notes |
+|---|---------|-------|------|-------|
+| C38 | Tancament d'aparellaments | Pi | B | Comprova cometes «», parèntesis i guions de diàleg sense tancar dins del paràgraf. Molt útil, gairebé gratuït. |
+| C39 | Ressaltat de diàleg | Pi | B | Pinta les línies de diàleg (— o «») amb un color del tema; estadística diàleg/narració per secció. |
+| C40 | Diàleg segons la RAE / IEC | Pi | M | Validació de les acotacions: `—Hola —va dir—.` (guió, espais i punt). Per idioma. |
+| C41 | Ritme de les frases | Pi | B | Longitud de cada frase d'un paràgraf com a barres ASCII; avisa de tres frases seguides amb la mateixa llargada o el mateix inici. Amplia C23. |
+| C42 | Freqüència de vocabulari | Pi | M | Les N paraules més usades (sense paraules buides, per idioma) i riquesa lèxica; localitza tics d'un capítol. Amplia C16. |
+| C43 | Tics gramaticals | Pi | M | Llistes configurables: gerundis abusius, verbs de dicció (va dir / va exclamar / va murmurar), «que» enllaçats, adverbis en -ment / -mente. |
+| C44 | Paraules a evitar | Pi | B | Fitxer `evita` al phileasrc (castellanismes, anglicismes, clixés) amb la forma suggerida; es pinta com els errors d'ortografia. Gens cap IA. |
+| C45 | `l·l` i punt volat | Pi | B | Amplia C17: escriure `l.l` dóna `l·l` en català (i `col.legi` → `col·legi`); alternativa: Ctrl+. insereix `·`. Resol un dolor real del teclat sense `·`. |
+| C46 | Inserir caràcter Unicode | Pi | B | `unicode 2014` o per nom curt (guió llarg, punt volat, ç majúscula, « »). Per a teclats sense AltGr i per a la consola. |
+| C47 | Diccionari de projecte | Pi | B | El corrector ja té un diccionari personal per idioma; afegir-ne un de projecte (carpeta del llibre) per als noms propis d'una novel·la, sense contaminar el general. |
+| C48 | Cerca sense accents | Pi | B | La cerca d'avui és exacta: afegir plegament de majúscules i accents (`cafe` troba `cafè`) i opció d'expressions regulars. |
+| C49 | Valencià i variants | Pi | B | Idioma per document (C21) amb `ca-valencia`; el corrector ja admet més d'un diccionari. |
+
+**C. Gèneres**
+
+| # | Millora | Àmbit | Cost | Notes |
+|---|---------|-------|------|-------|
+| C50 | Mode poesia | Pi | M | Bloc `poema`: salts durs sense wordwrap, recompte de síl·labes (sinalefa ca/es) per vers, rima consonant/assonant de final de vers i esquema (ABBA). L'única funció que cap processador de prosa no té. |
+| C51 | Mode guió / teatre | Pi | M | `PERSONATGE: text` i acotacions entre parèntesis amb sagnat propi; llista de personatges i de qui parla més. |
+| C52 | Rima i sil·labació | Pi | A | Diccionari de rimes/partició de síl·labes sense dades externes (regles de sil·labació ca/es). Només si C50 té ús. |
+
+**D. Ritme d'escriptura**
+
+| # | Millora | Àmbit | Cost | Notes |
+|---|---------|-------|------|-------|
+| C53 | Estadístiques del document | Pi | B | Caràcters amb/sense espais, paraules, frases, paràgrafs, pàgines estàndard (1.800 caràcters), temps de lectura. Ordre `estadistiques` (no la C15, que és històrica). Alta prioritat: gairebé gratuïta. |
+| C54 | Objectiu amb data límit | Pi | B | Extensió de C6: «40.000 paraules per al 31/12» → paraules per dia i marge a la barra d'estat. |
+| C55 | Paraules netes de sessió | Pi | B | Suma les escrites menys les esborrades, per al diari (C15). |
+| C56 | Punt de parada | Pi | B | En sortir, una línia opcional «demà començo per…» que es mostra en obrir el document (a l'`historial`, mai dins del fitxer, igual que C2). |
+| C57 | Marques de pàgina estimades | Pi | B | Línia fina a la pantalla cada ~250–300 paraules («pàg. 12»), només visual. Dona sensació de volum sense maquetar. |
+| C58 | Mode lectura | Pi | B | Només lectura, paginat amb espai: per rellegir sense poder tocar res ni desfer res per error. |
+
+**E. Seguretat i sortida**
+
+| # | Millora | Àmbit | Cost | Notes |
+|---|---------|-------|------|-------|
+| C59 | Salvaguarda a USB | Pi | M | `salvaguarda`: detecta un pendrive o microSD muntat i hi copia el projecte (amb instantànies de C10). Complementa `envia`. |
+| C60 | Canvis entre versions per paràgraf | Pi | M | Compara el document amb una instantània i llista només els paràgrafs afegits, esborrats i canviats. No és un diff de línia (descartat per pesat). |
+| C61 | Importar documents | PC | B | Ordre externa `importa` (pandoc: docx / odt / epub → md) per treballar sobre un manuscrit existent. |
+| C62 | Exportar EPUB i PDF | PC | B | Ordres externes sobre `exporta` (D6); a la Pi, via `envia` i l'ordinador. |
+| C63 | Imprimir esborrany | PC | B | `lp` amb capçalera (títol, pàgina); sobretot per a la revisió en paper. |
+
+**F. Edició de frase i interfície**
+
+| # | Millora | Àmbit | Cost | Notes |
+|---|---------|-------|------|-------|
+| C64 | Edició per frase | Pi | B | Moure's, esborrar i moure frases senceres (Alt+Retrocés per a la frase), transposar paraules, canviar majúscules/minúscules de la selecció. |
+| C65 | Marcadors | Pi | B | Alt+1…9 desen una posició, Ctrl+1…9 hi tornen; tornar a la posició anterior després d'un salt (esquema, cerca, nota). |
+| C66 | Cursiva i negreta amb tecla | Pi | B | Ordres `cursiva` / `negreta` que envolten la selecció (o la paraula) amb `*`/`**` i les treuen si ja hi són. |
+| C67 | Interlineat visual | Pi | B | Opció que dibuixa una fila en blanc entre línies (doble espai a la pantalla, no al fitxer) per llegir còmodament en pantalles grans. |
+| C68 | Rellotge a la barra | Pi | B | Hora discreta i, si hi ha mini-UPS, bateria. La Pi 1B no té RTC: cal NTP o l'hora quedaria falsa, així que només si hi ha xarxa. |
+
+**Suggeriment de prioritat (l'usuari decideix):** primer les gairebé gratuïtes i molt visibles: **C53** estadístiques, **C38** tancament d'aparellaments, **C45** `l·l`, **C48** cerca sense accents, **C47** diccionari de projecte. Després el **bloc de novel·la llarga**: **C9** projecte multifitxer, **C10** instantànies, **C28** estat per secció, **C29** cerca al projecte, **C32** fitxes. La **poesia (C50)** és la més original, però només si l'usuari escriu vers. Compilació i exportació (C31, C61–C63) van al PC; la Pi ja en té prou amb `envia`.
+
 ### Estat de la decisió
 
-Pendent de confirmar: el principi d'un sol programa, els requisits D1–D7 i l'ordre de les millores C2–C26 (C7–C26 afegides el 2026-10-29; prioritat de l'usuari: C7, C8, C12, C17).
+Pendent de confirmar: el principi d'un sol programa, els requisits D1–D7 i l'ordre de les millores C2–C26 (C7–C26 afegides el 2026-10-29; C28–C68 el 2026-11-11; prioritat de l'usuari: C7, C8, C12, C17).
 
 ## Proposta: dues finestres de text (C27, sense decidir)
 
