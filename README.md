@@ -481,6 +481,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.3.2**: **Fàbula 0.1**, l'eina `fabula` per organitzar una novel·la (arbre del projecte amb paraules, estat i progrés; nou, reanomenar, reordenar i paperera; Retorn obre el text a Phileas; capítol 16 del manual); opció `+LÍNIA` per obrir un document a un paràgraf; el separador `***` es centra també amb espais als costats.
 - **2.3.1**: manual d'ús (`MANUAL.md`, i `make manual` per al PDF); drecera Alt+T per activar o desactivar la tipografia automàtica; pendents (C11): ressaltat de `TODO`, `[?]` i `%%nota%%` i ordre `pendents` (Alt+K).
 - **2.3.0**: menú **Idees** (després de Vista) amb les ordres del calaix; «Vault d'Obsidian…», «Calaix de la Pi…» i «Importa a Obsidian» des de Phileas; la configuració és al phileasrc i desapareix el fitxer TOML i `--inicia`.
 - **2.2.7**: `phileas-importa-calaix --inicia VAULT` crea la configuració mínima (només cal el vault; la resta té valors per defecte); l'avís quan falta la configuració ho explica; model reordenat amb el mínim a dalt.

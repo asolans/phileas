@@ -1,6 +1,6 @@
 # Manual d'ús de Phileas
 
-*Versió 2.3.1*
+*Versió 2.3.2*
 
 Aquest manual t'acompanya pas a pas: des d'obrir Phileas per primera vegada
 fins a organitzar un llibre llarg. No cal llegir-lo de dalt a baix. Si només
@@ -25,7 +25,7 @@ cosa. L'ajuda de dins del programa (**F1**) és un llistat curt de tecles; això
 13. [Configurar Phileas](#13-configurar-phileas)
 14. [A la Raspberry Pi (BYOK)](#14-a-la-raspberry-pi-byok)
 15. [Resolució de problemes](#15-resolució-de-problemes)
-16. [Fàbula: organitzar una novel·la](#16-fàbula-organitzar-una-novel·la)
+16. [Fàbula: organitzar un llibre](#16-fàbula-organitzar-un-llibre)
 17. [Xuleta de dreceres](#17-xuleta-de-dreceres)
 
 ---
@@ -709,7 +709,7 @@ sudo apt install libhunspell-1.7-0 hunspell-ca hunspell-es
 
 **Una tecla no fa res a la consola de Linux.**
 Les combinacions amb Ctrl o Maj i fletxes no arriben a la consola. Fes servir
-l'alternativa amb Alt (a la taula del [capítol 16](#16-xuleta-de-dreceres)) o
+l'alternativa amb Alt (a la taula del [capítol 17](#17-xuleta-de-dreceres)) o
 **Esc** per als menús.
 
 **Ctrl+C o Ctrl+S no fan el que dic.**
@@ -739,7 +739,7 @@ amb l'extensió `.md` per tenir-hi tots els avantatges.
 
 ---
 
-## 16. Fàbula: organitzar una novel·la
+## 16. Fàbula: organitzar un llibre
 
 Phileas serveix per escriure. **Fàbula** és l'eina companya per tenir a la vista
 tota la novel·la: els capítols i les escenes, els personatges, els llocs i la
