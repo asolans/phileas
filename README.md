@@ -483,6 +483,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.4.0**: **Fàbula 0.2**. Instantànies dels fitxers (`.versions/`: automàtiques abans d'obrir, canviar l'estat o el títol, i a mà; `v` en recupera una); metadades (`pov`, `lloc`, `data`, `personatges`, `sinopsi`, `estat`) als capítols i, en un comentari sota la capçalera, a les escenes; taula (outliner) amb Tab, que s'ordena, s'edita i es filtra per qualsevol camp; enllaços `[[Nom]]` d'Obsidian (`u` on surt, `l` enllaços d'aquí, `t` trencats); cerca i substitució a tot el projecte (`f`, `R`), amb instantània prèvia; compilar el manuscrit (`C`, `fabula compila`) en un `.md` net o, amb pandoc, `.docx`/`.epub`/`.pdf`; `fabula --cerca`.
 - **2.3.3**: Fàbula 0.1.1: el menú d'Esc ja no parpelleja en moure la selecció.
 - **2.3.2**: **Fàbula 0.1**, l'eina `fabula` per organitzar una novel·la (arbre del projecte amb paraules, estat i progrés; nou, reanomenar, reordenar i paperera; Retorn obre el text a Phileas; capítol 16 del manual); opció `+LÍNIA` per obrir un document a un paràgraf; el separador `***` es centra també amb espais als costats.
 - **2.3.1**: manual d'ús (`MANUAL.md`, i `make manual` per al PDF); drecera Alt+T per activar o desactivar la tipografia automàtica; pendents (C11): ressaltat de `TODO`, `[?]` i `%%nota%%` i ordre `pendents` (Alt+K).
