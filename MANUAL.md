@@ -1,6 +1,6 @@
 # Manual d'ús de Phileas
 
-*Versió 2.4.0*
+*Versió 2.5.0*
 
 Aquest manual t'acompanya pas a pas: des d'obrir Phileas per primera vegada
 fins a organitzar un llibre llarg. No cal llegir-lo de dalt a baix. Si només
