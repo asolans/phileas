@@ -1,5 +1,6 @@
 /* Proves de Fàbula (fabula/): make test-fabula */
 #include "compile.h"
+#include "diary.h"
 #include "find.h"
 #include "flat.h"
 #include "project.h"
@@ -1215,6 +1216,79 @@ static void rmtree(const char *dir)
     if (system(cmd)) {}
 }
 
+/* ---------- diari ---------- */
+
+static time_t at(int y, int m, int d, int h)
+{
+    struct tm tm;
+
+    memset(&tm, 0, sizeof tm);
+    tm.tm_year = y - 1900; tm.tm_mon = m - 1; tm.tm_mday = d; tm.tm_hour = h; tm.tm_isdst = -1;
+    return mktime(&tm);
+}
+
+static void test_diary(void)
+{
+    char root[512];
+    Diary d;
+    DiaryStats st;
+    char **l;
+    size_t n;
+    time_t now = at(2026, 11, 12, 20);
+
+    snprintf(root, sizeof root, "%s/diari", tmpdir);
+    mkdir(root, 0755);
+    CHECK(diary_parse_day("2026-11-12") == diary_day_of(now));
+    CHECK(diary_parse_day("2026-13-01") < 0 && diary_parse_day("hola") < 0);
+    CHECK(diary_load(root, &d) == 0 && d.n == 0);
+    diary_free(&d);
+    /* primer dia: base, res escrit */
+    CHECK(diary_record(root, 1000, at(2026, 11, 8, 9)) == 0);
+    CHECK(diary_record(root, 1300, at(2026, 11, 8, 18)) == 0);
+    /* 9-11 sense feina; el 10 compta lo escrit fora (del 1300 al 1500) */
+    CHECK(diary_record(root, 1500, at(2026, 11, 10, 9)) == 0);
+    CHECK(diary_record(root, 1900, at(2026, 11, 11, 9)) == 0);
+    CHECK(diary_record(root, 2300, at(2026, 11, 12, 9)) == 0);
+    CHECK(diary_record(root, 2400, now) == 0);
+    CHECK(diary_record(root, 2400, now) == 0);
+    {
+        char *csv = slurp("diari/.fabula/diari.csv");
+
+        CHECK(csv && strstr(csv, "2026-11-08,1000,1300\n"));
+        CHECK(csv && strstr(csv, "2026-11-10,1300,1500\n"));
+        CHECK(csv && strstr(csv, "2026-11-12,1900,2400\n"));
+    }
+    CHECK(diary_load(root, &d) == 0 && d.n == 4);
+    diary_stats(&d, 2400, 5000, "2026-12-12", now, &st);
+    CHECK(st.today == 500);
+    CHECK(st.week[6] == 500 && st.week[5] == 400 && st.week[4] == 200 && st.week[3] == 0);
+    CHECK(st.week_total == 300 + 200 + 400 + 500);
+    CHECK(st.streak == 3);           /* el 10, 11 i 12 */
+    CHECK(st.best == 500 && st.active_days == 4);
+    CHECK(st.avg == 1400 / 5);       /* 5 dies des del primer */
+    CHECK(st.remaining == 2600 && st.days_to_goal == (2600 + 279) / 280 && st.finish_day == diary_day_of(now) + st.days_to_goal);
+    CHECK(st.limit_day == diary_day_of(now) + 30);
+    /* si avui encara no s'ha escrit, la ratxa arriba fins ahir */
+    diary_stats(&d, 2400, 0, NULL, at(2026, 11, 13, 8), &st);
+    CHECK(st.today == 0 && st.streak == 3 && st.remaining == -1 && st.finish_day == -1);
+    diary_stats(&d, 6000, 5000, NULL, now, &st);
+    CHECK(st.remaining == 0 && st.days_to_goal == 0);
+    l = diary_report(&d, 2400, 5000, "2026-12-12", now, &n);
+    CHECK(l && n >= 10);
+    CHECK(l && strstr(l[0], "Avui: 500"));
+    CHECK(l && strstr(l[2], "Ratxa: 3 dies"));
+    for (size_t i = 0; l && i < n; i++)
+        free(l[i]);
+    free(l);
+    diary_free(&d);
+    /* un dia que perd paraules no trenca res */
+    CHECK(diary_record(root, 2100, now) == 0);
+    CHECK(diary_load(root, &d) == 0);
+    diary_stats(&d, 2100, 0, NULL, now, &st);
+    CHECK(st.today == 200);
+    diary_free(&d);
+}
+
 int main(void)
 {
     setlocale(LC_ALL, "");
@@ -1236,6 +1310,7 @@ int main(void)
     test_links();
     test_find();
     test_compile();
+    test_diary();
     rmtree(tmpdir);
     printf("%d comprovacions, %d errors\n", checks, failures);
     return failures != 0;

@@ -824,6 +824,7 @@ sortir una mica més alt.
 | `f` | **cerca** un text a tot el projecte |
 | `R` | **substitueix** un text a tot el projecte (amb llista i confirmació) |
 | `C` | **compila** el manuscrit en un sol fitxer (`.md`, `.docx`, `.epub`…) |
+| `d` | **diari** d'escriptura: avui, la setmana, la ratxa i la previsió d'acabar |
 | `s` | desa una **instantània** del capítol o la fitxa |
 | `v` | **versions** anteriors: llista amb data, paraules i diferència; Retorn en recupera una |
 | Supr | mou a la paperera (pregunta abans) |
@@ -969,6 +970,22 @@ fabula compila --amb-notes --amb-enllacos   # conserva %%notes%% i [[enllaços]]
 Sense `-o`, el document surt per la sortida estàndard. El fitxer es crea a la
 carpeta del projecte si només en dius el nom, i **mai** a dins de `manuscrit/`,
 de les fitxes ni sobre `projecte.md`: Fàbula ho refusa. No canvia res del projecte.
+
+### Diari d'escriptura
+
+Fàbula apunta cada dia quantes paraules té el manuscrit a `.fabula/diari.csv`
+(`AAAA-MM-DD,inici,final`, una línia per dia amb feina). Ho fa en obrir el
+projecte, en tornar de Phileas i en prémer `d`, així que no cal fer res.
+L'*inici* d'un dia és el final de l'últim dia apuntat: també compta el que has
+escrit fora de Fàbula. Si esborres text, el dia pot sortir en negatiu.
+
+Amb **`d`** (o `fabula --diari`, sense pantalla) veus:
+
+- les paraules netes d'**avui** i de la **setmana**, i un gràfic dels últims set dies;
+- la **mitjana diària** dels darrers 30 dies (només el que s'ha escrit), el **millor dia** i la **ratxa** de dies seguits escrivint;
+- la **previsió**: si el `projecte.md` té `objectiu`, quan s'acabaria al ritme actual, i, si també té `data-limit`, quantes paraules al dia calen i si s'hi arriba a temps.
+
+El diari és un fitxer de text normal: es pot copiar, editar i `envia` el porta amb el projecte.
 
 ### Instantànies: marxa enrere
 

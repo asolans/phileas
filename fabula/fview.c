@@ -2,6 +2,7 @@
 #include "flat.h"
 #include "fterm.h"
 #include "compile.h"
+#include "diary.h"
 #include "find.h"
 #include "launch.h"
 #include "table.h"
@@ -630,6 +631,11 @@ static void act_versions(View *v)
 
 /* Obre l'element a l'editor i, en tornar, refresca el projecte conservant la
  * selecció (pel camí del fitxer i l'ordre de l'escena). */
+static void diary_note(View *v)
+{
+    (void)diary_record(v->p->root, (long)project_words(v->p), time(NULL));
+}
+
 static void open_file_line(View *v, FNode *file, size_t line, size_t scene)
 {
     char *path = strdup(file->path), err[200];
@@ -642,6 +648,8 @@ static void open_file_line(View *v, FNode *file, size_t line, size_t scene)
     rc = launch_editor(path, line, err, sizeof err);
     if (project_refresh(v->p, v->msg, sizeof v->msg) == 0) {
         FNode *keep = NULL;
+
+        diary_note(v);
 
         for (size_t g = 0; g < v->p->top->nkids && !keep; g++)
             for (size_t i = 0; i < v->p->top->kids[g]->nkids; i++) {
@@ -1302,6 +1310,25 @@ static void act_compile(View *v)
 
 /* Menú de l'Esc: la mateixa acció que cada tecla. Retorna el codi de la tecla
  * de l'acció triada, o -1 si es tanca sense triar. */
+static void act_diary(View *v)
+{
+    Diary d;
+    char **l;
+    size_t n;
+
+    diary_note(v);
+    if (diary_load(v->p->root, &d) != 0) {
+        snprintf(v->msg, sizeof v->msg, "No es pot llegir el diari.");
+        return;
+    }
+    l = diary_report(&d, (long)project_words(v->p), v->p->objectiu, v->p->data_limit, time(NULL), &n);
+    diary_free(&d);
+    if (!l)
+        return;
+    (void)pick_list(v, "Diari d'escriptura", l, n, " Esc/q: tanca ");
+    free_lines(l, n);
+}
+
 static int menu_run(View *v)
 {
     static const struct { const char *label, *hint; int key; } items[] = {
@@ -1319,6 +1346,7 @@ static int menu_run(View *v)
         { "Cerca al projecte", "f", 'f' },
         { "Compila el manuscrit", "C", 'C' },
         { "Substitueix al projecte", "R", 'R' },
+        { "Diari i estadístiques", "d", 'd' },
         { "Desa una instantània", "s", 's' },
         { "Versions anteriors", "v", 'v' },
         { "Mou a la paperera", "Supr", K_FN(KEY_DC) },
@@ -1405,6 +1433,7 @@ static void help(void)
         "  u / l / t                  on surt un capítol o fitxa / els seus [[enllaços]] / enllaços trencats",
         "  f / R                      cerca / substitueix al projecte (c, w, m: opcions)",
         "  C                          compila el manuscrit en un sol fitxer (.md, .docx, .epub…)",
+        "  d                          diari d'escriptura: avui, setmana, ratxa i previsió",
         "  s / v                      desa una instantània / veu les versions i en recupera una",
         "  Supr                       mou a la paperera (.paperera/); no s'esborra",
         "  Alt+↑ / Alt+↓  (< / >)     puja o baixa el capítol",
@@ -1610,6 +1639,7 @@ void fview_run(Project *p)
     v.p = p;
     v.sortcol = TC_NONE;
     rebuild(&v, NULL);
+    diary_note(&v);
     for (;;) {
         int key, page;
         FNode *n;
@@ -1682,6 +1712,9 @@ void fview_run(Project *p)
             break;
         case 's':
             act_snapshot(&v);
+            break;
+        case 'd':
+            act_diary(&v);
             break;
         case 'f':
             act_find(&v, 0);

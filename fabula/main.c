@@ -2,6 +2,7 @@
 #include "fview.h"
 #include "project.h"
 #include "compile.h"
+#include "diary.h"
 #include "find.h"
 #include "flat.h"
 #include "version.h"
@@ -52,6 +53,35 @@ static int summary(const char *dir)
             }
     }
     printf("Llegit en %.0f ms\n", (double)(t1.tv_sec - t0.tv_sec) * 1e3 + (double)(t1.tv_nsec - t0.tv_nsec) / 1e6);
+    project_free(&p);
+    return 0;
+}
+
+/* fabula --diari [CARPETA]: l'informe del diari d'escriptura, en text */
+static int diary_cli(const char *dir)
+{
+    Project p;
+    Diary d;
+    char err[300], **l;
+    size_t n;
+
+    if (project_open(&p, dir, err, sizeof err) != 0) {
+        fprintf(stderr, "fabula: %s\n", err);
+        return 1;
+    }
+    (void)diary_record(p.root, (long)project_words(&p), time(NULL));
+    if (diary_load(p.root, &d) != 0) {
+        fprintf(stderr, "fabula: no es pot llegir el diari\n");
+        project_free(&p);
+        return 1;
+    }
+    l = diary_report(&d, (long)project_words(&p), p.objectiu, p.data_limit, time(NULL), &n);
+    for (size_t i = 0; l && i < n; i++) {
+        puts(l[i]);
+        free(l[i]);
+    }
+    free(l);
+    diary_free(&d);
     project_free(&p);
     return 0;
 }
@@ -182,6 +212,7 @@ int main(int argc, char **argv)
         puts("Ús: fabula [CARPETA]\n"
              "     fabula nou \"TÍTOL\" [DIRECTORI]\n"
              "     fabula --resum [CARPETA]    el projecte en text, sense pantalla\n"
+             "     fabula --diari [CARPETA]    el diari d'escriptura: avui, ratxa i previsió\n"
              "     fabula --cerca TEXT [CARPETA]   cerca (sense majúscules ni accents), en text\n"
              "     fabula compila [-o FITXER] [--puja] [--separa-escenes] [--amb-notes] [--amb-enllacos] [CARPETA]\n"
              "                     el manuscrit en un sol document (.md, o .docx/.epub/.pdf amb pandoc)\n\n"
@@ -196,6 +227,8 @@ int main(int argc, char **argv)
         return compile_cli(argc - 2, argv + 2);
     if (argc > 2 && !strcmp(argv[1], "--cerca"))
         return search_cli(argv[2], argc > 3 ? argv[3] : ".");
+    if (argc > 1 && !strcmp(argv[1], "--diari"))
+        return diary_cli(argc > 2 ? argv[2] : ".");
     if (argc > 1 && !strcmp(argv[1], "--resum"))
         return summary(argc > 2 ? argv[2] : ".");
     if (argc > 1 && !strcmp(argv[1], "-v")) {
