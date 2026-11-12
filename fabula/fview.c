@@ -1378,37 +1378,45 @@ static void act_diary(View *v)
     free_lines(l, n);
 }
 
+/* Menú d'Esc, agrupat per categories. Una entrada amb key 0 és una capçalera
+ * (no es pot triar). */
 static int menu_run(View *v)
 {
     static const struct { const char *label, *hint; int key; } items[] = {
+        { "Fitxers", NULL, 0 },
         { "Obre a Phileas", "Retorn", '\n' },
-        { "Canvia de vista (arbre/taula)", "Tab", 9 },
-        { "Desplega o plega", "Espai", ' ' },
         { "Nou capítol o fitxa", "n", 'n' },
         { "Canvia el títol", "r", 'r' },
         { "Canvia l'estat", "e", 'e' },
         { "Puja el capítol", "Alt+↑", '<' },
         { "Baixa el capítol", "Alt+↓", '>' },
+        { "Mou a la paperera", "Supr", K_FN(KEY_DC) },
+        { "Vista", NULL, 0 },
+        { "Canvia de vista (arbre/taula)", "Tab", 9 },
+        { "Desplega o plega", "Espai", ' ' },
+        { "Filtra", "/", '/' },
+        { "Enllaços i cerca", NULL, 0 },
         { "On surt (on s'usa)", "u", 'u' },
         { "Enllaços d'aquí", "l", 'l' },
         { "Enllaços trencats", "t", 't' },
         { "Cerca al projecte", "f", 'f' },
-        { "Compila el manuscrit", "C", 'C' },
         { "Substitueix al projecte", "R", 'R' },
+        { "Manuscrit", NULL, 0 },
         { "Línia temporal", "T", 'T' },
         { "Diari i estadístiques", "d", 'd' },
+        { "Compila el manuscrit", "C", 'C' },
+        { "Versions", NULL, 0 },
         { "Desa una instantània", "s", 's' },
         { "Versions anteriors", "v", 'v' },
-        { "Mou a la paperera", "Supr", K_FN(KEY_DC) },
-        { "Filtra", "/", '/' },
+        { "Fàbula", NULL, 0 },
         { "Ajuda", "F1", K_FN(KEY_F(1)) },
         { "Surt", "Ctrl+Q", 17 },
     };
     const int n = (int)(sizeof items / sizeof *items);
-    int sel = 0, w = 0;
+    int sel = 1, w = 0, top = 0;
 
     for (int i = 0; i < n; i++) {
-        int lw = text_width(items[i].label) + 2 + text_width(items[i].hint) + 4;
+        int lw = text_width(items[i].label) + 2 + (items[i].hint ? text_width(items[i].hint) : 0) + 4;
 
         if (lw > w)
             w = lw;
@@ -1416,40 +1424,62 @@ static int menu_run(View *v)
     if (w > COLS - 2)
         w = COLS - 2;
     for (;;) {
-        int x0 = 1, y0 = 2, key;
+        int x0 = 1, y0 = 2, key, rows = LINES - y0 - 3, dir = 0;
 
+        if (rows > n)
+            rows = n;
+        if (rows < 3)
+            rows = 3;
+        /* que la selecció (i la capçalera de damunt) sigui visible */
+        if (sel - 1 < top && sel > 0 && !items[sel - 1].key)
+            top = sel - 1;
+        if (sel < top)
+            top = sel;
+        if (sel >= top + rows)
+            top = sel - rows + 1;
+        if (top + rows > n)
+            top = n - rows;
+        if (top < 0)
+            top = 0;
         paint(v);
         attrset(A_NORMAL);
-        for (int i = -1; i <= n; i++) {
-            int y = y0 + 1 + i;
+        attron(ft_attr(FT_DIM));
+        mvaddstr(y0, x0, "┌");
+        for (int c = 0; c < w; c++)
+            addstr("─");
+        addstr("┐");
+        mvaddstr(y0 + 1 + rows, x0, "└");
+        for (int c = 0; c < w; c++)
+            addstr("─");
+        addstr("┘");
+        attroff(ft_attr(FT_DIM));
+        for (int r = 0; r < rows; r++) {
+            int i = top + r, y = y0 + 1 + r;
+            int head = !items[i].key;
+            attr_t a = i == sel ? ft_attr(FT_SEL) : 0;
 
-            if (y >= LINES - 1)
-                break;
-            if (i < 0 || i == n) {
-                attron(ft_attr(FT_DIM));
-                mvaddstr(y, x0, i < 0 ? "┌" : "└");
-                for (int c = 0; c < w; c++)
-                    addstr("─");
-                addstr(i < 0 ? "┐" : "┘");
-                attroff(ft_attr(FT_DIM));
+            attron(ft_attr(FT_DIM));
+            mvaddstr(y, x0, "│");
+            mvaddstr(y, x0 + w + 1, "│");
+            attroff(ft_attr(FT_DIM));
+            attron(a);
+            move(y, x0 + 1);
+            for (int c = 0; c < w; c++)
+                addch(' ');
+            attroff(a);
+            if (head) {
+                put(y, x0 + 2, items[i].label, w - 2, ft_attr(FT_HEAD));
             } else {
-                attr_t a = i == sel ? ft_attr(FT_SEL) : 0;
-                int lw = text_width(items[i].label), hw = text_width(items[i].hint);
+                int hw = text_width(items[i].hint);
 
-                attron(ft_attr(FT_DIM));
-                mvaddstr(y, x0, "│");
-                mvaddstr(y, x0 + w + 1, "│");
-                attroff(ft_attr(FT_DIM));
-                attron(a);
-                move(y, x0 + 1);
-                for (int c = 0; c < w; c++)
-                    addch(' ');
-                attroff(a);
-                put(y, x0 + 2, items[i].label, w - 2, a);
+                put(y, x0 + 4, items[i].label, w - 4, a);
                 put(y, x0 + w - hw - 1, items[i].hint, hw, a ? a : ft_attr(FT_DIM));
-                (void)lw;
             }
         }
+        if (top > 0)
+            put(y0, x0 + w - 2, "▲", 1, ft_attr(FT_DIM));
+        if (top + rows < n)
+            put(y0 + 1 + rows, x0 + w - 2, "▼", 1, ft_attr(FT_DIM));
         refresh();
         key = key_read();
         if (key < 0 || key == K_FN(KEY_RESIZE))
@@ -1457,15 +1487,22 @@ static int menu_run(View *v)
         if (key == 27 || key == K_FN(KEY_F(10)))
             return -1;
         if (key == K_FN(KEY_UP))
-            sel = (sel + n - 1) % n;
+            dir = -1;
         else if (key == K_FN(KEY_DOWN))
-            sel = (sel + 1) % n;
-        else if (key == K_FN(KEY_HOME))
+            dir = 1;
+        else if (key == K_FN(KEY_HOME)) {
             sel = 0;
-        else if (key == K_FN(KEY_END))
-            sel = n - 1;
-        else if (key == '\n')
+            dir = 1;
+        } else if (key == K_FN(KEY_END)) {
+            sel = n;
+            dir = -1;
+        } else if (key == '\n' && items[sel].key)
             return items[sel].key;
+        if (dir) {          /* salta les capçaleres, amb tornada */
+            do
+                sel = (sel + dir + n) % n;
+            while (!items[sel].key);
+        }
     }
 }
 
