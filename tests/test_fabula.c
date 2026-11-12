@@ -5,6 +5,7 @@
 #include "flat.h"
 #include "project.h"
 #include "table.h"
+#include "timeline.h"
 #include "yaml.h"
 
 #include <errno.h>
@@ -1289,6 +1290,44 @@ static void test_diary(void)
     diary_free(&d);
 }
 
+/* ---------- línia temporal ---------- */
+
+static void test_timeline(void)
+{
+    Project p;
+    Timeline tl;
+    long lo, hi;
+    char err[300], dir[512];
+
+    CHECK(timeline_range("1936", &lo, &hi) == 0 && hi - lo == 365);
+    CHECK(timeline_range("1936-02", &lo, &hi) == 0 && hi - lo == 28);     /* 1936 és de traspàs: 29 dies */
+    CHECK(timeline_range("1937-02", &lo, &hi) == 0 && hi - lo == 27);
+    CHECK(timeline_range("1936-07-18", &lo, &hi) == 0 && lo == hi);
+    CHECK(timeline_range("juliol", &lo, &hi) < 0 && timeline_range("1936-13", &lo, &hi) < 0);
+    CHECK(timeline_range("1936-07-18x", &lo, &hi) < 0 && timeline_range("", &lo, &hi) < 0);
+
+    snprintf(dir, sizeof dir, "%s/tl", tmpdir);
+    put("tl/projecte.md", "x\n");
+    put("tl/manuscrit/01-a.md",
+        "---\ndata: 1936-07-18\n---\n\n## A\n\n### Un\n\nx\n\n"
+        "### Dos\n<!-- data: 1936-07 -->\n\ny\n\n"
+        "### Tres\n<!-- data: 1930 -->\n\nz\n");
+    put("tl/manuscrit/02-b.md", "---\ndata: 1936-08-01\n---\n\n## B\n\nsense escenes\n");
+    put("tl/manuscrit/03-c.md", "## C\n\n### Sense\n\nq\n\n### Dolenta\n<!-- data: ahir -->\n\nr\n");
+    CHECK(project_open(&p, dir, err, sizeof err) == 0);
+    CHECK(timeline_build(&p, &tl) == 0);
+    CHECK(tl.n == 6 && tl.dated == 4 && tl.undated == 2 && tl.bad == 1);
+    /* ordre: Tres (1930), Dos (1936-07: conté el 18), Un (07-18), B (08-01), després sense data */
+    CHECK(!strcmp(tl.items[0].node->title, "Tres"));
+    CHECK(!strcmp(tl.items[1].node->title, "Dos") && !strcmp(tl.items[2].node->title, "Un"));
+    CHECK(!strcmp(tl.items[3].node->title, "B"));
+    CHECK(!tl.items[4].dated && !tl.items[5].dated && tl.items[5].bad);
+    /* salts enrere en l'ordre del text: Tres (1930) després de Un/Dos; Dos no (el mes conté el 18) */
+    CHECK(tl.backs == 1 && tl.items[0].back && !tl.items[1].back && !tl.items[2].back);
+    timeline_free(&tl);
+    project_free(&p);
+}
+
 int main(void)
 {
     setlocale(LC_ALL, "");
@@ -1311,6 +1350,7 @@ int main(void)
     test_find();
     test_compile();
     test_diary();
+    test_timeline();
     rmtree(tmpdir);
     printf("%d comprovacions, %d errors\n", checks, failures);
     return failures != 0;

@@ -26,6 +26,7 @@ int  diary_record(const char *root, long words, time_t now);
 
 long diary_day_of(time_t t);                            /* dia local */
 void diary_day_str(long day, char *out, size_t sz);     /* «AAAA-MM-DD» */
+long diary_civil_days(long y, long m, long d);          /* dies des de 1970 (negatiu abans) */
 long diary_parse_day(const char *s);                    /* «AAAA-MM-DD» -> dia, o -1 */
 
 typedef struct {

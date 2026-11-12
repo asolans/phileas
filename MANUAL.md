@@ -824,6 +824,7 @@ sortir una mica més alt.
 | `f` | **cerca** un text a tot el projecte |
 | `R` | **substitueix** un text a tot el projecte (amb llista i confirmació) |
 | `C` | **compila** el manuscrit en un sol fitxer (`.md`, `.docx`, `.epub`…) |
+| `T` | **línia temporal**: les escenes per data, amb els salts enrere |
 | `d` | **diari** d'escriptura: avui, la setmana, la ratxa i la previsió d'acabar |
 | `s` | desa una **instantània** del capítol o la fitxa |
 | `v` | **versions** anteriors: llista amb data, paraules i diferència; Retorn en recupera una |
@@ -970,6 +971,19 @@ fabula compila --amb-notes --amb-enllacos   # conserva %%notes%% i [[enllaços]]
 Sense `-o`, el document surt per la sortida estàndard. El fitxer es crea a la
 carpeta del projecte si només en dius el nom, i **mai** a dins de `manuscrit/`,
 de les fitxes ni sobre `projecte.md`: Fàbula ho refusa. No canvia res del projecte.
+
+### Línia temporal
+
+Amb **`T`** veus les escenes ordenades per la seva **data** (la metadada `data`:
+`AAAA`, `AAAA-MM` o `AAAA-MM-DD`, que una escena hereta del capítol) i no per
+l'ordre del text. Un capítol sense escenes hi surt com un sol element. Les
+escenes **sense data** (o amb una data que no s'entén) van al final.
+
+Si el text hi arriba **després** d'una escena posterior, hi surt marcada amb
+**↶ salt enrere**: és un flaix enrere volgut, o una contradicció que convé
+revisar. Dues dates parcials que es toquen (`1936-07` i `1936-07-18`) no
+compten com a salt. El títol resumeix quantes escenes tenen data, quantes no i
+quants salts hi ha. Retorn obre l'escena a Phileas. No es desa res.
 
 ### Diari d'escriptura
 

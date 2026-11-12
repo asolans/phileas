@@ -38,6 +38,11 @@ static void civil_from_days(long z, long *y, long *m, long *d)
     *y += *m <= 2;
 }
 
+long diary_civil_days(long y, long m, long d)
+{
+    return days_from_civil(y, m, d);
+}
+
 long diary_day_of(time_t t)
 {
     struct tm tm;

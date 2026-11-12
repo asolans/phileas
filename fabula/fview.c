@@ -6,6 +6,7 @@
 #include "find.h"
 #include "launch.h"
 #include "table.h"
+#include "timeline.h"
 
 #include "keys.h"
 #include "utf8.h"
@@ -1310,6 +1311,54 @@ static void act_compile(View *v)
 
 /* Menú de l'Esc: la mateixa acció que cada tecla. Retorna el codi de la tecla
  * de l'acció triada, o -1 si es tanca sense triar. */
+/* T: la línia temporal: les escenes per data, amb els salts enrere i les sense data */
+static void act_timeline(View *v)
+{
+    Timeline t;
+    char **lines, title[160], foot[200];
+    long sel = 0;
+
+    if (timeline_build(v->p, &t) != 0 || !t.n) {
+        timeline_free(&t);
+        snprintf(v->msg, sizeof v->msg, "El manuscrit no té escenes ni capítols.");
+        return;
+    }
+    lines = calloc(t.n, sizeof *lines);
+    if (!lines) {
+        timeline_free(&t);
+        return;
+    }
+    for (size_t i = 0; i < t.n; i++) {
+        const TLItem *it = &t.items[i];
+        const FNode *n = it->node;
+        char buf[400], where[250];
+
+        if (n->kind == FK_SCENE)
+            snprintf(where, sizeof where, "%s · %s", n->parent->title, n->title);
+        else
+            snprintf(where, sizeof where, "%s", n->title);
+        snprintf(buf, sizeof buf, "%-10s  %s%s%s%s%s", it->dated ? n->data : it->bad ? "data ?" : "sense data",
+                 where, n->pov && *n->pov ? " · " : "", n->pov ? n->pov : "",
+                 it->back ? "   ↶ salt enrere" : "", it->bad ? "   (data no vàlida)" : "");
+        lines[i] = strdup(buf);
+        if (!lines[i])
+            lines[i] = strdup("");
+    }
+    snprintf(title, sizeof title, " Línia temporal · %zu amb data, %zu sense · %zu salts enrere ", t.dated,
+             t.undated, t.backs);
+    snprintf(foot, sizeof foot, " Retorn obre a Phileas · ↶ = el text hi arriba després d'una escena posterior · Esc tanca");
+    for (;;) {
+        int pick = pick_list_ex(v, title, lines, t.n, foot, NULL, NULL, &sel);
+
+        if (pick < 0)
+            break;
+        open_in_editor(v, t.items[pick].node);
+        break;
+    }
+    free_lines(lines, t.n);
+    timeline_free(&t);
+}
+
 static void act_diary(View *v)
 {
     Diary d;
@@ -1346,6 +1395,7 @@ static int menu_run(View *v)
         { "Cerca al projecte", "f", 'f' },
         { "Compila el manuscrit", "C", 'C' },
         { "Substitueix al projecte", "R", 'R' },
+        { "Línia temporal", "T", 'T' },
         { "Diari i estadístiques", "d", 'd' },
         { "Desa una instantània", "s", 's' },
         { "Versions anteriors", "v", 'v' },
@@ -1433,6 +1483,7 @@ static void help(void)
         "  u / l / t                  on surt un capítol o fitxa / els seus [[enllaços]] / enllaços trencats",
         "  f / R                      cerca / substitueix al projecte (c, w, m: opcions)",
         "  C                          compila el manuscrit en un sol fitxer (.md, .docx, .epub…)",
+        "  T                          línia temporal: escenes per data, amb els salts enrere",
         "  d                          diari d'escriptura: avui, setmana, ratxa i previsió",
         "  s / v                      desa una instantània / veu les versions i en recupera una",
         "  Supr                       mou a la paperera (.paperera/); no s'esborra",
@@ -1712,6 +1763,9 @@ void fview_run(Project *p)
             break;
         case 's':
             act_snapshot(&v);
+            break;
+        case 'T':
+            act_timeline(&v);
             break;
         case 'd':
             act_diary(&v);
