@@ -11,6 +11,9 @@
 #include "md.h"
 #include "outline.h"
 #include "todo.h"
+#include "chars.h"
+#include "pairs.h"
+#include "stats.h"
 #include "search.h"
 #include "spell.h"
 #include "theme.h"
@@ -608,6 +611,95 @@ static int typed_is(int apos, const char *text, const char *expect)
     return ok;
 }
 
+static int pair_is(const char *s, size_t pos, const char *why)
+{
+    size_t p;
+    const char *w;
+
+    return pairs_check(s, strlen(s), &p, &w) && p == pos && !strcmp(w, why);
+}
+
+static int pair_ok(const char *s)
+{
+    size_t p;
+    const char *w;
+
+    return !pairs_check(s, strlen(s), &p, &w);
+}
+
+static void test_pairs(void)
+{
+    CHECK(pair_ok("Ell va dir «hola (tal qual) [i prou]» i se'n va."));
+    CHECK(pair_ok("Una frase sense signes."));
+    CHECK(pair_ok(""));
+    CHECK(pair_is("Va dir «hola i se'n va.", 7, "« sense tancar"));
+    CHECK(pair_is("Va dir hola» i se'n va.", 11, "» sense obrir"));
+    CHECK(pair_is("Un (parèntesi obert", 3, "( sense tancar"));
+    CHECK(pair_is("Un parèntesi) tancat", 13, ") sense obrir"));
+    CHECK(pair_is("«a (b» c)", 4, "( tancat amb un altre signe"));
+    CHECK(pair_is("Va dir \"hola", 7, "\" sense tancar"));
+    CHECK(pair_ok("Va dir \"hola\" i prou"));
+    CHECK(pair_is("Va dir “hola", 7, "“ sense tancar"));
+    CHECK(pair_ok("Va dir “hola” i prou"));
+    CHECK(pair_ok("1) primer\n"));
+    CHECK(pair_ok("  a) segon"));
+    CHECK(pair_ok("Estic content :) i tu ;) també"));
+    CHECK(pair_ok("Codi `a ( b` i `]` no compta"));
+    CHECK(pair_is("Un ) de debò", 3, ") sense obrir"));
+    /* diàleg */
+    CHECK(pair_ok("—Hola, què tal?"));
+    CHECK(pair_ok("—Hola —va dir— què tal."));
+    CHECK(pair_ok("—Hola —va dir—."));
+    CHECK(pair_is("—Hola —va dir.", 8, "acotació de diàleg sense tancar (falta un guió)"));
+    CHECK(pair_ok("Una frase — amb guió — i prou."));     /* no comença amb guió: no és diàleg */
+}
+
+static void test_stats(void)
+{
+    DocStats s;
+    const char *t = "# Títol\nHola, món. Què? Sí!! «Ah.» Val 3.5 i prou...\n\nSegon paràgraf sense punt\n-\n";
+
+    doc_stats(t, strlen(t), &s);
+    CHECK(s.words == 14 && s.sentences == 6 && s.paragraphs == 3);   /* «3.5» no talla; el títol i «-» no són frases */
+    doc_stats("", 0, &s);
+    CHECK(s.words == 0 && s.chars == 0 && s.sentences == 0 && s.paragraphs == 0);
+    doc_stats("Una dues tres. Quatre", strlen("Una dues tres. Quatre"), &s);
+    CHECK(s.words == 4 && s.sentences == 2 && s.paragraphs == 1);
+    CHECK(s.chars == 21 && s.chars_nospace == 18);
+    doc_stats("Val 3.5 i a.b\nHola...\n\n# Títol\n- \n", strlen("Val 3.5 i a.b\nHola...\n\n# Títol\n- \n"), &s);
+    CHECK(s.paragraphs == 3 && s.sentences == 2);                 /* «...» una sola; el títol i «-» no són frases */
+    CHECK(s.words == 6);
+    doc_stats("«Sí.» «No?!» (Potser.)", strlen("«Sí.» «No?!» (Potser.)"), &s);
+    CHECK(s.sentences == 3 && s.words == 3);
+    {
+        char big[3601];
+
+        memset(big, 'a', 3600);
+        big[3600] = '\0';
+        doc_stats(big, 3600, &s);
+        CHECK(s.pages > 1.99 && s.pages < 2.01 && s.words == 1);
+    }
+    doc_stats("mot ", 4, &s);
+    CHECK(s.words == 1 && s.chars == 4 && s.chars_nospace == 3);
+}
+
+static void test_chars(void)
+{
+    char o[8];
+
+    CHECK(char_lookup("punt-volat", o, sizeof o) == 2 && !strcmp(o, "·"));
+    CHECK(char_lookup(" guio-llarg ", o, sizeof o) == 3 && !strcmp(o, "—"));
+    CHECK(char_lookup("c-majuscula", o, sizeof o) == 2 && !strcmp(o, "Ç"));
+    CHECK(char_lookup("2014", o, sizeof o) == 3 && !strcmp(o, "—"));
+    CHECK(char_lookup("U+00B7", o, sizeof o) == 2 && !strcmp(o, "·"));
+    CHECK(char_lookup("0xab", o, sizeof o) == 2 && !strcmp(o, "«"));
+    CHECK(char_lookup("é", o, sizeof o) == 2 && !strcmp(o, "é"));
+    CHECK(char_lookup("a", o, sizeof o) == 1 && !strcmp(o, "a"));      /* 'a' és hex, però d'un sol dígit va com a lletra */
+    CHECK(char_lookup("", o, sizeof o) == 0 && char_lookup("foo", o, sizeof o) == 0);
+    CHECK(char_lookup("1234567", o, sizeof o) == 0 && char_lookup("D800", o, sizeof o) == 0);
+    CHECK(char_lookup("0007", o, sizeof o) == 0);                       /* de control */
+}
+
 static void test_focus_typo(void)
 {
     const char *t = "Hola, món. Què? Sí!! «Ah.» 3.5 i el Sr. Fogg...  Fi";
@@ -666,6 +758,35 @@ static void test_focus_typo(void)
     CHECK(typed_is(0, "`a--b` i a--b", "`a--b` i a—b"));
     CHECK(typed_is(0, "| a--b |", "| a--b |"));  /* taula */
     CHECK(typed_is(0, "....", "…."));
+
+    /* Català: l.l → l·l dins d'una paraula (només amb el diccionari català) */
+    {
+        Editor ce;
+
+        ed_init(&ce, 72);
+        ce.typo = 1;
+        snprintf(ce.dict, sizeof ce.dict, "ca");
+        type_text(&ce, "col.legi, il.lusió, IL.LUSIÓ, tal.lo i a l.lo. Fi.L");
+        CHECK(dump_is(&ce.buf, "col·legi, il·lusió, IL·LUSIÓ, tal·lo i a l.lo. Fi.L"));
+        ed_free(&ce);
+        ed_init(&ce, 72);
+        ce.typo = 1;
+        snprintf(ce.dict, sizeof ce.dict, "es");
+        type_text(&ce, "col.legi");
+        CHECK(dump_is(&ce.buf, "col.legi"));         /* en castellà no */
+        ed_free(&ce);
+        ed_init(&ce, 72);
+        snprintf(ce.dict, sizeof ce.dict, "ca");
+        type_text(&ce, "col.legi");
+        CHECK(dump_is(&ce.buf, "col.legi"));         /* sense tipografia, no */
+        ed_free(&ce);
+        ed_init(&ce, 72);
+        ce.typo = 1;
+        snprintf(ce.dict, sizeof ce.dict, "ca");
+        type_text(&ce, "`col.legi`");
+        CHECK(dump_is(&ce.buf, "`col.legi`"));       /* codi en línia: no */
+        ed_free(&ce);
+    }
 
     /* Ctrl+Z just després torna a deixar el que s'havia escrit; el que ve
      * després va en un altre pas */
@@ -1001,6 +1122,22 @@ static void test_search(void)
     /* Sense majúscules al patró: no distingeix majúscules */
     CHECK(search_find(&b, (Pos){ 0, 0 }, "casa", 1, &a, &z, &w) && a.col == 3 && z.col == 7 && !w);
     CHECK(search_find(&b, (Pos){ 0, 4 }, "casa", 1, &a, &z, &w) && a.col == 13);
+    /* sense majúscules ni accents: «cafe» troba «Cafè»; amb accent o majúscula al patró, exacte */
+    {
+        Buffer q;
+        Pos qa, qz;
+        int qw;
+
+        buf_init(&q);
+        buf_insert(&q, (Pos){ 0, 0 }, "un Cafè i un cafe amb ÇA i ça", strlen("un Cafè i un cafe amb ÇA i ça"));
+        CHECK(search_find(&q, (Pos){ 0, 0 }, "cafe", 1, &qa, &qz, &qw) && qa.col == 3);
+        CHECK(search_find(&q, (Pos){ 0, 4 }, "cafe", 1, &qa, &qz, &qw) && qa.col == 14);
+        CHECK(search_find(&q, (Pos){ 0, 0 }, "cafè", 1, &qa, &qz, &qw) && qa.col == 3);
+        CHECK(search_find(&q, (Pos){ 0, 4 }, "cafè", 1, &qa, &qz, &qw) && qw);   /* només «Cafè»: torna al principi */
+        CHECK(search_find(&q, (Pos){ 0, 20 }, "ca", 1, &qa, &qz, &qw) && qa.col == 23);   /* ÇA = «ca» */
+        CHECK(search_find(&q, (Pos){ 0, 0 }, "Cafe", 1, &qa, &qz, &qw) == 0);              /* amb majúscula: exacte */
+        buf_free(&q);
+    }
     CHECK(search_find(&b, (Pos){ 0, 14 }, "casa", 1, &a, &z, &w) && a.line == 1 && a.col == 10);
     CHECK(search_find(&b, (Pos){ 1, 11 }, "casa", 1, &a, &z, &w) && a.line == 0 && a.col == 3 && w);
     /* Amb majúscules: les distingeix */
@@ -1160,6 +1297,50 @@ static void test_spell(void)
     spell_free_list(list, n);
     spell_ignore("Phileas", 7);
     CHECK(OK("Phileas"));
+
+    /* Diccionari de projecte: .diccionari.txt a la carpeta del document o a una de superior */
+    {
+        char dir[] = "/tmp/phileas-proj-XXXXXX", p[600], doc[600];
+        FILE *f;
+
+        CHECK(mkdtemp(dir) != NULL);
+        snprintf(p, sizeof p, "%s/manuscrit", dir);
+        mkdir(p, 0755);
+        snprintf(p, sizeof p, "%s/projecte.md", dir);
+        f = fopen(p, "w"); fputs("x\n", f); fclose(f);
+        snprintf(doc, sizeof doc, "%s/manuscrit/01-cap.md", dir);
+        spell_project_set(doc);
+        CHECK(spell_project_file() == NULL && !OK("Zarzuelita"));
+        /* afegir: es crea a l'arrel del projecte (on és projecte.md), no a manuscrit/ */
+        CHECK(spell_add_project("Zarzuelita", 10, doc) == 0);
+        snprintf(p, sizeof p, "%s/.diccionari.txt", dir);
+        CHECK(spell_project_file() && !strcmp(spell_project_file(), p) && OK("Zarzuelita"));
+        f = fopen(p, "r");
+        CHECK(f != NULL);
+        if (f) {
+            char l[64] = "";
+
+            CHECK(fgets(l, sizeof l, f) && !strcmp(l, "Zarzuelita\n"));
+            fclose(f);
+        }
+        /* un altre document del projecte (i una carpeta més avall) el troba, i serveix a tots els idiomes */
+        spell_project_set("/tmp/res-de-res.md");
+        CHECK(spell_project_file() == NULL);
+        spell_project_set(doc);
+        CHECK(spell_project_file() && !strcmp(spell_project_file(), p));
+        if (spell_open("es") == 0) {
+            CHECK(OK("Zarzuelita"));
+            spell_open("ca");
+        }
+        spell_project_set(NULL);
+        CHECK(spell_project_file() == NULL);
+        unlink(p);
+        snprintf(p, sizeof p, "%s/projecte.md", dir);
+        unlink(p);
+        snprintf(p, sizeof p, "%s/manuscrit", dir);
+        rmdir(p);
+        rmdir(dir);
+    }
 
     s = "Una `paraulla` i paraulla";
     md_style(s, strlen(s), MD_TEXT, 0, st);
@@ -2012,6 +2193,9 @@ int main(void)
     test_outline();
     test_footnotes();
     test_move();
+    test_chars();
+    test_stats();
+    test_pairs();
     test_focus_typo();
     test_focus_config();
     test_config_store();

@@ -2,6 +2,9 @@
 #include "calaixview.h"
 #include "clipboard.h"
 #include "command.h"
+#include "chars.h"
+#include "pairs.h"
+#include "stats.h"
 #include "complete.h"
 #include "config.h"
 #include "filebrowser.h"
@@ -198,6 +201,27 @@ static void c_focus(Editor *e)
                                             "Enfocament: frase (la resta s'atenua)");
     remember(e, "enfocament", names[e->focus]);
 }
+
+/* unicode NOM|CODI: insereix un caràcter pel nom curt (punt-volat, guio-llarg…)
+ * o pel codi hexadecimal (2014, U+00B7) */
+static void c_unicode(Editor *e)
+{
+    char arg[64], out[8];
+    size_t n;
+
+    snprintf(arg, sizeof arg, "%s", cmd_args());
+    if (!arg[0] &&
+        (!prompt(e, "Caràcter (nom o codi hex; punt-volat, guio-llarg, c-majuscula, 2014…): ", arg,
+                 sizeof arg, NULL) || !arg[0]))
+        return;
+    if (!(n = char_lookup(arg, out, sizeof out))) {
+        ed_msg(e, "No conec «%s». Noms: %s", arg, char_names());
+        return;
+    }
+    ed_insert(e, out, n);
+}
+
+static void c_middle_dot(Editor *e)       { ed_insert(e, "·", strlen("·")); }
 
 static void c_typography(Editor *e)
 {
@@ -1053,6 +1077,57 @@ static void c_about(Editor *e)
     about_show(e);
 }
 
+/* estadistiques: del document, o de la selecció si n'hi ha */
+static void c_stats(Editor *e)
+{
+    Pos a, z;
+    int sel = ed_selection(e, &a, &z);
+    size_t n;
+    char *t;
+    DocStats st;
+
+    if (!sel) {
+        a = (Pos){ 0, 0 };
+        z = (Pos){ e->buf.nlines - 1, e->buf.lines[e->buf.nlines - 1].len };
+    }
+    t = buf_extract(&e->buf, a, z, &n);
+    doc_stats(t, n, &st);
+    free(t);
+    stats_show(e, &st, sel);
+}
+
+/* revisar-aparellaments: va al paràgraf següent amb un signe sense tancar (« », ( ), [ ],
+ * cometes) o una acotació de diàleg a mitges; no revisa el codi */
+static void c_pairs_next(Editor *e)
+{
+    size_t n = e->buf.nlines, cy0 = e->cy;
+
+    buf_scan(&e->buf);
+    for (size_t k = 0; k <= n; k++) {
+        size_t y = (e->cy + k) % n, pos;
+        Line *l = &e->buf.lines[y];
+        int kd = MD_BASE(l->kind);
+        const char *why;
+
+        if (kd == MD_CODE || kd == MD_FENCE_OPEN || kd == MD_FENCE_CLOSE || kd == MD_META ||
+            kd == MD_TABLE || kd == MD_HTML)
+            continue;
+        if (!pairs_check(l->text, l->len, &pos, &why))
+            continue;
+        if (k == 0 && pos == e->cx)
+            continue;               /* ja som al problema: el següent */
+        if (k == n && y == e->cy && pos == e->cx)
+            break;
+        ed_sel_clear(e);
+        e->cy = y;
+        e->cx = pos;
+        e->want_x = -1;
+        ed_msg(e, "%s%s", y < cy0 || (k == n && y == cy0) ? "(des del principi) " : "", why);
+        return;
+    }
+    ed_msg(e, "Tots els signes i guions de diàleg són ben aparellats");
+}
+
 static void c_colors(Editor *e)
 {
     e->colors = !e->colors;
@@ -1232,7 +1307,7 @@ static void c_suggest(Editor *e)
 
         snprintf(item, sizeof item, " %d %s ", i + 1, list[i]);
         if ((int)utf8_count(question, strlen(question)) + (int)utf8_count(item, strlen(item)) +
-            34 > COLS)
+            52 > COLS)
             break;
         strcat(question, item);
         keys[nk++] = (char)('1' + i);
@@ -1240,8 +1315,9 @@ static void c_suggest(Editor *e)
     }
     if (n == 0)
         strcat(question, " (sense suggeriments)");
-    strcat(question, " · a afegir · i ignorar · Esc ");
+    strcat(question, " · a afegir · p al projecte · i ignorar · Esc ");
     keys[nk++] = 'a';
+    keys[nk++] = 'p';
     keys[nk++] = 'i';
     keys[nk] = '\0';
 
@@ -1258,6 +1334,11 @@ static void c_suggest(Editor *e)
                    word, strerror(errno));
         else
             ed_msg(e, "«%s» afegida al diccionari personal", word);
+    } else if (c == 'p') {
+        if (spell_add_project(word, len, e->filename) < 0)
+            ed_msg(e, "No s'ha pogut desar el diccionari del projecte: %s", strerror(errno));
+        else
+            ed_msg(e, "«%s» afegida al diccionari del projecte (%s)", word, spell_project_file());
     } else if (c == 'i') {
         spell_ignore(word, len);
         ed_msg(e, "«%s» s'ignorarà fins que es tanqui Phileas", word);
@@ -1401,6 +1482,9 @@ static const Command commands[] = {
     { "recarregar-configuracio", c_reload_config, "Torna a llegir el fitxer phileasrc", ACT_NONE },
     { "colors",            c_colors,     "Activa o desactiva els colors de Markdown", ACT_NONE },
     { "enfocament",        c_focus,      "Atenua el text fora del paràgraf o de la frase actual (no, paràgraf, frase)", ACT_NONE },
+    { "estadistiques",     c_stats,      "Paraules, caràcters, frases, pàgines i temps de lectura (de la selecció, si n'hi ha)", ACT_NONE },
+    { "unicode",           c_unicode,    "Insereix un caràcter pel nom (punt-volat, guio-llarg, c-majuscula…) o pel codi hex", ACT_NONE },
+    { "punt-volat",        c_middle_dot, "Insereix el punt volat · (l·l)", ACT_NONE },
     { "tipografia",        c_typography, "Tipografia en escriure: -- → —, << >> → « », ... → … (i ' → ’, amb l'opció)", ACT_NONE },
     { "desar-configuracio", c_save_config, "Desa la configuració actual, amb totes les opcions, al phileasrc", ACT_NONE },
     { "tema",              c_theme,      "Canvia el tema de colors (tema NOM: terminal, fosc, clar, sepia, fosfor, wordperfect)", ACT_NONE },
@@ -1424,6 +1508,7 @@ static const Command commands[] = {
     { "substituir",        c_replace,    "Substitueix un text, amb confirmació", ACT_NONE },
     { "autodesat",         c_autosave,   "Activa o desactiva l'autodesat", ACT_NONE },
     { "revisar-ortografia", c_spell_next, "Selecciona l'error ortogràfic següent", ACT_NONE },
+    { "revisar-aparellaments", c_pairs_next, "Va al paràgraf següent amb un « ( [ “ \" o un guió de diàleg sense tancar", ACT_NONE },
     { "suggeriments",      c_suggest,    "Suggeriments per a la paraula del cursor", ACT_NONE },
     { "ortografia",        c_spell_toggle, "Marca o no els errors ortogràfics", ACT_NONE },
     { "idioma",            c_language,   "Tria un diccionari pel nom", ACT_NONE },
@@ -1444,6 +1529,7 @@ static const char *const default_bindings[][2] = {
     { "alt-l", "anar-a-linia" },
     { "f2", "esquema" },              { "alt-e", "esquema" },
     { "alt-k", "pendents" },
+    { "alt-.", "punt-volat" },
 
     { "shift-up", "seleccio-amunt" },     { "shift-down", "seleccio-avall" },
     { "shift-left", "seleccio-esquerra" }, { "shift-right", "seleccio-dreta" },
@@ -1700,7 +1786,7 @@ void cmd_run(Editor *e, const Command *c, const char *args)
 
     if (x) {
         run_external(e, x, args);
-    } else if (args && *args && c->fn != c_theme) {
+    } else if (args && *args && c->fn != c_theme && c->fn != c_unicode) {
         ed_msg(e, "L'ordre %s no admet arguments", c->name);
     } else {
         run_args = args ? args : "";

@@ -17,6 +17,21 @@ static int has_upper(const char *pat)
     return 0;
 }
 
+/* Lletra sense accent (minúscula): à→a, ç→c, ñ→n… Les altres, tal qual. */
+static wchar_t fold_accent(wchar_t c)
+{
+    static const struct { const wchar_t *from; wchar_t to; } map[] = {
+        { L"àáâäãå", L'a' }, { L"çć", L'c' }, { L"èéêë", L'e' }, { L"ìíîï", L'i' },
+        { L"ñ", L'n' },       { L"òóôöõ", L'o' }, { L"ùúûü", L'u' }, { L"ýÿ", L'y' },
+    };
+
+    for (size_t i = 0; i < sizeof map / sizeof *map; i++)
+        for (const wchar_t *p = map[i].from; *p; p++)
+            if (*p == c)
+                return map[i].to;
+    return c;
+}
+
 /* Si pat coincideix a s[i..], retorna on acaba; si no, (size_t)-1. */
 static size_t match_at(const char *s, size_t len, size_t i,
                        const char *pat, size_t plen, int icase)
@@ -33,6 +48,10 @@ static size_t match_at(const char *s, size_t len, size_t i,
         if (icase && a != UTF8_INVALID && b != UTF8_INVALID) {
             a = (wchar_t)towlower((wint_t)a);
             b = (wchar_t)towlower((wint_t)b);
+            /* Una lletra sense accent al patró troba també la que en té
+             * (cafe → cafè); si el patró hi posa l'accent, ha de coincidir */
+            if (a != b && fold_accent(b) == b)
+                a = fold_accent(a);
         }
         /* L'apòstrof recte i el tipogràfic són el mateix */
         if (a == L'’')

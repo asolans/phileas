@@ -52,4 +52,14 @@ int  spell_next_word(const char *s, size_t len, size_t from, size_t *a, size_t *
 int  spell_next_error(const char *s, size_t len, const unsigned char *styles,
                       size_t from, size_t *a, size_t *b);
 
+/* Diccionari de projecte: el fitxer .diccionari.txt de la carpeta del document
+ * (o d'una de superior, fins a 6 nivells), una paraula per línia, vàlid per
+ * a tots els idiomes. spell_project_set el busca per al document (NULL: cap) i
+ * en carrega les paraules; es crida en obrir un document. spell_add_project hi
+ * afegeix una paraula; si no n'hi ha cap, el crea a l'arrel del projecte de
+ * Fàbula (la carpeta amb projecte.md) o a la carpeta del document. */
+void spell_project_set(const char *docpath);
+const char *spell_project_file(void);       /* NULL si no n'hi ha */
+int  spell_add_project(const char *s, size_t n, const char *docpath);
+
 #endif

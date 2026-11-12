@@ -1,6 +1,6 @@
 # Manual d'ús de Phileas
 
-*Versió 2.5.0*
+*Versió 2.6.0*
 
 Aquest manual t'acompanya pas a pas: des d'obrir Phileas per primera vegada
 fins a organitzar un llibre llarg. No cal llegir-lo de dalt a baix. Si només
@@ -280,6 +280,9 @@ coincidència **mentre escrius**. Retorn l'accepta.
 
 - **Ctrl+G** (o **F3**) salta a la coincidència següent.
 - **Alt+G** (o **Maj+F3**) a l'anterior.
+- La cerca **no distingeix majúscules** (si no n'escrius cap) **ni accents**:
+  `cafe` troba «cafè» i «Cafè», i `ca` troba també «ÇA». Si escrius l'accent
+  (`cafè`) o una majúscula (`Cafe`), la cerca és exacta.
 
 ### Substituir
 
@@ -332,11 +335,32 @@ En el quadre de suggeriments:
 
 - el **número** substitueix la paraula pel suggeriment triat;
 - **a** afegeix la paraula al teu diccionari personal (no tornarà a marcar-se);
+- **p** l'afegeix al **diccionari del projecte** (vegeu més avall);
 - **i** l'ignora fins que tanquis Phileas;
 - **Esc** surt sense fer res.
 
 *Exemple:* has escrit «presiciò». Poses el cursor a sobre, prems
 **Alt+Retorn**, veus «1 precisió, 2 pressió…» i prems **1**.
+
+### Diccionari del projecte
+
+Els noms propis d'una novel·la (personatges, llocs inventats) no han de
+contaminar el teu diccionari personal. Amb **p** al quadre de suggeriments, la
+paraula es desa a un fitxer **`.diccionari.txt`** (una paraula per línia) que
+serveix per a **tots els idiomes** i només per als documents d'aquell
+projecte: Phileas el busca a la carpeta del document i a les de sobre (fins a
+sis nivells). Si encara no n'hi ha, el crea a l'arrel del projecte de Fàbula
+(la carpeta amb `projecte.md`) o, si no és un projecte, a la carpeta del
+document. És un fitxer de text normal: es pot editar, copiar i `envia` el porta.
+
+### Aparellaments (Esc → Ortografia → Aparellaments)
+
+L'ordre **`revisar-aparellaments`** va al **paràgraf següent** amb un signe
+sense tancar o mal tancat: `«` `»`, `(` `)`, `[` `]`, `“` `”`, les cometes
+rectes, i el **guió de diàleg** (`—Hola —va dir.` té una acotació oberta i no
+tancada). Cada paràgraf s'ha de tancar tot sol. No revisa el codi, ni els
+numerals de llista (`1)`), ni els emoticones (`:)`). Quan no en queda cap, ho
+diu. Es repeteix per anar al problema següent.
 
 ---
 
@@ -466,6 +490,10 @@ Si ho actives, Phileas converteix mentre escrius:
 *Exemple de diàleg:* escrius `-- On vas? -- va preguntar.` i obtens
 `— On vas? — va preguntar.`
 
+- **Català:** amb la tipografia activa i el diccionari català, `col.legi` es
+  converteix en **`col·legi`** en escriure la segona `l` (també `il.lusió` i
+  `IL.LUSIÓ`; no en castellà, ni dins del codi, ni si el punt va després d'un
+  espai). Si no vols activar la tipografia, **Alt+.** insereix el punt volat `·`.
 - Activa-la o desactiva-la amb **Alt+T** (o Esc → Edita → Tipografia
   automàtica). La primera opció és `tipografia = si` al `phileasrc`; l'apòstrof
   tipogràfic és `apostrof-tipografic = si`.
@@ -473,6 +501,30 @@ Si ho actives, Phileas converteix mentre escrius:
 - No actua dins del codi ni a les línies fetes només de guions (`---`).
 - Al fitxer queden els caràcters Unicode, que són text normal i es veuen igual
   a tot arreu.
+
+### Inserir un caràcter pel nom (Esc → Edita → Insereix un caràcter)
+
+Per als teclats que no tenen un caràcter, **`unicode`** (Ctrl+P, o el menú)
+l'insereix pel nom curt o pel codi hexadecimal:
+
+| Nom | Caràcter | Nom | Caràcter |
+|-----|----------|-----|----------|
+| `punt-volat` | · | `guio-llarg` | — |
+| `guio-mitja` | – | `punts` | … |
+| `obre` / `tanca` | « » | `cometa-obre` / `cometa-tanca` | “ ” |
+| `apostrof` | ’ | `c-majuscula` / `c-minuscula` | Ç ç |
+| `ela-geminada` | ŀ | `grau`, `euro`, `lliura` | ° € £ |
+| `copyright`, `seccio`, `paragraf` | © § ¶ | `fletxa`, `multiplica` | → × |
+
+També `unicode 2014`, `unicode U+00B7` o `unicode 0xab`. Sense argument, en
+demana el nom. **Alt+.** és la drecera del punt volat.
+
+### Estadístiques (Esc → Cerca → Estadístiques)
+
+L'ordre **`estadistiques`** mostra, del document sencer o de la **selecció**:
+paraules, caràcters (amb i sense espais), frases, paràgrafs, **pàgines
+estàndard** (1.800 caràcters amb espais) i **temps de lectura** (200 paraules
+per minut). Les frases són aproximades (un títol no compta com a frase).
 
 ---
 
@@ -1057,6 +1109,7 @@ només la primera té instantània prèvia.
 | Ctrl+W / Alt+D | esborrar paraula anterior / següent |
 | Alt+↑ / Alt+↓ | pujar / baixar paràgraf (o secció, a l'esquema) |
 | Alt+T | tipografia automàtica |
+| Alt+. | punt volat · |
 | F5 / F6 | nota al peu / anar a la nota o tornar |
 
 ### Moviment i cerca

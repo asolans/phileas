@@ -35,14 +35,14 @@ static const struct {
     { "Edició", (const char *const[]){
         "nova-linia", "tabulador", "esborrar-enrere", "esborrar-endavant",
         "esborrar-paraula-anterior", "esborrar-paraula-seguent", "pujar-paragraf",
-        "baixar-paragraf", "tipografia", "nota-peu", "anar-a-nota", "renumerar-notes",
+        "baixar-paragraf", "tipografia", "unicode", "punt-volat", "nota-peu", "anar-a-nota", "renumerar-notes",
         "desfer", "refer", NULL } },
     { "Idees", (const char *const[]){
         "calaix-idea", "calaix-font", "calaix", "calaix-pi", "obsidian-vault", "obsidian-importa", NULL } },
     { "Cerca", (const char *const[]){
-        "cercar", "cercar-seguent", "cercar-anterior", "substituir", NULL } },
+        "cercar", "cercar-seguent", "cercar-anterior", "substituir", "estadistiques", NULL } },
     { "Ortografia", (const char *const[]){
-        "ortografia", "alternar-idioma", "revisar-ortografia", "suggeriments", "idioma", NULL } },
+        "ortografia", "alternar-idioma", "revisar-ortografia", "revisar-aparellaments", "suggeriments", "idioma", NULL } },
     { "Vista", (const char *const[]){
         "maquina-escriure", "centrar", "colors", "enfocament", "tema", "redibuixar", NULL } },
     { "Configuració i ajuda", (const char *const[]){
@@ -67,6 +67,9 @@ static const char *const intro[] = {
     "Pendents (Alt+K): TODO, [?] i %%nota%% es ressalten al text; la llista filtrable hi salta amb Enter.",
     "Suggeriments (Alt+Enter): el número substitueix, a afegeix, i ignora.",
     "Porta-retalls: a l'escriptori, Ctrl+C/Ctrl+V el comparteixen amb les altres aplicacions.",
+    "Cerca: no distingeix majúscules ni accents (cafe troba cafè); amb accent o majúscula al patró, és exacta.",
+    "Suggeriments: p afegeix la paraula al diccionari del projecte (.diccionari.txt, per a tots els idiomes).",
+    "Català amb tipografia activa: col.legi → col·legi. Alt+. insereix el punt volat; unicode NOM|CODI, qualsevol caràcter.",
     "Barra d'estat, a la dreta: desplaçament (salt, fixa o clàssic), idioma, paraules i pàgines.",
 };
 #define NINTRO (sizeof intro / sizeof intro[0])
@@ -373,25 +376,12 @@ void help_show(Editor *e)
     free(vis);
 }
 
-void about_show(Editor *e)
+/* Quadre centrat amb títol i línies, que es tanca amb qualsevol tecla. La
+ * primera línia va en negreta si bold1. */
+static void info_box(Editor *e, const char *title, const char *const *lines, int n, int bold1)
 {
-    char sys[128] = "";
-    const char *lines[8];
-    int n = 0, w = 0, h, x, y;
-    FILE *f = fopen("/etc/byok-version", "r");
+    int w = 0, h, x, y;
 
-    if (f) {
-        if (fgets(sys, sizeof sys, f))
-            sys[strcspn(sys, "\n")] = '\0';
-        fclose(f);
-    }
-    lines[n++] = "Phileas " PHILEAS_VERSION;
-    lines[n++] = "Editor de text amb Markdown";
-    if (sys[0])
-        lines[n++] = sys;
-    lines[n++] = "";
-    lines[n++] = "Llicència GPL-3.0-or-later";
-    lines[n++] = "github.com/asolans/phileas";
     for (int i = 0; i < n; i++) {
         int lw = (int)utf8_count(lines[i], strlen(lines[i]));
         if (lw > w)
@@ -422,12 +412,12 @@ void about_show(Editor *e)
     if (w > 14) {
         move(y, x + 2);
         attron(A_BOLD);
-        put(" Quant a ", w - 4);
+        put(title, w - 4);
         attroff(A_BOLD);
     }
     for (int i = 0; i < n && 2 + i < h - 1; i++) {
         move(y + 2 + i, x + 3);
-        if (i == 0)
+        if (i == 0 && bold1)
             attron(A_BOLD);
         put(lines[i], w - 6);
         attroff(A_BOLD);
@@ -438,4 +428,72 @@ void about_show(Editor *e)
     key_set_timeout(-1);
     while (key_read() < 0)
         ;
+}
+
+void about_show(Editor *e)
+{
+    char sys[128] = "";
+    const char *lines[8];
+    int n = 0;
+    FILE *f = fopen("/etc/byok-version", "r");
+
+    if (f) {
+        if (fgets(sys, sizeof sys, f))
+            sys[strcspn(sys, "\n")] = '\0';
+        fclose(f);
+    }
+    lines[n++] = "Phileas " PHILEAS_VERSION;
+    lines[n++] = "Editor de text amb Markdown";
+    if (sys[0])
+        lines[n++] = sys;
+    lines[n++] = "";
+    lines[n++] = "Llicència GPL-3.0-or-later";
+    lines[n++] = "github.com/asolans/phileas";
+    info_box(e, " Quant a ", lines, n, 1);
+}
+
+/* 12345 -> «12.345» */
+static void fmt_num(size_t v, char *out, size_t sz)
+{
+    char t[32];
+    size_t l, j = 0;
+
+    snprintf(t, sizeof t, "%zu", v);
+    l = strlen(t);
+    for (size_t i = 0; i < l && j + 2 < sz; i++) {
+        if (i && (l - i) % 3 == 0)
+            out[j++] = '.';
+        out[j++] = t[i];
+    }
+    out[j] = '\0';
+}
+
+void stats_show(Editor *e, const DocStats *st, int selection)
+{
+    char buf[8][96], a[32], b[32];
+    const char *lines[9];
+    int n = 0, mins;
+
+    fmt_num(st->words, a, sizeof a);
+    snprintf(buf[0], sizeof buf[0], "%-22s %s", "Paraules", a);
+    fmt_num(st->chars, a, sizeof a);
+    fmt_num(st->chars_nospace, b, sizeof b);
+    snprintf(buf[1], sizeof buf[1], "%-22s %s", "Caràcters (amb espais)", a);
+    snprintf(buf[2], sizeof buf[2], "%-22s %s", "Caràcters (sense)", b);
+    fmt_num(st->sentences, a, sizeof a);
+    snprintf(buf[3], sizeof buf[3], "%-22s %s", "Frases", a);
+    fmt_num(st->paragraphs, a, sizeof a);
+    snprintf(buf[4], sizeof buf[4], "%-22s %s", "Paràgrafs", a);
+    snprintf(buf[5], sizeof buf[5], "%-22s %.1f", "Pàgines (1.800 car.)", st->pages);
+    mins = (int)(st->minutes + 0.5);
+    if (mins < 1 && st->words)
+        snprintf(buf[6], sizeof buf[6], "%-22s menys d'1 min", "Lectura");
+    else if (mins < 60)
+        snprintf(buf[6], sizeof buf[6], "%-22s %d min", "Lectura", mins);
+    else
+        snprintf(buf[6], sizeof buf[6], "%-22s %d h %02d min", "Lectura", mins / 60, mins % 60);
+    for (int i = 0; i < 7; i++)
+        lines[n++] = buf[i];
+    lines[n++] = "";
+    info_box(e, selection ? " Estadístiques de la selecció " : " Estadístiques del document ", lines, n, 0);
 }

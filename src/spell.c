@@ -274,13 +274,13 @@ static char *convert(iconv_t cd, const char *s, size_t n)
     return out;
 }
 
-static void load_personal(void)
+/* Afegeix al diccionari d les paraules del fitxer (una per línia) */
+static void load_words_file(Dict *d, const char *path)
 {
-    char path[1024], line[256];
-    FILE *f;
+    char line[256];
+    FILE *f = fopen(path, "r");
 
-    personal_path(path, sizeof path);
-    if (!(f = fopen(path, "r")))
+    if (!f)
         return;
     while (fgets(line, sizeof line, f)) {
         size_t n = strcspn(line, "\r\n");
@@ -288,12 +288,27 @@ static void load_personal(void)
 
         if (n == 0)
             continue;
-        if ((w = convert(cur->to, line, n))) {
-            hs.add(cur->h, w);
+        if ((w = convert(d->to, line, n))) {
+            hs.add(d->h, w);
             free(w);
         }
+        cache_put(d, line, n, 1);
     }
     fclose(f);
+}
+
+/* Diccionari de projecte: .diccionari.txt a la carpeta del document o a una
+ * de superior; serveix per a tots els idiomes (noms propis d'una novel·la) */
+static char project_file[1024];
+
+static void load_personal(void)
+{
+    char path[1024];
+
+    personal_path(path, sizeof path);
+    load_words_file(cur, path);
+    if (project_file[0])
+        load_words_file(cur, project_file);
 }
 
 static Dict *find_loaded(const char *name)
@@ -508,6 +523,138 @@ int spell_add(const char *s, size_t n)
         return -1;
     fprintf(f, "%.*s\n", (int)n, s);
     return fclose(f) == 0 ? 0 : -1;
+}
+
+/* ---- Diccionari de projecte ---- */
+
+#define PROJECT_DICT ".diccionari.txt"
+#define PROJECT_LEVELS 6
+
+/* Carpeta del document (ruta absoluta), o 0 */
+static int doc_dir(const char *docpath, char *dir, size_t sz)
+{
+    char tmp[1024], *slash;
+
+    if (!docpath || !*docpath || strlen(docpath) >= sizeof tmp)
+        return 0;
+    snprintf(tmp, sizeof tmp, "%s", docpath);
+    slash = strrchr(tmp, '/');
+    if (slash && slash != tmp)
+        *slash = '\0';
+    else if (slash)
+        slash[1] = '\0';
+    else
+        snprintf(tmp, sizeof tmp, ".");
+    return realpath(tmp, dir) != NULL && strlen(dir) + strlen(PROJECT_DICT) + 2 < sz;
+}
+
+static int file_exists(const char *path)
+{
+    struct stat st;
+
+    return stat(path, &st) == 0 && S_ISREG(st.st_mode);
+}
+
+/* El diccionari de projecte que ja existeix per a aquest document, o 0 */
+static int project_lookup(const char *docpath, char *out, size_t sz)
+{
+    char dir[1024];
+
+    if (!doc_dir(docpath, dir, sizeof dir))
+        return 0;
+    for (int lv = 0; lv < PROJECT_LEVELS; lv++) {
+        char *slash;
+
+        if (snprintf(out, sz, "%s/%s", strcmp(dir, "/") ? dir : "", PROJECT_DICT) >= (int)sz)
+            break;
+        if (file_exists(out))
+            return 1;
+        if (!strcmp(dir, "/") || !(slash = strrchr(dir, '/')))
+            break;
+        if (slash == dir)
+            dir[1] = '\0';
+        else
+            *slash = '\0';
+    }
+    return 0;
+}
+
+/* On crear-lo si no n'hi ha: l'arrel d'un projecte de Fàbula (la carpeta amb
+ * projecte.md) o, si no, la carpeta del document */
+static int project_create_path(const char *docpath, char *out, size_t sz)
+{
+    char dir[1024], probe[1100], base[1024];
+
+    if (!doc_dir(docpath, dir, sizeof dir))
+        return 0;
+    snprintf(base, sizeof base, "%s", dir);
+    for (int lv = 0; lv < PROJECT_LEVELS; lv++) {
+        char *slash;
+
+        snprintf(probe, sizeof probe, "%s/projecte.md", strcmp(dir, "/") ? dir : "");
+        if (file_exists(probe)) {
+            snprintf(base, sizeof base, "%s", dir);
+            break;
+        }
+        if (!strcmp(dir, "/") || !(slash = strrchr(dir, '/')))
+            break;
+        if (slash == dir)
+            dir[1] = '\0';
+        else
+            *slash = '\0';
+    }
+    return snprintf(out, sz, "%s/%s", strcmp(base, "/") ? base : "", PROJECT_DICT) < (int)sz;
+}
+
+void spell_project_set(const char *docpath)
+{
+    char path[1024];
+
+    if (!project_lookup(docpath, path, sizeof path)) {
+        project_file[0] = '\0';
+        return;
+    }
+    if (!strcmp(path, project_file))
+        return;
+    snprintf(project_file, sizeof project_file, "%s", path);
+    for (int i = 0; i < MAX_DICTS; i++)
+        if (dicts[i].h)
+            load_words_file(&dicts[i], project_file);
+}
+
+const char *spell_project_file(void)
+{
+    return project_file[0] ? project_file : NULL;
+}
+
+int spell_add_project(const char *s, size_t n, const char *docpath)
+{
+    char path[1024];
+    FILE *f;
+
+    if (!project_file[0]) {
+        if (!project_create_path(docpath, path, sizeof path)) {
+            errno = ENOENT;
+            return -1;
+        }
+        snprintf(project_file, sizeof project_file, "%s", path);
+    }
+    if (!(f = fopen(project_file, "a")))
+        return -1;
+    fprintf(f, "%.*s\n", (int)n, s);
+    if (fclose(f) != 0)
+        return -1;
+    for (int i = 0; i < MAX_DICTS; i++)
+        if (dicts[i].h) {
+            char *w = convert(dicts[i].to, s, n);
+
+            if (w) {
+                hs.add(dicts[i].h, w);
+                free(w);
+            }
+            cache_put(&dicts[i], s, n, 1);
+        }
+    return 0;
 }
 
 void spell_ignore(const char *s, size_t n)

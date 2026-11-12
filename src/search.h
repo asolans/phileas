@@ -8,7 +8,8 @@
  *   dir < 0: l'última que comença abans de from.
  * Si arriba a un extrem del document, continua per l'altre i posa
  * *wrapped = 1. Si pat no té cap majúscula, no distingeix majúscules de
- * minúscules. Retorna 1 i el tram [*a, *z) si en troba. */
+ * minúscules ni les lletres amb accent de les
+ * sense (cafe troba cafè; cafè no troba cafe). Retorna 1 i el tram [*a, *z) si en troba. */
 int search_find(const Buffer *b, Pos from, const char *pat, int dir,
                 Pos *a, Pos *z, int *wrapped);
 

@@ -74,6 +74,7 @@ int ed_open(Editor *e, const char *path)
     }
     free(e->filename);
     e->filename = path ? xstrdup(path) : NULL;
+    spell_project_set(path);
     e->cy = e->cx = 0;
     e->top_line = e->top_row = 0;
     /* El final del text a l'ancoratge; un document buit comença a dalt, amb
@@ -872,6 +873,21 @@ int ed_typography(Editor *e, wchar_t ch)
         (q < 3 || s[q - 3] != '.') && typo_allowed(e, q - 2)) {
         typo_replace(e, q - 2, q + 1, "…");
         return 1;
+    }
+    /* Català: «col.legi» → «col·legi» (l.l dins d'una paraula; el punt volat
+     * no és al teclat) */
+    if ((ch == L'l' || ch == L'L') && q >= 3 && s[q - 1] == '.' && (s[q - 2] == 'l' || s[q - 2] == 'L')) {
+        wchar_t prev;
+        char code[32], rep[8];
+
+        spell_code(e->dict, code, sizeof code);
+        utf8_decode(s, l->len, utf8_prev(s, q - 2), &prev);
+        if (!strcmp(code, "ca") && prev != UTF8_INVALID && iswalpha((wint_t)prev) &&
+            typo_allowed(e, q - 1)) {
+            snprintf(rep, sizeof rep, "·%c", (char)ch);
+            typo_replace(e, q - 1, q + 1, rep);
+            return 1;
+        }
     }
     if (ch == L'\'' && e->typo_apos && q >= 1) {
         wchar_t prev;

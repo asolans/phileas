@@ -16,7 +16,7 @@ typedef struct {
 const Command *cmd_find(const char *name);
 
 /* Executa una ordre. args: el que s'ha escrit a la paleta després del nom
- * (NULL o "" si no res); només n'admeten les externes i «tema». */
+ * (NULL o "" si no res); només n'admeten les externes, «tema» i «unicode». */
 void cmd_run(Editor *e, const Command *c, const char *args);
 
 /* Arguments de l'ordre que s'està executant ("" si no en té). */
