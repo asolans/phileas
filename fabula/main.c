@@ -1,6 +1,7 @@
 #include "rc.h"
 #include "fterm.h"
 #include "ui.h"
+#include "chooser.h"
 #include "launch.h"
 #include "fview.h"
 #include "project.h"
@@ -15,6 +16,7 @@
 
 #include <limits.h>
 #include <locale.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -170,11 +172,51 @@ static void quit_hook(int sig)
 }
 
 /* Tema, paleta i colors del phileasrc (del sistema i de l'usuari), com a
- * Phileas, i l'editor */
+ * Phileas, l'editor i la carpeta dels projectes */
+static char projectes[PATH_MAX];
+
 static void rc_cb(const char *k, const char *v, void *ud)
 {
-    if (!cm_look_key(ud, k, v) && !strcmp(k, "editor"))
+    if (cm_look_key(ud, k, v))
+        return;
+    if (!strcmp(k, "editor"))
         launch_set_editor(v);
+    else if (!strcmp(k, "projectes"))
+        cm_rc_path(v, projectes, sizeof projectes);
+}
+
+/* Sense projecte (ni argument ni projecte.md a la carpeta actual) i amb
+ * «projectes =» al phileasrc: tria un projecte d'aquella carpeta o en crea un
+ * de nou. El terminal ja està iniciat. Retorna 1 amb el camí a out, 0 si es
+ * cancel·la i -1 amb el motiu a err. */
+static int choose_project(char *out, size_t outsz, char *err, size_t errsz)
+{
+    char **v, title[PATH_MAX + 64];
+    size_t n;
+    int r;
+
+    mkdir(projectes, 0755);                 /* la primera vegada pot no existir */
+    n = cm_dirs(projectes, "projecte.md", &v);
+    snprintf(title, sizeof title, "Fàbula · projectes de %s", projectes);
+    r = cm_choose(title, (const char *const *)v, n, "Projecte nou…",
+                  "Encara no hi ha cap projecte.");
+    if (r >= 0 && (size_t)r < n && (size_t)snprintf(out, outsz, "%s/%s", projectes, v[r]) >= outsz) {
+        snprintf(err, errsz, "camí massa llarg");
+        cm_dirs_free(v, n);
+        return -1;
+    }
+    cm_dirs_free(v, n);
+    if (r < 0)
+        return 0;
+    if ((size_t)r == n) {                    /* projecte nou */
+        char nom[256];
+
+        if (!cm_prompt("Títol del projecte nou: ", "", nom, sizeof nom, NULL, NULL) || !nom[0])
+            return 0;
+        if (project_create(projectes, nom, out, outsz, err, errsz) != 0)
+            return -1;
+    }
+    return 1;
 }
 
 int main(int argc, char **argv)
@@ -194,7 +236,8 @@ int main(int argc, char **argv)
              "     fabula compila [-o FITXER] [--puja] [--separa-escenes] [--amb-notes] [--amb-enllacos] [CARPETA]\n"
              "                     el manuscrit en un sol document (.md, o .docx/.epub/.pdf amb pandoc)\n\n"
              "Obre el projecte literari de CARPETA (la que té projecte.md; per defecte, la\n"
-             "carpeta actual). «nou» crea la carpeta del projecte (TÍTOL en minúscules i amb\n"
+             "carpeta actual). Sense CARPETA i fora d'un projecte, amb «projectes =» al\n"
+             "phileasrc, deixa triar un projecte d'aquella carpeta o crear-ne un. «nou» crea la carpeta del projecte (TÍTOL en minúscules i amb\n"
              "guions) dins de DIRECTORI (per defecte, l'actual) i l'obre.\n\n"
              "Retorn obre el capítol o la fitxa a Phileas (o a l'editor de «editor =» del\n"
              "phileasrc, o de FABULA_EDITOR, que hi mana).\n"
@@ -232,15 +275,38 @@ int main(int argc, char **argv)
     } else if (argc > 1) {
         dir = argv[1];
     }
-    if (project_open(&p, dir, err, sizeof err) != 0) {
-        fprintf(stderr, "fabula: %s\n", err);
-        return 1;
-    }
     cm_look_init(&look);
     cm_rc_read(rc_cb, &look);
-    cm_look_start(&look);
     key_quit_hook = quit_hook;
-    key_signals();
+    if (argc == 1 && projectes[0] && access("projecte.md", F_OK) != 0) {
+        int r;
+
+        cm_look_start(&look);
+        key_signals();
+        r = choose_project(path, sizeof path, err, sizeof err);
+        if (r <= 0) {
+            ft_end();
+            if (r < 0)
+                fprintf(stderr, "fabula: %s\n", err);
+            return r < 0;
+        }
+        dir = path;
+        if (project_open(&p, dir, err, sizeof err) != 0) {
+            ft_end();
+            fprintf(stderr, "fabula: %s\n", err);
+            return 1;
+        }
+    } else {
+        if (project_open(&p, dir, err, sizeof err) != 0) {
+            fprintf(stderr, "fabula: %s\n", err);
+            if (argc == 1 && !projectes[0])
+                fputs("(Amb «projectes = CARPETA» al phileasrc, «fabula» sense arguments deixa\n"
+                      "triar un projecte d'aquella carpeta o crear-ne un de nou.)\n", stderr);
+            return 1;
+        }
+        cm_look_start(&look);
+        key_signals();
+    }
     fview_run(&p);
     ft_end();
     project_free(&p);

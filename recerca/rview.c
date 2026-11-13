@@ -1081,6 +1081,7 @@ static void help(void)
         "  Ctrl+R                     torna a llegir el vault (només el que ha canviat)",
         "  r                          a la Pi: rep el vault del PC i hi envia _pi/ (rep), i el torna a llegir",
         "  Esc                        esborra el filtre; sense filtre, el menú",
+        "  Ctrl+P                     el menú (com la paleta de Phileas)",
         "  Ctrl+L                     redibuixa",
         "  Ctrl+Q / q                 surt",
         "",
@@ -1700,6 +1701,8 @@ void rview_run(Vault *v, const RviewOpts *o)
                 rebuild_list(&rv, 1);
                 break;
             }
+            /* fall through */
+        case 16:                                        /* Ctrl+P, com a Phileas */
             key = menu_run(&rv);
             if (key > 0) {
                 if (key == ']' || key == '\n' || key == K_FN(KEY_BACKSPACE))

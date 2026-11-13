@@ -1419,6 +1419,9 @@ static void c_autosave(Editor *e)
     }
 }
 
+static void c_fabula(Editor *e);
+static void c_recerca(Editor *e);
+
 static const Command commands[] = {
     { "moure-amunt",       c_up,         "Puja una línia de pantalla", ACT_NONE },
     { "moure-avall",       c_down,       "Baixa una línia de pantalla", ACT_NONE },
@@ -1472,6 +1475,8 @@ static const Command commands[] = {
     { "calaix-font",               c_calaix_font,    "Tria la font (llibre o article) que el calaix proposa a cada idea", ACT_NONE },
     { "obsidian-vault",            c_obsidian_vault, "Tria la carpeta del vault d'Obsidian (i, si es vol, la carpeta d'entrada i la propietat del tipus)", ACT_NONE },
     { "calaix-pi",                 c_calaix_pi,      "Diu on és el calaix que arriba de la Pi amb «envia»", ACT_NONE },
+    { "fabula",            c_fabula,     "Obre Fàbula (projectes de llibre); en sortir, torna a Phileas", ACT_NONE },
+    { "recerca",           c_recerca,    "Obre Recerca (fitxes de recerca d'un vault); en sortir, torna a Phileas", ACT_NONE },
     { "obsidian-importa",          c_obsidian_import, "Importa el calaix local i el de la Pi al vault d'Obsidian, sense sortir de Phileas", ACT_NONE },
     { "tallar",                    c_cut,            "Talla la selecció", ACT_NONE },
     { "copiar",                    c_copy,           "Copia la selecció", ACT_NONE },
@@ -1607,17 +1612,42 @@ static External *as_external(const Command *c)
     return NULL;
 }
 
+/* Les eines germanes (ordres fabula i recerca): el programa que executen.
+ * Un «externa-pantalla.fabula = ORDRE» del phileasrc el canvia. */
+static const char *const tool_names[] = { "fabula", "recerca" };
+static char *tool_shell[2];
+
 void cmd_extern_clear(void)
 {
     for (size_t i = 0; i < nexternals; i++)
         free(externals[i].shell);
     nexternals = 0;
+    for (int i = 0; i < 2; i++) {
+        free(tool_shell[i]);
+        tool_shell[i] = NULL;
+    }
+}
+
+
+static int tool_index(const char *name)
+{
+    for (int i = 0; i < 2; i++)
+        if (!strcmp(name, tool_names[i]))
+            return i;
+    return -1;
 }
 
 int cmd_config_extern(const char *name, const char *shell, int brief, char *err, size_t errsz)
 {
     External *x = NULL;
+    int t = tool_index(name);
 
+    if (t >= 0) {                   /* fabula i recerca ja hi són: se'n canvia l'ordre */
+        (void)brief;
+        free(tool_shell[t]);
+        tool_shell[t] = xstrdup(shell);
+        return 0;
+    }
     for (size_t i = 0; i < NCOMMANDS; i++) {
         if (!strcmp(commands[i].name, name)) {
             snprintf(err, errsz, "«%s» ja és una ordre de Phileas", name);
@@ -1755,16 +1785,41 @@ static void run_interactive(Editor *e, const External *x, const char *cmd)
         ed_msg(e, "%s: fet", x->name);
 }
 
+/* Si el document ha canviat al disc mentre era fora (Fàbula o Recerca l'han
+ * obert a un altre Phileas), el torna a llegir, amb el cursor on era. Abans
+ * de sortir s'ha desat: no hi ha canvis que es perdin. */
+static void reload_if_changed(Editor *e, const struct stat *before)
+{
+    struct stat now;
+    char *path;
+
+    if (!e->filename || e->buf.modified || stat(e->filename, &now) != 0)
+        return;
+    if (now.st_mtim.tv_sec == before->st_mtim.tv_sec &&
+        now.st_mtim.tv_nsec == before->st_mtim.tv_nsec && now.st_size == before->st_size)
+        return;
+    history_remember(e);
+    path = xstrdup(e->filename);
+    if (ed_open(e, path) == 0) {
+        history_restore(e);
+        ed_msg(e, "%s s'ha canviat fora: l'he tornat a llegir", path);
+    }
+    free(path);
+}
+
 /* De pantalla sencera (Recerca, Fàbula): en acabar torna directament */
 static void run_screen(Editor *e, const External *x, const char *cmd)
 {
-    int st;
+    struct stat before;
+    int st, have = e->filename && stat(e->filename, &before) == 0;
 
     ui_suspend();
     st = system(cmd);
     ui_resume();
     if (!extern_failed(e, x, st, NULL))
         ed_msg(e, "%s: fet", x->name);
+    if (have)
+        reload_if_changed(e, &before);
 }
 
 static void run_external(Editor *e, const External *x, const char *args)
@@ -1794,13 +1849,36 @@ const char *cmd_args(void)
     return run_args;
 }
 
+/* Fàbula i Recerca, de pantalla sencera; en sortir, es torna a Phileas.
+ * Els arguments de la paleta passen al programa (un projecte, un vault). */
+static void run_tool(Editor *e, int t)
+{
+    External x = { 0 };
+
+    snprintf(x.name, sizeof x.name, "%s", tool_names[t]);
+    x.shell = tool_shell[t] ? tool_shell[t] : (char *)tool_names[t];
+    x.brief = 2;
+    run_external(e, &x, cmd_args());
+}
+
+static void c_fabula(Editor *e)
+{
+    run_tool(e, 0);
+}
+
+static void c_recerca(Editor *e)
+{
+    run_tool(e, 1);
+}
+
 void cmd_run(Editor *e, const Command *c, const char *args)
 {
     const External *x = as_external(c);
 
     if (x) {
         run_external(e, x, args);
-    } else if (args && *args && c->fn != c_theme && c->fn != c_unicode) {
+    } else if (args && *args && c->fn != c_theme && c->fn != c_unicode && c->fn != c_fabula &&
+               c->fn != c_recerca) {
         ed_msg(e, "L'ordre %s no admet arguments", c->name);
     } else {
         run_args = args ? args : "";

@@ -3,6 +3,7 @@
 #include "fold.h"
 #include "fterm.h"
 #include "ui.h"
+#include "chooser.h"
 #include "launch.h"
 #include "rc.h"
 #include "rview.h"
@@ -24,8 +25,9 @@ static void ajuda(void)
          "\n"
          "Ús: recerca [OPCIÓ] [VAULT]\n"
          "\n"
-         "VAULT és la carpeta del vault (per defecte, «recerca-vault =» del phileasrc,\n"
-         "o si no la carpeta actual). Sense opcions, obre la pantalla de navegació.\n"
+         "VAULT és la carpeta del vault (per defecte, «recerca-vault =» del phileasrc;\n"
+         "si no, amb «recerques = CARPETA», el vault d'aquella carpeta, o es tria si n'hi\n"
+         "ha més d'un; si no, la carpeta actual). Sense opcions, obre la pantalla de navegació.\n"
          "L'índex és a VAULT/.recerca/index.db: es posa al dia sol cada vegada\n"
          "(només les notes noves o canviades) i es pot esborrar sense perdre res.\n"
          "\n"
@@ -232,6 +234,7 @@ typedef struct {
     char vault[4096];
     int  replica;
     char entrada[256];
+    char recerques[4096];   /* carpeta dels vaults («recerques =») */
 } Rc;
 
 static void rc_cb(const char *k, const char *v, void *ud)
@@ -246,6 +249,8 @@ static void rc_cb(const char *k, const char *v, void *ud)
         cm_rc_path(v, rc->vault, sizeof rc->vault);
     else if (!strcmp(k, "recerca-replica"))
         rc->replica = cm_rc_bool(v);
+    else if (!strcmp(k, "recerques"))
+        cm_rc_path(v, rc->recerques, sizeof rc->recerques);
     else if (!strcmp(k, "recerca-entrada"))
         snprintf(rc->entrada, sizeof rc->entrada, "%s", v);
 }
@@ -267,12 +272,15 @@ static void progres_pantalla(size_t fet, size_t total, void *ud)
     refresh();
 }
 
+static int started;     /* el terminal ja és en marxa (pel triador de vaults) */
+
 static int pantalla(Vault *v, const Rc *rc)
 {
     VaultSync s;
     char err[512];
 
-    cm_look_start(&rc->look);
+    if (!started)
+        cm_look_start(&rc->look);
     key_quit_hook = quit_hook;
     key_signals();
     progres_pantalla(0, 0, NULL);
@@ -350,10 +358,51 @@ int main(int argc, char **argv)
 
     cm_look_init(&rc.look);
     cm_rc_read(rc_cb, &rc);
+    /* Sense vault ni «recerca-vault», i amb «recerques =»: el vault d'aquella
+     * carpeta, si només n'hi ha un, o es tria */
+    if (!dir && !rc.vault[0] && rc.recerques[0] && !op) {
+        static char triat[4200];
+        char **vs;
+        size_t n = cm_dirs(rc.recerques, NULL, &vs);
+
+        if (n == 0) {
+            fprintf(stderr, "Encara no hi ha cap vault de recerca a %s.\n"
+                    "Porta'n un de l'ordinador amb «rep» (a la BYOK, menú BYOK → Ordinador).\n",
+                    rc.recerques);
+            return 1;
+        }
+        if (n == 1) {
+            snprintf(triat, sizeof triat, "%s/%s", rc.recerques, vs[0]);
+        } else {
+            char title[4200];
+            int t;
+
+            if (!isatty(0) || !isatty(1)) {
+                fprintf(stderr, "recerca: la pantalla necessita un terminal (vegeu --help)\n");
+                return 1;
+            }
+            cm_look_start(&rc.look);
+            started = 1;
+            key_quit_hook = quit_hook;
+            key_signals();
+            snprintf(title, sizeof title, "Recerca · vaults de %s", rc.recerques);
+            t = cm_choose(title, (const char *const *)vs, n, NULL, NULL);
+            if (t < 0) {
+                ft_end();
+                cm_dirs_free(vs, n);
+                return 0;
+            }
+            snprintf(triat, sizeof triat, "%s/%s", rc.recerques, vs[t]);
+        }
+        cm_dirs_free(vs, n);
+        dir = triat;
+    }
     if (!dir)
         dir = rc.vault[0] ? rc.vault : ".";
     v = vault_open(dir, err, sizeof err);
     if (!v) {
+        if (started)
+            ft_end();
         fprintf(stderr, "recerca: %s\n", err);
         return 1;
     }

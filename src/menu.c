@@ -141,15 +141,18 @@ static const MenuItem byok_known[] = {
     { 'o', "Ordinador: sincronitza…", "ordinador", NULL, NULL },
     { 'e', "Exporta al pendrive",  "exporta", NULL, NULL },
     { 'n', "Envia a un ordinador", "envia",   NULL, NULL },
-    SEP,
-    { 'f', "Fàbula (projectes)",   "fabula",  NULL, NULL },
-    { 'c', "Recerca",              "recerca", NULL, NULL },
     { 'b', "Rep la recerca del PC", "rep",    NULL, NULL },
 };
 #define NBYOK_KNOWN (sizeof byok_known / sizeof byok_known[0])
 
 static MenuItem byok_items[NBYOK_KNOWN + 41];
 static const Menu m_byok = { "BYOK", byok_items };
+
+/* Les eines germanes: Fàbula i Recerca (a la BYOK i a l'ordinador) */
+static const Menu m_tools = { "Eines", (const MenuItem[]){
+    { 'f', "Fàbula: projectes de llibre", "fabula",  NULL, NULL },
+    { 'r', "Recerca: fitxes de recerca",  "recerca", NULL, NULL },
+    { 0 } } };
 
 static const Menu m_main = { "Menú", (const MenuItem[]){
     { 'f', "Fitxer",               NULL, NULL, &m_file },
@@ -158,6 +161,7 @@ static const Menu m_main = { "Menú", (const MenuItem[]){
     { 'o', "Ortografia",           NULL, NULL, &m_spell },
     { 'v', "Vista",                NULL, NULL, &m_view },
     { 'i', "Idees",                NULL, NULL, &m_ideas },
+    { 'n', "Eines",                NULL, NULL, &m_tools },
     SEP,
     { 'b', "BYOK",                 NULL, NULL, &m_byok },
     SEP,

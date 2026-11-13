@@ -39,6 +39,7 @@ static const struct {
         "desfer", "refer", NULL } },
     { "Idees", (const char *const[]){
         "calaix-idea", "calaix-font", "calaix", "calaix-pi", "obsidian-vault", "obsidian-importa", NULL } },
+    { "Eines: Fàbula i Recerca", (const char *const[]){ "fabula", "recerca", NULL } },
     { "Cerca", (const char *const[]){
         "cercar", "cercar-seguent", "cercar-anterior", "substituir", "estadistiques", NULL } },
     { "Ortografia", (const char *const[]){
@@ -67,6 +68,7 @@ static const char *const intro[] = {
     "Pendents (Alt+K): TODO, [?] i %%nota%% es ressalten al text; la llista filtrable hi salta amb Enter.",
     "Suggeriments (Alt+Enter): el número substitueix, a afegeix, i ignora.",
     "Porta-retalls: a l'escriptori, Ctrl+C/Ctrl+V el comparteixen amb les altres aplicacions.",
+    "Eines (Esc → Eines, o fabula i recerca a la paleta): Fàbula i Recerca; en sortir, tornes aquí.",
     "Cerca: no distingeix majúscules ni accents (cafe troba cafè); amb accent o majúscula al patró, és exacta.",
     "Suggeriments: p afegeix la paraula al diccionari del projecte (.diccionari.txt, per a tots els idiomes).",
     "Català amb tipografia activa: col.legi → col·legi. Alt+. insereix el punt volat; unicode NOM|CODI, qualsevol caràcter.",

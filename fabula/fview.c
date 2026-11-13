@@ -1358,6 +1358,7 @@ static void help(void)
         "  Tab                        canvia entre l'arbre i la taula (outliner)",
         "  Taula: ← →  columna · o  ordena (▲ ▼ i res) · m  edita la metadada de la columna",
         "  Esc                        esborra el filtre; sense filtre, el menú",
+        "  Ctrl+P                     el menú (com la paleta de Phileas)",
         "  Ctrl+L                     redibuixa",
         "  Ctrl+Q / q                 surt",
         "",
@@ -1676,6 +1677,8 @@ void fview_run(Project *p)
                 rebuild(&v, n);
                 break;
             }
+            /* fall through */
+        case 16:                                        /* Ctrl+P, com a Phileas */
             key = menu_run(&v);
             if (key < 0)
                 break;

@@ -1,6 +1,6 @@
 # Manual d'ús de Phileas
 
-*Versió 2.9.0*
+*Versió 2.10.0*
 
 Aquest manual t'acompanya pas a pas: des d'obrir Phileas per primera vegada
 fins a organitzar un llibre llarg. No cal llegir-lo de dalt a baix. Si només
@@ -719,8 +719,9 @@ externa.terminal = sh
   sortida a la barra d'estat. A la paleta: `paraules capitol1.md`.
 - `externa.NOM`: deixa la pantalla a l'ordre fins que acaba; després torna
   a Phileas quan prems Retorn. Va bé per obrir un shell o executar `pandoc`.
-- `externa-pantalla.NOM`: per a un programa de **pantalla sencera** (com
-  Recerca o Fàbula): en sortir-ne, torna directament a Phileas, sense Retorn.
+- `externa-pantalla.NOM`: per a un programa de **pantalla sencera**: en
+  sortir-ne, torna directament a Phileas, sense Retorn. Fàbula i Recerca ja
+  són ordres de Phileas (Esc → Eines); amb aquestes línies se'n canvia l'ordre:
 
 ```ini
 externa-pantalla.recerca = recerca ~/Documents/Recerca
@@ -754,11 +755,14 @@ Esc → **BYOK** (només a la Pi):
 | Ordinador: sincronitza… | tot l'intercanvi amb un ordinador de la xarxa: puja els textos i els projectes, porta i torna la recerca, i aparella ordinadors nous (vegeu més avall) |
 | Exporta al pendrive | copia els textos, els projectes i les fitxes de recerca fetes a la Pi a un pendrive USB |
 | Envia a un ordinador | copia els textos i els projectes, per la xarxa, a un ordinador Linux |
-| Fàbula (projectes) | obre Fàbula ([capítol 16](#16-fàbula-organitzar-un-llibre)): tria un projecte de `/data/projectes` o en crea un de nou; en sortir, torna a Phileas |
-| Recerca | obre Recerca amb els vaults de recerca de la Pi ([capítol 17](#17-recerca-fitxes-de-recerca)); en sortir, torna a Phileas |
 | Rep la recerca del PC | porta un vault d'Obsidian del PC a la Pi i hi torna les fitxes escrites a la Pi |
 
-També són ordres de la paleta: `lletra`, `gira`, `ordinador`, `exporta`, `envia`, `fabula`, `recerca`, `rep`.
+També són ordres de la paleta: `lletra`, `gira`, `ordinador`, `exporta`, `envia`, `rep`.
+
+Fàbula i Recerca són al menú **Eines** (Esc → Eines), a la Pi i a l'ordinador:
+Fàbula deixa triar un projecte de `/data/projectes` o crear-ne un de nou, i
+Recerca, un vault de `/data/recerca` (si només n'hi ha un, l'obre directament).
+En sortir, tornes a Phileas.
 
 ### Passar els textos a l'ordinador
 
@@ -894,6 +898,15 @@ fabula la-casa-del-pou            # obre un projecte existent
 fabula                            # obre el de la carpeta actual
 fabula --resum la-casa-del-pou    # el resum en text, sense pantalla
 ```
+
+Des de Phileas: **Esc → Eines → Fàbula** (o `fabula` a la paleta). Si al
+`phileasrc` hi ha `projectes = CARPETA` i no ets dins d'un projecte, Fàbula
+mostra la llista dels projectes d'aquella carpeta i «Projecte nou…». En
+sortir de Fàbula, tornes a Phileas; si el document que tenies obert s'ha
+canviat mentrestant, Phileas el torna a llegir.
+
+A Fàbula, **Esc** o **Ctrl+P** obren el menú, **F1** l'ajuda i **Ctrl+Q** surt,
+com a Phileas i a Recerca.
 
 Fàbula agafa el tema i els colors del `phileasrc`, com Phileas. Si vols un
 altre editor, posa `editor = ORDRE` al `phileasrc` (ordre i arguments separats
@@ -1156,6 +1169,11 @@ res del format: el mateix vault s'obre a Obsidian al PC i a Recerca a la Pi.
 recerca ~/Documents/Recerca      # obre el vault
 recerca --resum ~/Documents/Recerca
 ```
+
+Des de Phileas: **Esc → Eines → Recerca** (o `recerca` a la paleta). Sense
+vault a la línia d'ordres ni `recerca-vault`, i amb `recerques = CARPETA` al
+`phileasrc`, Recerca obre el vault d'aquella carpeta o, si n'hi ha més d'un,
+te'l deixa triar. Esc o Ctrl+P obren el menú.
 
 ### Què entén
 

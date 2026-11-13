@@ -36,7 +36,7 @@ build/test_phileas: tests/test.c $(CORE)
 # ---- Fàbula (eina companya, fabula/): objectes compartits de src/ i propis ----
 FSHARED = build/utf8.o build/util.o build/md.o build/buffer.o build/undo.o build/outline.o
 FOBJ    = build/comu_yaml.o build/comu_fold.o build/fabula_project.o build/fabula_find.o build/fabula_compile.o build/fabula_diary.o build/fabula_timeline.o
-FUI     = build/fabula_flat.o build/fabula_table.o build/comu_fterm.o build/comu_ui.o build/fabula_fview.o build/comu_launch.o build/fabula_main.o build/comu_rc.o
+FUI     = build/fabula_flat.o build/fabula_table.o build/comu_fterm.o build/comu_ui.o build/comu_chooser.o build/fabula_fview.o build/comu_launch.o build/fabula_main.o build/comu_rc.o
 FSHARED_UI = build/theme.o build/keys.o
 
 .PHONY: fabula test-fabula
@@ -106,7 +106,7 @@ SQLDEF  = -DSQLITE_ENABLE_FTS5 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSIO
           -DSQLITE_DEFAULT_WAL_SYNCHRONOUS=1
 RCOMU   = build/comu_fold.o build/comu_mdscan.o build/comu_front.o build/comu_rc.o
 ROBJ    = $(RCOMU) build/recerca_vault.o build/recerca_model.o build/recerca_nova.o build/comu_yaml.o build/recerca_sqlite3.o build/utf8.o build/util.o build/theme.o
-RUI     = build/recerca_rview.o build/recerca_main.o build/comu_fterm.o build/comu_ui.o build/comu_launch.o build/keys.o
+RUI     = build/recerca_rview.o build/recerca_main.o build/comu_fterm.o build/comu_ui.o build/comu_chooser.o build/comu_launch.o build/keys.o
 RINC    = -Isrc -Icomu -Irecerca -Irecerca/sqlite
 
 .PHONY: recerca test-recerca
