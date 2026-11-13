@@ -59,6 +59,10 @@ static void cursor_color(long rgb)
     osc(seq, n);
 }
 
+/* La parella de colors de ncurses d'un paper és el paper + 1: la parella 0
+ * és la del terminal i no es pot canviar (amb FT_TEXT = 0, el text normal
+ * quedava sempre amb els colors del terminal, i els temes clars es veien
+ * amb el fons fosc). */
 static void set_pair(short pair, short c, short b, short text_fg, short text_bg)
 {
     pair_bold[pair] = 0;
@@ -72,12 +76,12 @@ static void set_pair(short pair, short c, short b, short text_fg, short text_bg)
         b = text_bg;
     else if (b >= 8 && b >= COLORS)
         b -= 8;
-    init_pair(pair, c, b);
+    init_pair(pair + 1, c, b);
 }
 
 static attr_t pair_attr(short pair)
 {
-    return COLOR_PAIR(pair) | pair_bold[pair];
+    return COLOR_PAIR(pair + 1) | pair_bold[pair];
 }
 
 /* Els mateixos colors que Phileas (render_colors): text i fons, barra,

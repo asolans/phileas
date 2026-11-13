@@ -1,6 +1,6 @@
 # Manual d'ús de Phileas
 
-*Versió 2.7.0*
+*Versió 2.7.1*
 
 Aquest manual t'acompanya pas a pas: des d'obrir Phileas per primera vegada
 fins a organitzar un llibre llarg. No cal llegir-lo de dalt a baix. Si només
@@ -730,7 +730,7 @@ Esc → **BYOK** (només a la Pi):
 | Lletra més gran / més petita | canvia la mida de la lletra de la pantalla |
 | Gira la pantalla | gira la imatge (útil si el monitor està en vertical) |
 | Exporta al pendrive | copia els textos a un pendrive USB |
-| Envia a un ordinador | copia els textos, per la xarxa, a un ordinador Linux |
+| Envia a un ordinador | copia els textos i els projectes, per la xarxa, a un ordinador Linux |
 | Recerca | obre Recerca amb els vaults de recerca de la Pi ([capítol 17](#17-recerca-fitxes-de-recerca)); en sortir, torna a Phileas |
 | Rep la recerca del PC | porta un vault d'Obsidian del PC a la Pi i hi torna les fitxes escrites a la Pi |
 
@@ -741,7 +741,12 @@ També són ordres de la paleta: `lletra`, `gira`, `exporta`, `envia`, `recerca`
 - **Amb un pendrive:** endolla'l, Esc → BYOK → Exporta al pendrive, i
   desendolla'l quan acabi.
 - **Per la xarxa:** Esc → BYOK → Envia a un ordinador. Es mostra un menú
-  amb els ordinadors aparellats; els textos arriben a `~/BYOK` de l'ordinador.
+  amb els ordinadors aparellats; després demana la **carpeta de destinació**
+  dins del teu home (per exemple `Documents/Escriure`; per defecte, la darrera
+  que has triat). Hi deixa dues carpetes: `textos/` (els de `/data/textos`) i
+  `projectes/` (els de `/data/projectes`). No esborra mai res de l'ordinador.
+  Si hi tens el calaix, a l'ordinador és a `<carpeta>/textos/calaix.md`: posa
+  aquest camí a `calaix-pi` del phileasrc de l'ordinador.
 
 ### Apagar el dispositiu
 
@@ -1197,6 +1202,10 @@ La recerca es fa al PC, amb Obsidian, i la Pi en porta una **còpia**:
    envia `_pi/` al PC. Al PC, a Obsidian, mou les fitxes de `_pi/` al seu
    lloc: la vegada següent, desapareixen de `_pi/` a la Pi i hi arriben al
    lloc nou.
+
+Per treure un vault de la llista de `rep`, tria **treu un vault de la llista** al
+seu menú: n'esborra la configuració i, si vols, la còpia de la Pi, i et diu
+l'ordre per treure del PC les dues claus d'aquell vault.
 
 Les fonts (PDF, imatges) no viatgen: queden al PC. A les fitxes, la propietat
 `font` hi apunta.
