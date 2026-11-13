@@ -314,8 +314,21 @@ amb les propietats a dalt. Retorn passa de la navegació a les fitxes i d'aquí 
 visor; al visor, Tab i Maj+Tab trien un enllaç (també `]` i `[`), Retorn el segueix
 i Retrocés torna enrere. `u` i `b` mostren les notes que hi enllacen, `l` els
 enllaços de la fitxa, `t` els trencats de tot el vault i `z` amplia el visor. Per
-sota de 110 columnes es veuen dos panells. Esc obre el menú i F1, l'ajuda. El vault per
-defecte es pot posar al phileasrc (`recerca-vault = /ruta/al/vault`).
+sota de 110 columnes es veuen dos panells. Esc obre el menú i F1, l'ajuda.
+
+`e` obre la fitxa a Phileas (o a l'editor de `RECERCA_EDITOR`) a la línia que es
+veu, i en tornar la torna a llegir. `n` crea una fitxa nova a la carpeta triada,
+amb una plantilla de la carpeta de plantilles d'Obsidian si n'hi ha; `a` hi fa una
+anotació (una fitxa nova amb `anota: "[[Fitxa]]"`), i `Supr` la mou a la
+paperera d'Obsidian (`.trash/`). Les fitxes noves porten `id` i `created`.
+
+Al phileasrc:
+
+```
+recerca-vault = /ruta/al/vault   # el vault per defecte
+recerca-replica = si             # el vault és una còpia del PC (la Pi):
+recerca-entrada = _pi            # només s'escriu en aquesta carpeta
+```
 
 ```bash
 recerca VAULT                    # la pantalla

@@ -3,6 +3,7 @@
 #include "front.h"
 #include "mdscan.h"
 #include "model.h"
+#include "nova.h"
 #include "vault.h"
 
 #include <locale.h>
@@ -396,6 +397,54 @@ static void test_relatiu(void)
     vault_close(v);
 }
 
+static void test_nova(void)
+{
+    char root[600], rel[700], dest[700], err[256], *s, **l;
+    size_t n;
+    struct stat st;
+
+    CHECK(eqfree(nova_nom("  Carta: «el rei» / f. 56v?  "), "Carta «el rei»  f. 56v"));
+    CHECK(eqfree(nova_nom("[[x]]#^|*"), "x"));
+    CHECK(eqfree(nova_nom("..."), ""));
+
+    s = nova_text(NULL, "Fogatge", "pi-1", "2026-11-13 08:15", NULL);
+    CHECK(strstr(s, "id: pi-1\n") && strstr(s, "created:") && strstr(s, "2026-11-13 08:15") && strstr(s, "# Fogatge\n"));
+    CHECK(!strncmp(s, "---\n", 4));
+    free(s);
+    s = nova_text("---\ntipus: fons\n---\n# {{title}}\nCreada el {{date}} a les {{time}}; {{titol}}.\n",
+                  "Reg. 12", "x7", "2026-11-13 08:15", "Pere III");
+    CHECK(strstr(s, "tipus: fons\n") && strstr(s, "id: x7") && strstr(s, "anota: \"[[Pere III]]\"\n"));
+    CHECK(strstr(s, "# Reg. 12\nCreada el 2026-11-13 a les 08:15; Reg. 12.\n"));
+    {
+        size_t line;
+
+        CHECK(cm_front(s, strlen(s), &line, NULL, NULL) > 0);
+    }
+    free(s);
+
+    snprintf(root, sizeof root, "%s/nova", tmpdir);
+    mkdir(root, 0755);
+    CHECK(nova_crea(root, "_pi", "Nota", "a\n", rel, sizeof rel, err, sizeof err) == 0 && !strcmp(rel, "_pi/Nota.md"));
+    CHECK(nova_crea(root, "_pi", "Nota", "b\n", rel, sizeof rel, err, sizeof err) == 0 && !strcmp(rel, "_pi/Nota 2.md"));
+    CHECK(nova_crea(root, "", "Arrel", "c\n", rel, sizeof rel, err, sizeof err) == 0 && !strcmp(rel, "Arrel.md"));
+    CHECK(nova_crea(root, "x", "", "c\n", rel, sizeof rel, err, sizeof err) != 0);
+    CHECK(nova_paperera(root, "_pi/Nota.md", dest, sizeof dest, err, sizeof err) == 0 && !strcmp(dest, ".trash/Nota.md"));
+    CHECK(nova_crea(root, "_pi", "Nota", "d\n", rel, sizeof rel, err, sizeof err) == 0 && !strcmp(rel, "_pi/Nota.md"));
+    CHECK(nova_paperera(root, "_pi/Nota.md", dest, sizeof dest, err, sizeof err) == 0 && !strcmp(dest, ".trash/Nota 2.md"));
+    snprintf(rel, sizeof rel, "%s/.trash/Nota 2.md", root);
+    CHECK(stat(rel, &st) == 0);
+
+    /* plantilles: la carpeta de .obsidian/templates.json */
+    put("nova/.obsidian/templates.json", "{\n  \"folder\": \"Models\"\n}\n");
+    put("nova/Models/Fons.md", "---\ntipus: fons\n---\n");
+    put("nova/Models/notes.txt", "no\n");
+    nova_carpeta_plantilles(root, dest, sizeof dest);
+    CHECK(!strcmp(dest, "Models"));
+    n = nova_plantilles(root, &l);
+    CHECK(n == 1 && !strcmp(l[0], "Models/Fons.md"));
+    nova_llista_free(l, n);
+}
+
 int main(void)
 {
     char cmd[600];
@@ -410,6 +459,7 @@ int main(void)
     test_scan();
     test_vault();
     test_relatiu();
+    test_nova();
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", tmpdir);
     if (system(cmd)) {
     }

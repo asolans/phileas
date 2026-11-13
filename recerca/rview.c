@@ -3,8 +3,10 @@
 #include "fold.h"
 #include "front.h"
 #include "fterm.h"
+#include "launch.h"
 #include "mdscan.h"
 #include "model.h"
+#include "nova.h"
 
 #include "keys.h"
 #include "utf8.h"
@@ -87,7 +89,8 @@ typedef struct {
     long long back_of;      /* nota de la qual són els backlinks */
     Hist     hist[64];
     int      nhist;
-    char     msg[256];
+    char     msg[4400];
+    RviewOpts opt;
 } RView;
 
 /* ---------- dibuix bàsic ---------- */
@@ -755,7 +758,7 @@ static void status(RView *rv)
     }
     switch (rv->focus) {
     case F_NAV:  hint = "↑↓ tria · Retorn fitxes · 1 2 3 carpetes/etiquetes/tipus · Tab · Esc menú · F1"; break;
-    case F_LIST: hint = "↑↓ tria · Retorn llegeix · / filtra · o ordena · ← navegació · Esc menú · F1"; break;
+    case F_LIST: hint = "↑↓ tria · Retorn llegeix · e edita · n nova · / filtra · o ordena · Esc menú · F1"; break;
     case F_DOC:  hint = "Tab enllaç · Retorn segueix · Retrocés torna · ← fitxes · u backlinks · z amplia · Esc menú"; break;
     default:     hint = "↑↓ tria · Retorn obre la nota · Tab · Esc menú · F1"; break;
     }
@@ -1087,6 +1090,11 @@ static int menu_run(RView *rv)
         { "Filtra les fitxes", "/", '/' },
         { "Canvia l'ordre", "o", 'o' },
         { "Fitxa", NULL, 0 },
+        { "Edita a Phileas", "e", 'e' },
+        { "Fitxa nova", "n", 'n' },
+        { "Anotació a aquesta fitxa", "a", 'a' },
+        { "Mou a la paperera", "Supr", K_FN(KEY_DC) },
+        { "Enllaços", NULL, 0 },
         { "Enllaç següent / anterior", "Tab Maj+Tab", ']' },
         { "Segueix l'enllaç", "Retorn", '\n' },
         { "Torna enrere", "Retrocés", K_FN(KEY_BACKSPACE) },
@@ -1205,12 +1213,17 @@ static void help(void)
         "  l                          enllaços d'aquesta fitxa i on van a parar",
         "  t                          enllaços trencats de tot el vault",
         "  z                          visor a tota la pantalla (i tornar)",
+        "  e                          edita la fitxa del visor a Phileas (a la línia que es veu)",
+        "  n                          fitxa nova a la carpeta triada (amb plantilla, si n'hi ha)",
+        "  a                          anotació: una fitxa nova que enllaça a la del visor",
+        "  Supr                       mou la fitxa a la paperera d'Obsidian (.trash/)",
         "  Ctrl+R                     torna a llegir el vault (només el que ha canviat)",
         "  Esc                        esborra el filtre; sense filtre, el menú",
         "  Ctrl+L                     redibuixa",
         "  Ctrl+Q / q                 surt",
         "",
         "  L'índex és a .recerca/ dins del vault; es pot esborrar sense perdre res.",
+        "  En una rèplica del PC (recerca-replica = si) només s'escriu a la carpeta d'entrada (_pi/).",
         "",
         "  Premeu una tecla per tornar.",
     };
@@ -1255,6 +1268,305 @@ static void reload(RView *rv)
     }
     snprintf(rv->msg, sizeof rv->msg, "Vault llegit: %zu noves, %zu canviades, %zu esborrades",
              s.noves, s.canviades, s.esborrades);
+}
+
+/* ---------- escriure ---------- */
+
+static int prompt_line(RView *rv, const char *label, const char *initial, char *buf, size_t sz)
+{
+    size_t l;
+
+    snprintf(buf, sz, "%s", initial ? initial : "");
+    l = strlen(buf);
+    for (;;) {
+        char shown[600];
+        int col, key;
+
+        paint(rv);
+        snprintf(shown, sizeof shown, " %s%s", label, buf);
+        blank(LINES - 1, 0, COLS, ft_attr(FT_BAR));
+        put(LINES - 1, 0, shown, COLS, ft_attr(FT_BAR));
+        col = text_width(shown);
+        curs_set(1);
+        move(LINES - 1, col < COLS ? col : COLS - 1);
+        refresh();
+        key = key_read();
+        if (key < 0 || key == K_FN(KEY_RESIZE))
+            continue;
+        if (key == '\n') {
+            curs_set(0);
+            return 1;
+        } else if (key == 27) {
+            curs_set(0);
+            return 0;
+        } else if (key == 21) {                         /* Ctrl+U */
+            buf[l = 0] = '\0';
+        } else if (key == K_FN(KEY_BACKSPACE) || key == 127 || key == 8) {
+            while (l && ((unsigned char)buf[l - 1] & 0xC0) == 0x80)
+                l--;
+            if (l)
+                buf[--l] = '\0';
+        } else if (key >= 32 && !(key & (KEY_FLAG_FN | KEY_FLAG_ALT))) {
+            char enc[4];
+            size_t k = utf8_encode((wchar_t)key, enc);
+
+            if (l + k < sz) {
+                memcpy(buf + l, enc, k);
+                buf[l += k] = '\0';
+            }
+        }
+    }
+}
+
+static int confirm(RView *rv, const char *question)
+{
+    char shown[700];
+    int key;
+
+    paint(rv);
+    snprintf(shown, sizeof shown, " %s (s/n) ", question);
+    blank(LINES - 1, 0, COLS, ft_attr(FT_BAR));
+    put(LINES - 1, 0, shown, COLS, ft_attr(FT_BAR));
+    refresh();
+    do
+        key = key_read();
+    while (key < 0 || key == K_FN(KEY_RESIZE));
+    return key == 's' || key == 'S' || key == 'y' || key == 'Y';
+}
+
+/* A la rèplica només es pot escriure dins de la carpeta d'entrada */
+static int writable(const RView *rv, const char *rel)
+{
+    size_t n = strlen(rv->opt.entrada);
+
+    return !rv->opt.replica || (!strncmp(rel, rv->opt.entrada, n) && rel[n] == '/');
+}
+
+/* Torna a llegir una nota (o la treu) i ho posa tot al dia; selecciona
+ * select_id a la llista si hi és i el mostra al visor. */
+static void after_write(RView *rv, const char *rel, long long select_id)
+{
+    char err[200];
+    long top = rv->doc.top;
+    long long doc = select_id ? select_id : rv->doc.id;
+
+    if (vault_reindex(rv->v, rel, err, sizeof err)) {
+        snprintf(rv->msg, sizeof rv->msg, "%s", err);
+        return;
+    }
+    model_load(&rv->m, vault_db(rv->v));
+    if (rv->nav_sel >= (long)rv->m.nnav)
+        rv->nav_sel = 0;
+    back_free(rv);
+    rebuild_list(rv, !select_id);
+    if (select_id)
+        for (size_t i = 0; i < rv->nlist; i++)
+            if (rv->m.notes[rv->list[i]].id == select_id)
+                rv->list_sel = (long)i;
+    rv->doc.id = 0;
+    if (doc && model_find(&rv->m, doc) >= 0) {
+        doc_load(rv, doc);
+        if (!select_id)
+            rv->doc.top = top;
+    } else if (cur_note(rv)) {
+        doc_load(rv, cur_note(rv)->id);
+    }
+}
+
+static long long id_of(const RView *rv, const char *rel)
+{
+    for (size_t i = 0; i < rv->m.n; i++)
+        if (!strcmp(rv->m.notes[i].cami, rel))
+            return rv->m.notes[i].id;
+    return 0;
+}
+
+static void edit_rel(RView *rv, const char *rel, size_t line)
+{
+    char path[8192], err[300];
+    char *r = xstrdup(rel);
+
+    snprintf(path, sizeof path, "%s/%s", vault_root(rv->v), rel);
+    if (launch_editor(path, line, err, sizeof err))
+        snprintf(rv->msg, sizeof rv->msg, "%s", err);
+    after_write(rv, r, 0);
+    free(r);
+}
+
+/* La nota del visor, o NULL */
+static const MNote *doc_note(const RView *rv)
+{
+    long i = rv->doc.buf ? model_find(&rv->m, rv->doc.id) : -1;
+
+    return i >= 0 ? &rv->m.notes[i] : NULL;
+}
+
+/* e: obre la fitxa del visor a Phileas, a la línia que es veu (o la de
+ * l'enllaç triat) */
+static void act_edit(RView *rv)
+{
+    const MNote *n = doc_note(rv);
+    Doc *d = &rv->doc;
+    size_t line = 1;
+
+    if (!n)
+        return;
+    if (!writable(rv, n->cami)) {
+        snprintf(rv->msg, sizeof rv->msg, "És una còpia del PC: no s'edita aquí. «a» hi fa una anotació a %s/",
+                 rv->opt.entrada);
+        return;
+    }
+    if (d->link >= 0 && d->link < (long)d->nlinks)
+        line = d->links[d->link].line;
+    else
+        for (long r = d->top; r < (long)d->nrows; r++)
+            if (d->rows[r].kind == R_BODY || d->rows[r].kind == R_BLANK) {
+                line = d->rows[r].idx + 1;
+                break;
+            }
+    edit_rel(rv, n->cami, line);
+}
+
+/* Llegeix una plantilla del vault (o NULL si no se'n tria cap) */
+static char *choose_template(RView *rv)
+{
+    char **l, **lines, *text = NULL;
+    size_t n = nova_plantilles(vault_root(rv->v), &l);
+    int k;
+
+    if (!n)
+        return NULL;
+    lines = xmalloc((n + 1) * sizeof *lines);
+    lines[0] = xstrdup("(sense plantilla)");
+    for (size_t i = 0; i < n; i++)
+        lines[i + 1] = xstrdup(l[i]);
+    k = pick(rv, "Plantilla de la fitxa nova", lines, n + 1, "");
+    if (k > 0) {
+        char path[8192];
+        FILE *f;
+
+        snprintf(path, sizeof path, "%s/%s", vault_root(rv->v), l[k - 1]);
+        if ((f = fopen(path, "rb"))) {
+            size_t cap = 4096, m = 0, r;
+
+            text = xmalloc(cap + 1);
+            while ((r = fread(text + m, 1, cap - m, f)) > 0)
+                if ((m += r) == cap)
+                    text = xrealloc(text, (cap *= 2) + 1);
+            text[m] = '\0';
+            fclose(f);
+        }
+    }
+    free_lines(lines, n + 1);
+    nova_llista_free(l, n);
+    return k < 0 ? (char *)-1 : text;
+}
+
+static void now_str(char *out, size_t sz)
+{
+    time_t t = time(NULL);
+    struct tm tm;
+
+    localtime_r(&t, &tm);
+    strftime(out, sz, "%Y-%m-%d %H:%M", &tm);
+}
+
+/* Crea la fitxa i l'obre a Phileas */
+static void create_and_edit(RView *rv, const char *carpeta, const char *titol, const char *plantilla,
+                            const char *anota)
+{
+    char *nom = nova_nom(titol), *text, id[64], ara[32], rel[4096], err[300];
+    long long nid;
+
+    nova_id(rv->opt.replica ? "pi-" : "", id, sizeof id);
+    now_str(ara, sizeof ara);
+    text = nova_text(plantilla, titol, id, ara, anota);
+    if (nova_crea(vault_root(rv->v), carpeta, nom, text, rel, sizeof rel, err, sizeof err)) {
+        snprintf(rv->msg, sizeof rv->msg, "%s", err);
+    } else {
+        after_write(rv, rel, 0);            /* a l'índex i a la llista */
+        edit_rel(rv, rel, 1);               /* a Phileas; en tornar, es torna a llegir */
+        nid = id_of(rv, rel);
+        if (nid) {
+            for (size_t i = 0; i < rv->nlist; i++)
+                if (rv->m.notes[rv->list[i]].id == nid)
+                    rv->list_sel = (long)i;
+            rv->nhist = 0;
+            doc_load(rv, nid);
+        }
+        snprintf(rv->msg, sizeof rv->msg, "Fitxa nova: %s", rel);
+    }
+    free(text);
+    free(nom);
+}
+
+/* n: fitxa nova a la carpeta triada (a la rèplica, a la d'entrada) */
+static void act_new(RView *rv)
+{
+    char titol[300], carpeta[4096] = "";
+    char *plantilla;
+    const MNav *nv = cur_nav(rv);
+
+    if (rv->opt.replica)
+        snprintf(carpeta, sizeof carpeta, "%s", rv->opt.entrada);
+    else if (rv->m.mode == NAV_CARPETES && nv && nv->key)   /* la carpeta triada; si no, l'arrel */
+        snprintf(carpeta, sizeof carpeta, "%s", nv->key);
+    {
+        char label[600];
+
+        snprintf(label, sizeof label, "Fitxa nova a %s/: ", *carpeta ? carpeta : "(arrel)");
+        if (!prompt_line(rv, label, NULL, titol, sizeof titol) || !titol[0])
+            return;
+    }
+    plantilla = choose_template(rv);
+    if (plantilla == (char *)-1)
+        return;
+    create_and_edit(rv, carpeta, titol, plantilla, NULL);
+    free(plantilla);
+}
+
+/* a: anotació a la fitxa del visor (una fitxa nova que hi enllaça) */
+static void act_annotate(RView *rv)
+{
+    const MNote *n = doc_note(rv);
+    char titol[300], ini[300], ara[32], carpeta[4096], nom[256];
+
+    if (!n)
+        return;
+    snprintf(nom, sizeof nom, "%s", n->nom);
+    snprintf(carpeta, sizeof carpeta, "%s", rv->opt.replica ? rv->opt.entrada : n->carpeta);
+    now_str(ara, sizeof ara);
+    snprintf(ini, sizeof ini, "Anotació a %s %.10s", nom, ara);
+    if (!prompt_line(rv, "Anotació: ", ini, titol, sizeof titol) || !titol[0])
+        return;
+    create_and_edit(rv, carpeta, titol, NULL, nom);
+}
+
+/* Supr: la fitxa triada (llista) o la del visor, a .trash/ */
+static void act_trash(RView *rv)
+{
+    const MNote *n = rv->focus == F_LIST ? cur_note(rv) : doc_note(rv);
+    char q[600], dest[4096], err[300], *rel;
+
+    if (!n)
+        return;
+    if (!writable(rv, n->cami)) {
+        snprintf(rv->msg, sizeof rv->msg, "És una còpia del PC: aquí només es poden esborrar les fitxes de %s/",
+                 rv->opt.entrada);
+        return;
+    }
+    snprintf(q, sizeof q, "Moure «%s» a la paperera (.trash/)?", n->nom);
+    if (!confirm(rv, q))
+        return;
+    rel = xstrdup(n->cami);
+    if (nova_paperera(vault_root(rv->v), rel, dest, sizeof dest, err, sizeof err)) {
+        snprintf(rv->msg, sizeof rv->msg, "%s", err);
+    } else {
+        rv->nhist = 0;
+        after_write(rv, rel, 0);
+        snprintf(rv->msg, sizeof rv->msg, "A la paperera: %s", dest);
+    }
+    free(rel);
 }
 
 /* ---------- tecles ---------- */
@@ -1440,7 +1752,7 @@ static double now_ms(void)
     return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
 }
 
-void rview_run(Vault *v)
+void rview_run(Vault *v, const RviewOpts *o)
 {
     RView rv;
     int pending = 0, last = 0;
@@ -1451,6 +1763,9 @@ void rview_run(Vault *v)
 
     memset(&rv, 0, sizeof rv);
     rv.v = v;
+    rv.opt = *o;
+    if (!rv.opt.entrada || !*rv.opt.entrada)
+        rv.opt.entrada = "_pi";
     rv.doc.link = -1;
     rv.focus = F_NAV;
     if (model_load(&rv.m, vault_db(v)))
@@ -1534,6 +1849,18 @@ void rview_run(Vault *v)
             break;
         case 'l':
             act_outgoing(&rv);
+            break;
+        case 'e':
+            act_edit(&rv);
+            break;
+        case 'n':
+            act_new(&rv);
+            break;
+        case 'a':
+            act_annotate(&rv);
+            break;
+        case K_FN(KEY_DC):
+            act_trash(&rv);
             break;
         case 't':
             act_broken(&rv);

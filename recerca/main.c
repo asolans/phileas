@@ -36,7 +36,11 @@ static void ajuda(void)
          "  -h, --help        aquesta ajuda\n"
          "  -v, --version     versió\n"
          "\n"
-         "A la pantalla, F1 mostra les tecles i Esc el menú. El tema és el de Phileas.");
+         "A la pantalla, F1 mostra les tecles i Esc el menú. El tema és el de Phileas.\n"
+         "«e» edita a Phileas (o a l'editor de RECERCA_EDITOR). Al phileasrc:\n"
+         "  recerca-vault = CARPETA     el vault per defecte\n"
+         "  recerca-replica = si        el vault és una còpia del PC: només s'escriu\n"
+         "  recerca-entrada = _pi       a aquesta carpeta (fitxes noves i anotacions)");
 }
 
 static int tty;
@@ -223,6 +227,8 @@ typedef struct {
     char tema[64];
     int  console;
     char vault[4096];
+    int  replica;
+    char entrada[256];
 } Rc;
 
 static void rc_cb(const char *k, const char *v, void *ud)
@@ -235,6 +241,10 @@ static void rc_cb(const char *k, const char *v, void *ud)
         rc->console = !(!strcmp(v, "no") || !strcmp(v, "false") || !strcmp(v, "0"));
     else if (!strcmp(k, "recerca-vault"))
         snprintf(rc->vault, sizeof rc->vault, "%s", v);
+    else if (!strcmp(k, "recerca-replica"))
+        rc->replica = !strcmp(v, "si") || !strcmp(v, "sí") || !strcmp(v, "yes") || !strcmp(v, "true") || !strcmp(v, "1");
+    else if (!strcmp(k, "recerca-entrada"))
+        snprintf(rc->entrada, sizeof rc->entrada, "%s", v);
 }
 
 static void quit_hook(int sig)
@@ -269,7 +279,14 @@ static int pantalla(Vault *v, const Rc *rc)
         fprintf(stderr, "recerca: %s\n", err);
         return 1;
     }
-    rview_run(v);
+    {
+        RviewOpts o = { rc->replica, rc->entrada[0] ? rc->entrada : "_pi" };
+        const char *ed = getenv("RECERCA_EDITOR");
+
+        if (ed && *ed)                      /* launch_editor llegeix FABULA_EDITOR */
+            setenv("FABULA_EDITOR", ed, 1);
+        rview_run(v, &o);
+    }
     ft_end();
     return 0;
 }
@@ -277,7 +294,7 @@ static int pantalla(Vault *v, const Rc *rc)
 int main(int argc, char **argv)
 {
     const char *op = NULL, *arg = NULL, *dir = NULL;
-    Rc rc = { "terminal", 1, "" };
+    Rc rc = { "terminal", 1, "", 0, "" };
     char err[512];
     Vault *v;
     int r = 0;

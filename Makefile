@@ -96,8 +96,8 @@ SQLDEF  = -DSQLITE_ENABLE_FTS5 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSIO
           -DSQLITE_DEFAULT_MEMSTATUS=0 -DSQLITE_DQS=0 -DSQLITE_OMIT_DEPRECATED \
           -DSQLITE_DEFAULT_WAL_SYNCHRONOUS=1
 RCOMU   = build/comu_fold.o build/comu_mdscan.o build/comu_front.o build/comu_rc.o
-ROBJ    = $(RCOMU) build/recerca_vault.o build/recerca_model.o build/recerca_sqlite3.o build/utf8.o build/util.o
-RUI     = build/recerca_rview.o build/recerca_main.o build/fabula_fterm.o build/theme.o build/keys.o
+ROBJ    = $(RCOMU) build/recerca_vault.o build/recerca_model.o build/recerca_nova.o build/fabula_yaml.o build/recerca_sqlite3.o build/utf8.o build/util.o
+RUI     = build/recerca_rview.o build/recerca_main.o build/fabula_fterm.o build/fabula_launch.o build/theme.o build/keys.o
 RINC    = -Isrc -Icomu -Irecerca -Irecerca/sqlite -Ifabula
 
 .PHONY: recerca test-recerca
