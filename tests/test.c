@@ -20,6 +20,7 @@
 #include "utf8.h"
 #include "util.h"
 #include "wrap.h"
+#include "retalls.h"
 
 #include <limits.h>
 #include <locale.h>
@@ -2187,6 +2188,41 @@ static void test_todo(void)
     ed_free(&e);
 }
 
+/* Porta-retalls comú (comu/retalls.c): el fitxer «retalls» del directori de
+ * configuració */
+static void test_retalls(void)
+{
+    char dir[600], *t, *old = getenv("PHILEAS_CONFIG") ? strdup(getenv("PHILEAS_CONFIG")) : NULL;
+    struct stat own, got;
+    size_t n;
+
+    char base[] = "/tmp/phileas-retalls-XXXXXX";
+
+    if (!mkdtemp(base))
+        return;
+    snprintf(dir, sizeof dir, "%s/cfg", base);              /* encara no existeix */
+    setenv("PHILEAS_CONFIG", dir, 1);
+    CHECK(cm_retalls_read(&n, NULL) == NULL && n == 0);
+    CHECK(cm_retalls_write("Primer paràgraf.\n\nSegon.", 26, &own) == 0);
+    t = cm_retalls_read(&n, &got);
+    CHECK(t && n == 26 && !strcmp(t, "Primer paràgraf.\n\nSegon."));
+    free(t);
+    CHECK(!cm_retalls_changed(&own));
+    /* Un altre programa hi escriu: ho detecta qui l'havia escrit abans */
+    CHECK(cm_retalls_write("Un altre", 8, NULL) == 0);
+    CHECK(cm_retalls_changed(&own));
+    if (old)
+        setenv("PHILEAS_CONFIG", old, 1);
+    else
+        unsetenv("PHILEAS_CONFIG");
+    free(old);
+    snprintf(dir, sizeof dir, "%s/cfg/retalls", base);
+    unlink(dir);
+    snprintf(dir, sizeof dir, "%s/cfg", base);
+    rmdir(dir);
+    rmdir(base);
+}
+
 int main(void)
 {
     /* Qualsevol configuració UTF-8 (una Raspberry amb buildroot pot no tenir C.UTF-8) */
@@ -2200,6 +2236,7 @@ int main(void)
         return 1;
     }
     test_todo();
+    test_retalls();
     test_utf8();
     test_wrap();
     test_buffer();

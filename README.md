@@ -49,8 +49,9 @@ només serveix per escriure.
 - **Porta-retalls compartit** a l'escriptori: Ctrl+C i Ctrl+X hi envien el
   text (amb la línia en blanc entre paràgrafs, com al fitxer) i Ctrl+V porta
   el que s'hi hagi copiat en una altra aplicació. Fa servir `wl-copy` i
-  `wl-paste` (Wayland), `xclip` o `xsel` (X11); sense cap d'aquestes eines, o
-  a la consola, Phileas fa servir el seu porta-retalls intern.
+  `wl-paste` (Wayland), `xclip` o `xsel` (X11). A més, hi ha un **porta-retalls
+  comú** de Phileas, Fàbula i Recerca (el fitxer `retalls` del directori de
+  configuració), que funciona entre programes també a la consola de la Pi.
 - **Menús** a l'estil de WordGrinder (Esc) i **paleta d'ordres** amb
   autocompleció (Ctrl+P): tota ordre té un nom i s'hi pot arribar encara que
   no tingui tecla.
@@ -322,6 +323,11 @@ i Retrocés torna enrere. `u` i `b` mostren les notes que hi enllacen, `l` els
 enllaços de la fitxa, `t` els trencats de tot el vault i `z` amplia el visor. Per
 sota de 110 columnes es veuen dos panells. Esc obre el menú i F1, l'ajuda.
 
+`f` cerca al nom, a les propietats i al text de totes les fitxes (amb l'índex
+FTS5; `"entre cometes"`, la frase exacta) i mostra la primera línia on surten.
+`m` marca paràgrafs del visor (↑ ↓ n'amplien la marca) i `c` els copia (`C`, amb
+`[[la fitxa]]` al final) al porta-retalls comú: a Phileas, Ctrl+V.
+
 `e` obre la fitxa a Phileas (o a l'editor de `editor =` del phileasrc, o de `RECERCA_EDITOR`) a la línia que es
 veu, i en tornar la torna a llegir. `n` crea una fitxa nova a la carpeta triada,
 amb una plantilla de la carpeta de plantilles d'Obsidian si n'hi ha; `a` hi fa una
@@ -557,7 +563,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
-- **2.10.0**: **Phileas és la casa.** Menú **Eines** (Fàbula i Recerca) i ordres `fabula` i `recerca` de Phileas (abans, ordres externes de la imatge BYOK); en tornar, si el document obert s'ha canviat fora, Phileas el torna a llegir. Fàbula 0.3.4 i Recerca 0.1.3: triador de projectes (amb «Projecte nou…») i de vaults dins dels programes (`projectes =`, `recerques =`), i Ctrl+P obre el menú, com a Phileas. A la imatge BYOK, un sol llançador (`/usr/lib/byok/executa`) per a `phileas`, `ph`, `fabula` i `recerca`, i fora els triadors en shell.
+- **2.10.0**: **Phileas és la casa.** **Porta-retalls comú** de les tres eines (fitxer `retalls` al directori de configuració): el que es copia en un programa s'enganxa a un altre, també a la Pi. **Recerca 0.2.0:** `f` cerca al nom, les propietats i el text de totes les fitxes (amb l'índex FTS5; `"frase exacta"`), i `m` marca paràgrafs del visor per copiar-los (`c`, o `C` amb `[[la fitxa]]`). Menú **Eines** (Fàbula i Recerca) i ordres `fabula` i `recerca` de Phileas (abans, ordres externes de la imatge BYOK); en tornar, si el document obert s'ha canviat fora, Phileas el torna a llegir. Fàbula 0.3.4 i Recerca 0.2.0: triador de projectes (amb «Projecte nou…») i de vaults dins dels programes (`projectes =`, `recerques =`), i Ctrl+P obre el menú, com a Phileas. A la imatge BYOK, un sol llançador (`/usr/lib/byok/executa`) per a `phileas`, `ph`, `fabula` i `recerca`, i fora els triadors en shell.
 - **2.9.0**: a la imatge BYOK, **una ordre per a l'intercanvi amb l'ordinador**: `ordinador` (menú BYOK → Ordinador: sincronitza…) tria l'ordinador i fa «sincronitza-ho tot» (puja textos i projectes a la darrera carpeta i porta i torna els vaults de recerca d'aquell ordinador), només puja, o gestiona els vaults; també hi aparella ordinadors nous. `envia` i `rep` comparteixen la xarxa (`/usr/lib/byok/xarxa.sh`) i tenen modes sense menú (`envia [--darrera] NOM`, `envia --nou`, `rep --ordinador NOM`). Phileas: Ordinador al menú BYOK.
 - **2.8.0**: **una configuració per a les tres eines.** Opcions comunes `editor` (l'editor de Fàbula i Recerca; `FABULA_EDITOR` i `RECERCA_EDITOR` hi manen), `textos`, `projectes` i `recerques`; la plantilla de `desar-configuracio` té les seccions Comú, Phileas i Recerca, amb els valors de totes tres; `phileas --valor CLAU`. Fàbula i Recerca llegeixen els comentaris del final de línia com Phileas, i `phileas-importa-calaix` també llegeix `/etc/phileas/phileasrc`. A la imatge BYOK, els llocs surten del phileasrc (`/usr/lib/byok/llocs.sh`). Fàbula 0.3.3, Recerca 0.1.2. També, codi comú de Phileas, Fàbula i Recerca a `comu/` (lector del phileasrc, colors, accents, menú, diàlegs, terminal), sense canvis visibles. L'ajuda (F1) de Fàbula i de Recerca es desplaça amb ↑ ↓ RePàg AvPàg quan no hi cap (abans es tallava). Fàbula treu els accents amb les mateixes regles que Recerca (ara també ý, ÿ i ŀ). `make clean` ja no esborra `dist/` (ho fa `make distclean`).
 - **2.7.2**: `desar-configuracio` ja no esborra les claus de Recerca (`recerca-vault`…): conserva totes les línies que Phileas no escriu, i Phileas accepta sense error les claus `recerca-…` i `fabula-…` del phileasrc. A la imatge BYOK: Fàbula al menú BYOK (tria un projecte de `/data/projectes` o en crea un); `exporta` copia al pendrive `BYOK/textos`, `BYOK/projectes` i les fitxes `_pi/` de cada vault; el bàner de la consola mostra Fàbula, Recerca i `rep`.

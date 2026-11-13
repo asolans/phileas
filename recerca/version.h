@@ -1,4 +1,4 @@
 #ifndef RECERCA_VERSION_H
 #define RECERCA_VERSION_H
-#define RECERCA_VERSION "0.1.3"
+#define RECERCA_VERSION "0.2.0"
 #endif

@@ -8,11 +8,16 @@
 #include "mdscan.h"
 #include "model.h"
 #include "nova.h"
+#include "retalls.h"
+
+#include "clipboard.h"
 
 #include "keys.h"
 #include "utf8.h"
 #include "util.h"
 
+#include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -90,6 +95,10 @@ typedef struct {
     int      nhist;
     char     msg[4400];
     RviewOpts opt;
+    int      marking;       /* «m»: paràgrafs marcats al visor per copiar-los */
+    size_t   mark_a, mark_b; /* primera i darrera línia marcades (del fitxer, 0 = la primera) */
+    long long hint_id;      /* fitxa i línia on ha portat la cerca: «m» hi comença */
+    size_t   hint_line;
 } RView;
 
 static void sep_line(int x, int y0, int y1)
@@ -559,6 +568,13 @@ static void paint_body_row(const RView *rv, const DRow *row, int y, int x, int w
     size_t n = d->ll[row->idx];
     int head = n && s[0] == '#', col = 0;
     attr_t base = head ? ft_attr(FT_HEAD) : 0;
+    size_t lo = rv->mark_a < rv->mark_b ? rv->mark_a : rv->mark_b;
+    size_t hi = rv->mark_a < rv->mark_b ? rv->mark_b : rv->mark_a;
+
+    if (rv->marking && row->idx >= lo && row->idx <= hi) {   /* marcat: fins al final de la fila */
+        base = ft_attr(FT_SEL);
+        cm_blank(y, x, w, base);
+    }
 
     move(y, x);
     for (size_t i = row->b; i < row->e && col < w;) {
@@ -693,10 +709,15 @@ static void status(RView *rv)
         cm_put(LINES - 1, 1, rv->msg, COLS - 2, ft_attr(FT_BAR));
         return;
     }
+    if (rv->marking) {
+        cm_put(LINES - 1, 1, "Marca: ↑↓ paràgrafs · c copia · C copia amb [[referència]] · Esc cancel·la",
+               COLS - 2, ft_attr(FT_BAR));
+        return;
+    }
     switch (rv->focus) {
     case F_NAV:  hint = "↑↓ tria · Retorn fitxes · 1 2 3 carpetes/etiquetes/tipus · Tab · Esc menú · F1"; break;
     case F_LIST: hint = "↑↓ tria · Retorn llegeix · e edita · n nova · / filtra · o ordena · Esc menú · F1"; break;
-    case F_DOC:  hint = "Tab enllaç · Retorn segueix · Retrocés torna · ← fitxes · u backlinks · z amplia · Esc menú"; break;
+    case F_DOC:  hint = "Tab enllaç · Retorn segueix · Retrocés torna · m marca per copiar · f cerca · u backlinks · Esc menú"; break;
     default:     hint = "↑↓ tria · Retorn obre la nota · Tab · Esc menú · F1"; break;
     }
     snprintf(s, sizeof s, "%s", hint);
@@ -1023,6 +1044,194 @@ static void act_broken(RView *rv)
     free(ln);
 }
 
+/* ---------- cercar al contingut ---------- */
+
+/* El fitxer sencer (cal alliberar-lo), o NULL */
+static char *slurp_file(const char *path, size_t *len)
+{
+    FILE *f = fopen(path, "rb");
+    char *buf = NULL;
+    size_t cap = 0, n = 0, r;
+
+    if (!f)
+        return NULL;
+    do {
+        if (cap - n < 4096)
+            buf = xrealloc(buf, cap = cap ? 2 * cap : 16384);
+        r = fread(buf + n, 1, cap - n - 1, f);
+        n += r;
+    } while (r > 0);
+    fclose(f);
+    buf[n] = '\0';
+    *len = n;
+    return buf;
+}
+
+/* Les paraules de q (lletres i xifres; la resta separa), plegades amb cm_fold */
+static size_t words_of(const char *q, char ***out)
+{
+    char **v = NULL;
+    size_t n = 0;
+
+    for (const char *p = q; *p;) {
+        size_t l = 0;
+
+        while (p[l] && ((unsigned char)p[l] >= 0x80 || isalnum((unsigned char)p[l])))
+            l++;
+        if (l) {
+            v = xrealloc(v, (n + 1) * sizeof *v);
+            v[n++] = cm_fold(p, l);
+            p += l;
+        } else {
+            p++;
+        }
+    }
+    *out = v;
+    return n;
+}
+
+/* La primera línia de text[0..len) (des de la línia from, 0 = la primera) que
+ * conté totes les paraules; si phrase, la frase sencera. Retorna la línia (1
+ * = la primera) o 0, i en copia el text a ctx. */
+static int find_line(const char *text, size_t len, size_t from, char **w, size_t nw,
+                     const char *phrase, char *ctx, size_t ctxsz)
+{
+    size_t line = 0;
+
+    for (size_t i = 0; i < len; line++) {
+        size_t e = i;
+        int ok = 1;
+        char *f;
+
+        while (e < len && text[e] != '\n')
+            e++;
+        if (line >= from && e > i) {
+            f = cm_fold(text + i, e - i);
+            if (phrase)
+                ok = strstr(f, phrase) != NULL;
+            else
+                for (size_t k = 0; k < nw && ok; k++)
+                    ok = strstr(f, w[k]) != NULL;
+            free(f);
+            if (ok) {
+                const char *s = text + i;
+
+                while (s < text + e && (*s == ' ' || *s == '\t' || *s == '#' || *s == '>' || *s == '-'))
+                    s++;
+                snprintf(ctx, ctxsz, "%.*s", (int)(text + e - s), s);
+                return (int)line + 1;
+            }
+        }
+        i = e + 1;
+    }
+    return 0;
+}
+
+/* «f»: cerca les paraules (o «una frase» entre cometes) al nom, a les
+ * propietats i al text de totes les fitxes, amb l'índex FTS5; la llista
+ * mostra la primera línia on surten, i Retorn hi va */
+static void act_search(RView *rv)
+{
+    static char q[200];
+    char **w = NULL, *expr, *phrase = NULL, title[300];
+    size_t nw, cap, el = 0, n = 0;
+    sqlite3_stmt *s;
+    char **lines = NULL;
+    long long *ids = NULL;
+    int *ln = NULL, k;
+
+    if (!cm_prompt("Cerca a les fitxes (\"frase exacta\"): ", q, q, sizeof q, paint_cb, rv))
+        return;
+    nw = words_of(q, &w);
+    if (!nw) {
+        free(w);
+        return;
+    }
+    /* L'expressió de FTS5: cada paraula entre cometes (així cap caràcter de
+     * l'usuari no és un operador), totes alhora. L'índex no guarda les
+     * posicions (detail=none): una frase («entre cometes») es busca com les
+     * seves paraules, i després es comprova al text de cada fitxa. */
+    cap = strlen(q) * 2 + nw * 8 + 8;
+    expr = xmalloc(cap);
+    for (size_t i = 0; i < nw; i++)
+        el += (size_t)snprintf(expr + el, cap - el, "%s\"%s\"", i ? " AND " : "", w[i]);
+    {
+        const char *t = q;
+
+        while (*t == ' ')
+            t++;
+        if (*t == '"' && nw > 1) {
+            size_t pl = 0;
+
+            phrase = xmalloc(strlen(q) + nw + 1);
+            for (size_t i = 0; i < nw; i++)
+                pl += (size_t)sprintf(phrase + pl, "%s%s", i ? " " : "", w[i]);
+        }
+    }
+    if (sqlite3_prepare_v2(vault_db(rv->v), "SELECT f.id, f.cami FROM text JOIN fitxes f ON f.id = text.rowid "
+                                            "WHERE text MATCH ? ORDER BY f.cami LIMIT 500", -1, &s, NULL) != SQLITE_OK) {
+        snprintf(rv->msg, sizeof rv->msg, "No es pot cercar: %s", sqlite3_errmsg(vault_db(rv->v)));
+        goto out;
+    }
+    sqlite3_bind_text(s, 1, expr, -1, SQLITE_STATIC);
+    while (sqlite3_step(s) == SQLITE_ROW) {
+        const char *cami = (const char *)sqlite3_column_text(s, 1);
+        char path[4600], ctx[300] = "", x[900], *buf;
+        size_t len, body = 0;
+        int line = 0;
+
+        snprintf(path, sizeof path, "%s/%s", vault_root(rv->v), cami);
+        if ((buf = slurp_file(path, &len))) {
+            size_t body_line = 1;
+
+            body = cm_front(buf, len, &body_line, NULL, NULL) ? body_line - 1 : 0;
+            line = find_line(buf, len, body, w, nw, phrase, ctx, sizeof ctx);
+            if (!line && phrase) {          /* la frase: a la capçalera, o enlloc */
+                char *f = cm_fold(buf, len);
+                int in = strstr(f, phrase) != NULL;
+
+                free(f);
+                free(buf);
+                if (!in)
+                    continue;
+                buf = NULL;
+            }
+            free(buf);
+        }
+        if (line)
+            snprintf(x, sizeof x, "%s:%d  %s", cami, line, ctx);
+        else
+            snprintf(x, sizeof x, "%s  (al nom o a les propietats)", cami);
+        lines = xrealloc(lines, (n + 1) * sizeof *lines);
+        ids = xrealloc(ids, (n + 1) * sizeof *ids);
+        ln = xrealloc(ln, (n + 1) * sizeof *ln);
+        ids[n] = sqlite3_column_int64(s, 0);
+        ln[n] = line;
+        lines[n++] = xstrdup(x);
+    }
+    if (sqlite3_errcode(vault_db(rv->v)) != SQLITE_DONE && sqlite3_errcode(vault_db(rv->v)) != SQLITE_ROW)
+        snprintf(rv->msg, sizeof rv->msg, "Error en cercar: %s", sqlite3_errmsg(vault_db(rv->v)));
+    sqlite3_finalize(s);
+    snprintf(title, sizeof title, "Cerca «%s»: %zu %s%s", q, n, n == 1 ? "fitxa" : "fitxes",
+             n == 500 ? " (les 500 primeres)" : "");
+    k = pick(rv, title, lines, n, "Cap fitxa no conté aquestes paraules.");
+    if (k >= 0) {
+        go_note(rv, ids[k], ln[k], NULL, 0);
+        rv->focus = F_DOC;
+        rv->hint_id = ln[k] > 0 ? ids[k] : 0;
+        rv->hint_line = ln[k] > 0 ? (size_t)ln[k] - 1 : 0;
+    }
+    free_lines(lines, n);
+    free(ids);
+    free(ln);
+out:
+    for (size_t i = 0; i < nw; i++)
+        free(w[i]);
+    free(w);
+    free(expr);
+    free(phrase);
+}
+
 static int menu_run(RView *rv)
 {
     static const CmMenuItem items[] = {
@@ -1030,10 +1239,12 @@ static int menu_run(RView *rv)
         { "Per carpetes", "1", '1' },
         { "Per etiquetes", "2", '2' },
         { "Per tipus", "3", '3' },
-        { "Filtra les fitxes", "/", '/' },
+        { "Filtra les fitxes pel nom", "/", '/' },
+        { "Cerca al contingut de totes", "f", 'f' },
         { "Canvia l'ordre", "o", 'o' },
         { "Fitxa", NULL, 0 },
         { "Edita a Phileas", "e", 'e' },
+        { "Marca paràgrafs per copiar", "m", 'm' },
         { "Fitxa nova", "n", 'n' },
         { "Anotació a aquesta fitxa", "a", 'a' },
         { "Mou a la paperera", "Supr", K_FN(KEY_DC) },
@@ -1067,6 +1278,8 @@ static void help(void)
         "  Retorn / →                 navegació → fitxes → visor; al visor, segueix l'enllaç triat",
         "  ←                          torna al panell anterior (del visor, a les fitxes)",
         "  /                          filtra les fitxes pel nom (sense majúscules ni accents)",
+        "  f                          cerca al nom, les propietats i el text de totes les fitxes",
+        "                             (\"entre cometes\": la frase exacta); Retorn va a la línia",
         "  o                          ordena per nom, data, modificació o paraules",
         "  Tab / Maj+Tab (o ] / [)    al visor: enllaç següent / anterior (Retorn tria el primer)",
         "  Retrocés                   torna a la fitxa d'abans (després de seguir un enllaç)",
@@ -1075,6 +1288,8 @@ static void help(void)
         "  t                          enllaços trencats de tot el vault",
         "  z                          visor a tota la pantalla (i tornar)",
         "  e                          edita la fitxa del visor a Phileas (a la línia que es veu)",
+        "  m                          marca paràgrafs del visor: ↑↓ n'amplia la marca, c copia,",
+        "                             C copia amb [[la fitxa]] al final; a Phileas, Ctrl+V",
         "  n                          fitxa nova a la carpeta triada (amb plantilla, si n'hi ha)",
         "  a                          anotació: una fitxa nova que enllaça a la del visor",
         "  Supr                       mou la fitxa a la paperera d'Obsidian (.trash/)",
@@ -1460,6 +1675,151 @@ static void focus_next(RView *rv, int dir)
     rv->focus = order[(at + dir + n) % n];
 }
 
+/* ---------- marcar i copiar ---------- */
+
+/* 1 si la línia l del cos té alguna cosa més que espais */
+static int body_text(const Doc *d, size_t l)
+{
+    if (l < d->body || l >= d->nlines)
+        return 0;
+    for (size_t i = 0; i < d->ll[l]; i++)
+        if (d->buf[d->lo[l] + i] != ' ' && d->buf[d->lo[l] + i] != '\t')
+            return 1;
+    return 0;
+}
+
+/* La primera línia del cos amb text (o d->nlines si no n'hi ha) */
+static size_t first_text(const Doc *d)
+{
+    size_t k = d->body;
+
+    while (k < d->nlines && !body_text(d, k))
+        k++;
+    return k;
+}
+
+/* La línia amb text següent (dir = 1) o anterior (-1) a l, o l si no n'hi ha */
+static size_t next_text(const Doc *d, size_t l, int dir)
+{
+    for (size_t k = l; dir > 0 ? k + 1 < d->nlines : k > d->body;) {
+        k = dir > 0 ? k + 1 : k - 1;
+        if (body_text(d, k))
+            return k;
+    }
+    return l;
+}
+
+/* «m»: comença a marcar pel primer paràgraf que es veu al visor */
+static void mark_start(RView *rv)
+{
+    Doc *d = &rv->doc;
+    size_t first = (size_t)-1;
+
+    if (!d->buf)
+        return;
+    if (rv->hint_id == d->id && body_text(d, rv->hint_line)) {   /* la línia de la cerca */
+        Lay l = layout(rv);
+        long r = row_of_line(d, rv->hint_line);
+
+        if (r >= d->top && r < d->top + (l.doc_y1 - l.y0))
+            first = rv->hint_line;
+    }
+    for (size_t k = d->top < 0 ? 0 : (size_t)d->top; k < d->nrows && first == (size_t)-1; k++)
+        if (d->rows[k].kind == R_BODY && body_text(d, d->rows[k].idx))
+            first = d->rows[k].idx;
+    if (first == (size_t)-1) {
+        first = first_text(d);
+        if (first >= d->nlines) {
+            snprintf(rv->msg, sizeof rv->msg, "Aquesta fitxa no té text per copiar");
+            return;
+        }
+    }
+    rv->marking = 1;
+    rv->mark_a = rv->mark_b = first;
+    rv->focus = F_DOC;
+}
+
+/* Que la darrera línia marcada es vegi */
+static void mark_visible(RView *rv)
+{
+    Doc *d = &rv->doc;
+    Lay l = layout(rv);
+    long rows = l.doc_y1 - l.y0, r = row_of_line(d, rv->mark_b);
+
+    if (r < d->top)
+        d->top = r;
+    else if (r >= d->top + rows)
+        d->top = r - rows + 1;
+}
+
+/* Copia les línies marcades (amb ref, i «[[Nom]]» al final) al porta-retalls
+ * comú i al del sistema, si n'hi ha */
+static void mark_copy(RView *rv, int ref)
+{
+    Doc *d = &rv->doc;
+    size_t lo = rv->mark_a < rv->mark_b ? rv->mark_a : rv->mark_b;
+    size_t hi = rv->mark_a < rv->mark_b ? rv->mark_b : rv->mark_a;
+    size_t len = d->lo[hi] + d->ll[hi] - d->lo[lo], n = len, par = 0;
+    long i = model_find(&rv->m, d->id);
+    const char *nom = i >= 0 ? rv->m.notes[i].nom : "";
+    char *s = xmalloc(len + strlen(nom) + 16);
+
+    memcpy(s, d->buf + d->lo[lo], len);
+    for (size_t k = lo; k <= hi; k++)
+        par += body_text(d, k) && (k == lo || !body_text(d, k - 1));
+    if (ref && nom[0])
+        n += (size_t)sprintf(s + n, "\n\n[[%s]]", nom);
+    rv->marking = 0;
+    if (cm_retalls_write(s, n, NULL) != 0) {
+        snprintf(rv->msg, sizeof rv->msg, "No s'ha pogut copiar: %s", strerror(errno));
+    } else {
+        if (sysclip_tool())
+            sysclip_set(s, n);
+        snprintf(rv->msg, sizeof rv->msg, "Copiat: %zu %s%s · a Phileas, Ctrl+V", par,
+                 par == 1 ? "paràgraf" : "paràgrafs", ref ? " amb la referència" : "");
+    }
+    free(s);
+}
+
+/* Les tecles mentre es marca */
+static void mark_key(RView *rv, int key)
+{
+    Doc *d = &rv->doc;
+
+    switch (key) {
+    case K_FN(KEY_DOWN): case 'j':
+        rv->mark_b = next_text(d, rv->mark_b, 1);
+        break;
+    case K_FN(KEY_UP): case 'k':
+        rv->mark_b = next_text(d, rv->mark_b, -1);
+        break;
+    case K_FN(KEY_HOME):
+        if (first_text(d) < d->nlines)
+            rv->mark_b = first_text(d);
+        break;
+    case K_FN(KEY_END):
+        for (size_t k = d->nlines; k-- > d->body;)
+            if (body_text(d, k)) {
+                rv->mark_b = k;
+                break;
+            }
+        break;
+    case 'c': case '\n':
+        mark_copy(rv, 0);
+        return;
+    case 'C':
+        mark_copy(rv, 1);
+        return;
+    case 27: case 'm':
+        rv->marking = 0;
+        snprintf(rv->msg, sizeof rv->msg, "Marca cancel·lada");
+        return;
+    default:
+        return;
+    }
+    mark_visible(rv);
+}
+
 static int pane_key(RView *rv, int key)
 {
     Lay l = layout(rv);
@@ -1620,6 +1980,10 @@ void rview_run(Vault *v, const RviewOpts *o)
             filter_key(&rv, key);
             continue;
         }
+        if (rv.marking) {
+            mark_key(&rv, key);
+            continue;
+        }
         if (pane_key(&rv, key))
             continue;
         switch (key) {
@@ -1636,6 +2000,12 @@ void rview_run(Vault *v, const RviewOpts *o)
             break;
         case 18:
             reload(&rv);
+            break;
+        case 'm':
+            mark_start(&rv);
+            break;
+        case 'f':
+            act_search(&rv);
             break;
         case '1': set_mode(&rv, NAV_CARPETES); break;
         case '2': set_mode(&rv, NAV_ETIQUETES); break;

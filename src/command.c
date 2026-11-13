@@ -11,6 +11,7 @@
 #include "footnote.h"
 #include "help.h"
 #include "history.h"
+#include "retalls.h"
 #include "keys.h"
 #include "menu.h"
 #include "outlineview.h"
@@ -108,17 +109,42 @@ static void c_cancel(Editor *e)
 static char  *exported;
 static size_t exported_len;
 
-/* El text seleccionat va també al porta-retalls del sistema, si n'hi ha, en
- * el format del fitxer. S'ha de cridar abans de copiar o tallar. */
+/* El porta-retalls comú (comu/retalls.h) tal com l'ha deixat aquest Phileas:
+ * si després el canvia un altre programa (Recerca, un altre Phileas), Ctrl+V
+ * enganxa el seu text */
+static struct stat retalls_own;
+static int retalls_known;
+
+/* El text seleccionat va també, en el format del fitxer, al porta-retalls
+ * comú i al del sistema, si n'hi ha. S'ha de cridar abans de copiar o tallar. */
 static int export_selection(Editor *e)
 {
     Pos a, z;
 
-    if (!sysclip_tool() || !ed_selection(e, &a, &z))
+    if (!ed_selection(e, &a, &z))
         return 0;
     free(exported);
     exported = buf_export(&e->buf, a, z, &exported_len);
+    retalls_known = cm_retalls_write(exported, exported_len, &retalls_own) == 0;
+    if (!sysclip_tool())
+        return 0;
     return sysclip_set(exported, exported_len);
+}
+
+/* Enganxa un text en el format del fitxer (del sistema o del comú) */
+static void paste_text(Editor *e, char *s, size_t n)
+{
+    size_t i, j;
+    char *conv;
+
+    for (i = j = 0; i < n; i++) {
+        if (s[i] == '\r' && i + 1 < n && s[i + 1] == '\n')
+            continue;
+        s[j++] = s[i] == '\r' ? '\n' : s[i];
+    }
+    conv = buf_paste_text(&e->buf, e->cy, s, j, &n);
+    ed_insert(e, conv, n);
+    free(conv);
 }
 
 static void copied(Editor *e, const char *what, int sys, size_t n)
@@ -146,24 +172,27 @@ static void c_cut(Editor *e)
     copied(e, "Tallat", sys, ed_cut(e));
 }
 
+/* Ctrl+V: el text del porta-retalls del sistema, si l'hi ha posat una altra
+ * aplicació; si no, el del comú, si l'ha canviat un altre programa (o aquest
+ * Phileas encara no hi ha copiat res); si no, l'intern */
 static void c_paste(Editor *e)
 {
-    size_t n, i, j;
-    char *s = sysclip_get(&n), *conv;
+    size_t n;
+    char *s = sysclip_get(&n);
 
     if (s && !(n == exported_len && memcmp(s, exported, n) == 0)) {
-        for (i = j = 0; i < n; i++) {
-            if (s[i] == '\r' && i + 1 < n && s[i + 1] == '\n')
-                continue;
-            s[j++] = s[i] == '\r' ? '\n' : s[i];
-        }
-        conv = buf_paste_text(&e->buf, e->cy, s, j, &n);
-        ed_insert(e, conv, n);
-        free(conv);
-    } else if (!ed_paste(e)) {
-        ed_msg(e, "El porta-retalls és buit");
+        paste_text(e, s, n);
+        free(s);
+        return;
     }
     free(s);
+    if ((!retalls_known || cm_retalls_changed(&retalls_own)) && (s = cm_retalls_read(&n, NULL))) {
+        paste_text(e, s, n);
+        free(s);
+        return;
+    }
+    if (!ed_paste(e))
+        ed_msg(e, "El porta-retalls és buit");
 }
 
 /* Les opcions de vista (centrar, colors, màquina d'escriure i tema) es

@@ -199,8 +199,14 @@ Per anar més lluny:
 **Ctrl+C** copia, **Ctrl+X** talla i **Ctrl+V** enganxa. A l'escriptori, el
 porta-retalls és **el del sistema**: pots copiar un paràgraf des del navegador i
 enganxar-lo a Phileas, o a l'inrevés. (Cal `wl-clipboard`, `xclip` o `xsel`; el
-paquet `.deb` ja ho recomana.) A la consola de la Pi, Phileas fa servir el seu
-porta-retalls intern.
+paquet `.deb` ja ho recomana.)
+
+A més, el que copies queda en un **porta-retalls comú** de Phileas, Fàbula i
+Recerca: el fitxer `retalls` del directori de configuració (a la Pi,
+`/data/phileas/retalls`). Així pots copiar un paràgraf d'una fitxa de Recerca,
+o d'un capítol obert des de Fàbula, i enganxar-lo amb Ctrl+V al document que
+tenies obert, també a la consola de la Pi, on no hi ha porta-retalls del
+sistema. Es conserva d'una sessió a l'altra.
 
 ### Desfer i refer
 
@@ -1223,7 +1229,8 @@ navegació o de llista. Retorn passa d'un panell al següent, i ← torna enrere
 | `1` `2` `3` | navega per carpetes, per etiquetes o per tipus |
 | ↑ ↓ RePàg AvPàg Inici Fi | moure's |
 | Retorn / → | de la navegació a les fitxes, i de les fitxes al visor |
-| `/` | filtra les fitxes pel nom (sense majúscules ni accents) |
+| `/` | filtra les fitxes pel **nom** (sense majúscules ni accents) |
+| `f` | **cerca** al nom, a les propietats i al text de totes les fitxes (vegeu més avall) |
 | `o` | ordena per nom, data, modificació o paraules |
 | Tab / Maj+Tab | al visor, l'enllaç següent o l'anterior (també `]` i `[`) |
 | Retorn | al visor, segueix l'enllaç triat (si no n'hi ha cap, tria el primer) |
@@ -1233,12 +1240,42 @@ navegació o de llista. Retorn passa d'un panell al següent, i ← torna enrere
 | `t` | els enllaços trencats de tot el vault |
 | `z` | el visor a tota la pantalla |
 | `e` | edita la fitxa a Phileas, a la línia que es veu; en tornar, es torna a llegir |
+| `m` | **marca** paràgrafs del visor per copiar-los (vegeu més avall) |
 | `n` | fitxa nova a la carpeta triada, amb plantilla si n'hi ha |
 | `a` | anotació: una fitxa nova amb `anota: "[[Fitxa]]"` |
 | Supr | mou la fitxa a la paperera d'Obsidian (`.trash/`) |
 | `r` | a la Pi: rep el vault del PC (vegeu més avall) |
 | Ctrl+R | torna a llegir el vault |
 | Esc, F1, Ctrl+Q | menú, ajuda (si no hi cap, ↑ ↓ RePàg AvPàg la desplacen), sortir |
+
+### Cercar al contingut
+
+`/` només mira el nom de les fitxes de la branca triada. Per buscar dins de
+**totes** les fitxes, prem **`f`** i escriu les paraules:
+
+- `construcció pou` troba les fitxes que tenen les dues paraules (en qualsevol
+  lloc: al nom, a les propietats o al text), sense majúscules ni accents;
+- `"pou de 1935"` (entre cometes) troba la frase exacta.
+
+La llista mostra cada fitxa amb la primera línia on surten les paraules; amb
+Retorn s'obre al visor, en aquella línia. Les etiquetes són propietats: `f
+arxiu` troba les fitxes amb `tags: [arxiu]`. La cerca fa servir l'índex
+(`.recerca/index.db`), i a la Pi és ràpida també amb milers de fitxes.
+
+### Copiar text d'una fitxa
+
+Al visor, **`m`** marca un paràgraf: el que hi ha a dalt de la pantalla o,
+si hi has arribat amb una cerca, el que l'ha trobat. Amb ↑ ↓ amplies la marca
+paràgraf a paràgraf; després:
+
+- **`c`** (o Retorn) copia el text marcat;
+- **`C`** el copia amb la referència a la fitxa al final (`[[Nom]]`), per
+  saber d'on ve quan l'enganxis en un capítol;
+- Esc ho cancel·la.
+
+El text va al porta-retalls comú (i, a l'escriptori, al del sistema): a
+Phileas, **Ctrl+V** l'enganxa al cursor, també al document que tenies obert
+abans d'entrar a Recerca.
 
 Les fitxes noves porten `id` i `created` a la capçalera. Les plantilles són
 les de la carpeta de plantilles d'Obsidian (`.obsidian/templates.json`) o,
