@@ -7,12 +7,14 @@
 #include "launch.h"
 #include "table.h"
 #include "timeline.h"
+#include "yaml.h"
 
 #include "keys.h"
 #include "utf8.h"
 #include "util.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1380,6 +1382,38 @@ static void act_diary(View *v)
 
 /* Menú d'Esc, agrupat per categories. Una entrada amb key 0 és una capçalera
  * (no es pot triar). */
+/* b: obre Recerca amb el vault del camp «recerca:» de projecte.md (relatiu
+ * a la carpeta del projecte) o, si no n'hi ha, el vault per defecte de
+ * Recerca (recerca-vault del phileasrc). En sortir-ne, es torna aquí. */
+static void act_research(View *v)
+{
+    char path[PATH_MAX + 32], vault[PATH_MAX], full[2 * PATH_MAX], err[180];
+    char *argv[3] = { "recerca", NULL, NULL };
+    FILE *f;
+
+    vault[0] = '\0';
+    snprintf(path, sizeof path, "%s/projecte.md", v->p->root);
+    if ((f = fopen(path, "rb"))) {
+        char buf[16384];
+        size_t n = fread(buf, 1, sizeof buf - 1, f);
+
+        buf[n] = '\0';
+        fclose(f);
+        yaml_get(buf, n, "recerca", vault, sizeof vault);
+    }
+    if (vault[0]) {
+        if (vault[0] == '~' && vault[1] == '/' && getenv("HOME"))
+            snprintf(full, sizeof full, "%s/%s", getenv("HOME"), vault + 2);
+        else if (vault[0] != '/')
+            snprintf(full, sizeof full, "%s/%s", v->p->root, vault);
+        else
+            snprintf(full, sizeof full, "%s", vault);
+        argv[1] = full;
+    }
+    if (launch_program(argv, err, sizeof err))
+        snprintf(v->msg, sizeof v->msg, "Recerca: %s", err);
+}
+
 static int menu_run(View *v)
 {
     static const struct { const char *label, *hint; int key; } items[] = {
@@ -1400,6 +1434,7 @@ static int menu_run(View *v)
         { "Enllaços d'aquí", "l", 'l' },
         { "Enllaços trencats", "t", 't' },
         { "Cerca al projecte", "f", 'f' },
+        { "Recerca (fitxes de recerca)", "b", 'b' },
         { "Substitueix al projecte", "R", 'R' },
         { "Manuscrit", NULL, 0 },
         { "Línia temporal", "T", 'T' },
@@ -1519,6 +1554,7 @@ static void help(void)
         "  r                          canvia el títol (i el nom del fitxer)",
         "  u / l / t                  on surt un capítol o fitxa / els seus [[enllaços]] / enllaços trencats",
         "  f / R                      cerca / substitueix al projecte (c, w, m: opcions)",
+        "  b                          obre Recerca (el vault de «recerca:» a projecte.md); en sortir, torna",
         "  C                          compila el manuscrit en un sol fitxer (.md, .docx, .epub…)",
         "  T                          línia temporal: escenes per data, amb els salts enrere",
         "  d                          diari d'escriptura: avui, setmana, ratxa i previsió",
@@ -1824,6 +1860,9 @@ void fview_run(Project *p)
             break;
         case 't':
             act_broken(&v);
+            break;
+        case 'b':
+            act_research(&v);
             break;
         case 'v':
             act_versions(&v);

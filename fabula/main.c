@@ -1,3 +1,4 @@
+#include "rc.h"
 #include "fterm.h"
 #include "fview.h"
 #include "project.h"
@@ -168,6 +169,8 @@ static void quit_hook(int sig)
 
 /* Tema i paleta de la consola, com a Phileas: «tema =» i «paleta-consola =» del
  * phileasrc del sistema i després el de l'usuari. */
+static short color_over[PAL_N];     /* «color-…» del phileasrc, com a Phileas */
+
 static void read_rc(const char *path, char *tema, size_t tsz, int *console)
 {
     FILE *f = fopen(path, "r");
@@ -191,8 +194,11 @@ static void read_rc(const char *path, char *tema, size_t tsz, int *console)
             v++;
         for (l = strlen(v); l && (v[l - 1] == '\n' || v[l - 1] == '\r' || v[l - 1] == ' '); l--)
             v[l - 1] = '\0';
-        if (!strcmp(k, "tema"))
+        if (!strcmp(k, "tema")) {
             snprintf(tema, tsz, "%s", v);
+            cm_rc_color_reset(color_over);
+        } else if (cm_rc_color(k, v, color_over))
+            ;
         else if (!strcmp(k, "paleta-consola"))
             *console = !(!strcmp(v, "no") || !strcmp(v, "false") || !strcmp(v, "0"));
     }
@@ -220,6 +226,7 @@ int main(int argc, char **argv)
              "carpeta actual). «nou» crea la carpeta del projecte (TÍTOL en minúscules i amb\n"
              "guions) dins de DIRECTORI (per defecte, l'actual) i l'obre.\n\n"
              "Retorn obre el capítol o la fitxa a Phileas (o a l'editor de FABULA_EDITOR).\n"
+             "«b» obre Recerca amb el vault de «recerca:» de projecte.md; en sortir, torna.\n"
              "El tema es llegeix del phileasrc de Phileas. F1 mostra les tecles.");
         return 0;
     }
@@ -257,6 +264,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "fabula: %s\n", err);
         return 1;
     }
+    cm_rc_color_reset(color_over);
     read_rc("/etc/phileas/phileasrc", tema, sizeof tema, &console);
     config_dir(cfg, sizeof cfg);
     snprintf(rcpath, sizeof rcpath, "%s/phileasrc", cfg);
@@ -265,7 +273,13 @@ int main(int argc, char **argv)
     if (!th)
         th = theme_at(0);
 
-    ft_init(th, console);
+    {
+        short pal[PAL_N];
+
+        theme_palette(th, pal);
+        cm_rc_apply(pal, color_over);
+        ft_init_pal(th, console, pal);
+    }
     key_quit_hook = quit_hook;
     key_signals();
     fview_run(&p);

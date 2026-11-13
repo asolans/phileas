@@ -16,6 +16,9 @@ static const unsigned *console_rgb;
 static long          cursor_rgb = -1;
 static const Theme  *cur_theme;
 static int           want_console;
+static short         cur_pal[PAL_N];
+static int           have_pal;
+static attr_t        no_color;      /* atributs que el terminal no combina amb color (ncv) */
 
 static int linux_console(void)
 {
@@ -77,11 +80,17 @@ static attr_t pair_attr(short pair)
     return COLOR_PAIR(pair) | pair_bold[pair];
 }
 
+/* Els mateixos colors que Phileas (render_colors): text i fons, barra,
+ * selecció, menús, capçaleres, error i atenuat. L'atenuat, com el de
+ * Phileas: el color dels marcadors si el tema en té; a la consola amb la
+ * paleta del tema, el color atenuat del tema; l'atenuat del terminal si el
+ * pot combinar amb el color; i si no, blau. */
 static void setup_roles(void)
 {
     short pal[PAL_N], text_fg, text_bg;
     const unsigned *rgb;
     long cur;
+    int themed;
 
     for (int i = 0; i < FT_N; i++)
         role_attr[i] = 0;
@@ -91,17 +100,28 @@ static void setup_roles(void)
     role_attr[FT_WARN] = A_BOLD;
     if (!have_colors || !cur_theme)
         return;
-    theme_palette(cur_theme, pal);
+    if (have_pal)
+        memcpy(pal, cur_pal, sizeof pal);
+    else
+        theme_palette(cur_theme, pal);
     text_fg = pal[PAL_TEXT] != PAL_DEFAULT ? pal[PAL_TEXT] : default_bg != -1 ? COLOR_WHITE : -1;
     text_bg = pal[PAL_BG] != PAL_DEFAULT ? pal[PAL_BG] : default_bg;
     if (text_bg >= 8 && text_bg >= COLORS)
         text_bg -= 8;
 
-    set_pair(FT_TEXT, text_fg, text_bg, text_fg, text_bg);
-    if (pal[PAL_TEXT] != PAL_DEFAULT || pal[PAL_BG] != PAL_DEFAULT) {
-        role_attr[FT_TEXT] = pair_attr(FT_TEXT);
-        bkgd(' ' | role_attr[FT_TEXT]);
+    /* la paleta de la consola primer: l'atenuat en depèn */
+    rgb = want_console && linux_console() ? cur_theme->rgb : NULL;
+    if (rgb != console_rgb) {
+        console_palette(rgb);
+        console_rgb = rgb;
+        clearok(curscr, TRUE);
     }
+
+    set_pair(FT_TEXT, text_fg, text_bg, text_fg, text_bg);
+    themed = pal[PAL_TEXT] != PAL_DEFAULT || pal[PAL_BG] != PAL_DEFAULT;
+    if (themed)
+        role_attr[FT_TEXT] = pair_attr(FT_TEXT);
+    bkgd(' ' | (themed ? pair_attr(FT_TEXT) : 0));
     if (pal[PAL_BAR] != PAL_DEFAULT || pal[PAL_BAR_BG] != PAL_DEFAULT) {
         set_pair(FT_BAR, pal[PAL_BAR], pal[PAL_BAR_BG], text_fg, text_bg);
         role_attr[FT_BAR] = pair_attr(FT_BAR);
@@ -110,6 +130,10 @@ static void setup_roles(void)
         set_pair(FT_SEL, pal[PAL_SEL], pal[PAL_SEL_BG], text_fg, text_bg);
         role_attr[FT_SEL] = pair_attr(FT_SEL);
     }
+    if (pal[PAL_MENU] != PAL_DEFAULT || pal[PAL_MENU_BG] != PAL_DEFAULT) {
+        set_pair(FT_MENU, pal[PAL_MENU], pal[PAL_MENU_BG], text_fg, text_bg);
+        role_attr[FT_MENU] = pair_attr(FT_MENU);
+    }
     if (pal[PAL_H1] != PAL_DEFAULT) {
         set_pair(FT_HEAD, pal[PAL_H1], PAL_DEFAULT, text_fg, text_bg);
         role_attr[FT_HEAD] = pair_attr(FT_HEAD) | A_BOLD;
@@ -117,18 +141,20 @@ static void setup_roles(void)
     if (pal[PAL_MARK] != PAL_DEFAULT) {
         set_pair(FT_DIM, pal[PAL_MARK], PAL_DEFAULT, text_fg, text_bg);
         role_attr[FT_DIM] = pair_attr(FT_DIM);
+    } else if (console_rgb && cur_theme->dim >= 0) {
+        set_pair(FT_DIM, cur_theme->dim, PAL_DEFAULT, text_fg, text_bg);
+        role_attr[FT_DIM] = pair_attr(FT_DIM);
+    } else if ((termattrs() & A_DIM) && (!(no_color & A_DIM) || !themed)) {
+        role_attr[FT_DIM] = A_DIM;
+    } else {
+        set_pair(FT_DIM, COLOR_BLUE, PAL_DEFAULT, text_fg, text_bg);
+        role_attr[FT_DIM] = pair_attr(FT_DIM);
     }
     if (pal[PAL_ERROR] != PAL_DEFAULT) {
         set_pair(FT_WARN, pal[PAL_ERROR], PAL_DEFAULT, text_fg, text_bg);
         role_attr[FT_WARN] = pair_attr(FT_WARN) | A_BOLD;
     }
 
-    rgb = want_console && linux_console() ? cur_theme->rgb : NULL;
-    if (rgb != console_rgb) {
-        console_palette(rgb);
-        console_rgb = rgb;
-        clearok(curscr, TRUE);
-    }
     cur = -1;
     rgb = cur_theme->rgb;
     if (!linux_console() && rgb && pal[PAL_TEXT] >= 0 && pal[PAL_TEXT] < 16)
@@ -141,8 +167,16 @@ static void setup_roles(void)
 
 void ft_init(const Theme *t, int console_pal)
 {
+    ft_init_pal(t, console_pal, NULL);
+}
+
+void ft_init_pal(const Theme *t, int console_pal, const short *pal)
+{
     cur_theme = t;
     want_console = console_pal;
+    have_pal = pal != NULL;
+    if (pal)
+        memcpy(cur_pal, pal, sizeof cur_pal);
     initscr();
     raw();
     noecho();
@@ -151,8 +185,12 @@ void ft_init(const Theme *t, int console_pal)
     curs_set(0);
     key_init();
     if (has_colors() && start_color() == OK) {
+        int ncv = tigetnum("ncv");
+
         default_bg = use_default_colors() == OK ? -1 : COLOR_BLACK;
         have_colors = 1;
+        if (ncv > 0)
+            no_color = (ncv & 2 ? A_UNDERLINE : 0) | (ncv & 16 ? A_DIM : 0);
     }
     setup_roles();
 }

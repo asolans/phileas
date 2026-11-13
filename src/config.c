@@ -120,9 +120,11 @@ int config_set(Editor *e, const char *key, const char *v, char *err, size_t errs
         }
         return 0;
     }
-    if (!strncmp(key, "externa.", 8) || !strncmp(key, "externa-breu.", 13)) {
-        int brief = key[7] == '-';
-        const char *name = key + (brief ? 13 : 8);
+    if (!strncmp(key, "externa.", 8) || !strncmp(key, "externa-breu.", 13) ||
+        !strncmp(key, "externa-pantalla.", 17)) {
+        /* 0 interactiva, 1 breu, 2 de pantalla sencera (torna sense Retorn) */
+        int brief = key[7] == '.' ? 0 : key[8] == 'b' ? 1 : 2;
+        const char *name = key + (brief == 0 ? 8 : brief == 1 ? 13 : 17);
 
         if (!valid_command_name(name)) {
             snprintf(err, errsz, "nom d'ordre «%s» incorrecte (lletres minúscules, xifres i "
@@ -680,6 +682,8 @@ void config_template(FILE *f, const Editor *e)
           "# els arguments. Abans d'executar-la es desa el document si té canvis.\n"
           "#   externa.NOM = ORDRE       amb la pantalla del terminal; Retorn torna\n"
           "#   externa-breu.NOM = ORDRE  la darrera línia de la sortida, a la barra\n"
+          "#   externa-pantalla.NOM = ORDRE  un programa de pantalla sencera (Recerca);\n"
+          "#                             en sortir-ne, torna a Phileas sense Retorn\n"
           "# Per assignar-hi una tecla, la línia tecla. va després de la definició.\n"
           "# (Les del fitxer del sistema ja hi són; no cal repetir-les.)\n"
           "# externa.terminal = sh\n"

@@ -10,4 +10,9 @@
  * l'editor ha acabat amb error). */
 int launch_editor(const char *path, size_t line, char *err, size_t errsz);
 
+/* Executa un programa de pantalla sencera (argv acabat en NULL; argv[0] es
+ * busca al PATH), deixant-li el terminal fins que acaba. 0, o -1 amb el
+ * motiu a err. */
+int launch_program(char *const argv[], char *err, size_t errsz);
+
 #endif

@@ -140,6 +140,9 @@ static const MenuItem byok_known[] = {
     SEP,
     { 'e', "Exporta al pendrive",  "exporta", NULL, NULL },
     { 'n', "Envia a un ordinador", "envia",   NULL, NULL },
+    SEP,
+    { 'c', "Recerca",              "recerca", NULL, NULL },
+    { 'b', "Rep la recerca del PC", "rep",    NULL, NULL },
 };
 #define NBYOK_KNOWN (sizeof byok_known / sizeof byok_known[0])
 

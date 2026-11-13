@@ -1105,6 +1105,7 @@ static int menu_run(RView *rv)
         { "Recerca", NULL, 0 },
         { "Enllaços trencats", "t", 't' },
         { "Torna a llegir el vault", "Ctrl+R", 18 },
+        { "Rep del PC (rep)", "r", 'r' },
         { "Ajuda", "F1", K_FN(KEY_F(1)) },
         { "Surt", "Ctrl+Q", 17 },
     };
@@ -1218,6 +1219,7 @@ static void help(void)
         "  a                          anotació: una fitxa nova que enllaça a la del visor",
         "  Supr                       mou la fitxa a la paperera d'Obsidian (.trash/)",
         "  Ctrl+R                     torna a llegir el vault (només el que ha canviat)",
+        "  r                          a la Pi: rep el vault del PC i hi envia _pi/ (rep), i el torna a llegir",
         "  Esc                        esborra el filtre; sense filtre, el menú",
         "  Ctrl+L                     redibuixa",
         "  Ctrl+Q / q                 surt",
@@ -1265,6 +1267,11 @@ static void reload(RView *rv)
 
         doc_load(rv, doc);
         rv->doc.top = top;
+    } else if (cur_note(rv)) {          /* la fitxa del visor ja no hi és */
+        rv->nhist = 0;
+        doc_load(rv, cur_note(rv)->id);
+    } else {
+        doc_free(&rv->doc);
     }
     snprintf(rv->msg, sizeof rv->msg, "Vault llegit: %zu noves, %zu canviades, %zu esborrades",
              s.noves, s.canviades, s.esborrades);
@@ -1569,6 +1576,25 @@ static void act_trash(RView *rv)
     free(rel);
 }
 
+/* r: a la rèplica (la Pi), executa «rep VAULT» i torna a llegir el vault */
+static void act_rep(RView *rv)
+{
+    static const char *script =
+        "R=$(command -v rep || echo /data/recerca/rep); sh \"$R\" \"$1\"; "
+        "printf '\\nPrem Retorn per tornar a Recerca.'; read x";
+    char *argv[] = { "sh", "-c", (char *)script, "rep", (char *)vault_root(rv->v), NULL };
+    char err[200];
+
+    if (!rv->opt.replica) {
+        snprintf(rv->msg, sizeof rv->msg, "«rep» només hi és en les còpies del PC (a la Pi)");
+        return;
+    }
+    if (launch_program(argv, err, sizeof err))
+        snprintf(rv->msg, sizeof rv->msg, "rep: %s", err);
+    rv->nhist = 0;
+    reload(rv);
+}
+
 /* ---------- tecles ---------- */
 
 static void filter_key(RView *rv, int key)
@@ -1852,6 +1878,9 @@ void rview_run(Vault *v, const RviewOpts *o)
             break;
         case 'e':
             act_edit(&rv);
+            break;
+        case 'r':
+            act_rep(&rv);
             break;
         case 'n':
             act_new(&rv);

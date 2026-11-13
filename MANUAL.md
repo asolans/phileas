@@ -1,6 +1,6 @@
 # Manual d'ús de Phileas
 
-*Versió 2.6.0*
+*Versió 2.7.0*
 
 Aquest manual t'acompanya pas a pas: des d'obrir Phileas per primera vegada
 fins a organitzar un llibre llarg. No cal llegir-lo de dalt a baix. Si només
@@ -26,7 +26,8 @@ cosa. L'ajuda de dins del programa (**F1**) és un llistat curt de tecles; això
 14. [A la Raspberry Pi (BYOK)](#14-a-la-raspberry-pi-byok)
 15. [Resolució de problemes](#15-resolució-de-problemes)
 16. [Fàbula: organitzar un llibre](#16-fàbula-organitzar-un-llibre)
-17. [Xuleta de dreceres](#17-xuleta-de-dreceres)
+17. [Recerca: fitxes de recerca](#17-recerca-fitxes-de-recerca)
+18. [Xuleta de dreceres](#18-xuleta-de-dreceres)
 
 ---
 
@@ -695,7 +696,13 @@ externa.terminal = sh
 - `externa-breu.NOM`: executa l'ordre i mostra la **darrera línia** de la
   sortida a la barra d'estat. A la paleta: `paraules capitol1.md`.
 - `externa.NOM`: deixa la pantalla a l'ordre fins que acaba; després torna
-  a Phileas. Va bé per obrir un shell o executar `pandoc`.
+  a Phileas quan prems Retorn. Va bé per obrir un shell o executar `pandoc`.
+- `externa-pantalla.NOM`: per a un programa de **pantalla sencera** (com
+  Recerca o Fàbula): en sortir-ne, torna directament a Phileas, sense Retorn.
+
+```ini
+externa-pantalla.recerca = recerca ~/Documents/Recerca
+```
 
 Abans d'executar-la, Phileas **desa el document** si té canvis.
 
@@ -724,8 +731,10 @@ Esc → **BYOK** (només a la Pi):
 | Gira la pantalla | gira la imatge (útil si el monitor està en vertical) |
 | Exporta al pendrive | copia els textos a un pendrive USB |
 | Envia a un ordinador | copia els textos, per la xarxa, a un ordinador Linux |
+| Recerca | obre Recerca amb els vaults de recerca de la Pi ([capítol 17](#17-recerca-fitxes-de-recerca)); en sortir, torna a Phileas |
+| Rep la recerca del PC | porta un vault d'Obsidian del PC a la Pi i hi torna les fitxes escrites a la Pi |
 
-També són ordres de la paleta: `lletra`, `gira`, `exporta`, `envia`.
+També són ordres de la paleta: `lletra`, `gira`, `exporta`, `envia`, `recerca`, `rep`.
 
 ### Passar els textos a l'ordinador
 
@@ -761,7 +770,7 @@ sudo apt install libhunspell-1.7-0 hunspell-ca hunspell-es
 
 **Una tecla no fa res a la consola de Linux.**
 Les combinacions amb Ctrl o Maj i fletxes no arriben a la consola. Fes servir
-l'alternativa amb Alt (a la taula del [capítol 17](#17-xuleta-de-dreceres)) o
+l'alternativa amb Alt (a la taula del [capítol 18](#18-xuleta-de-dreceres)) o
 **Esc** per als menús.
 
 **Ctrl+C o Ctrl+S no fan el que dic.**
@@ -882,10 +891,16 @@ sortir una mica més alt.
 | `v` | **versions** anteriors: llista amb data, paraules i diferència; Retorn en recupera una |
 | Supr | mou a la paperera (pregunta abans) |
 | `/` | filtra pel títol o la sinopsi, sense majúscules ni accents |
+| `b` | obre **Recerca** amb el vault de recerca del projecte (vegeu més avall); en sortir, torna a Fàbula |
 | Esc | esborra el filtre; sense filtre, obre el menú |
 | F1, Ctrl+Q | ajuda, sortir |
 
 Al retornar de Phileas, Fàbula torna a llegir només els fitxers que han canviat.
+
+Per lligar el projecte amb un vault de recerca ([capítol 17](#17-recerca-fitxes-de-recerca)),
+posa'l a `projecte.md`: `recerca: ~/Documents/Recerca` (també pot ser un camí
+relatiu a la carpeta del projecte). Sense aquesta línia, `b` obre el vault per
+defecte de Recerca.
 
 ### L'outliner: la taula del manuscrit
 
@@ -1084,7 +1099,121 @@ només la primera té instantània prèvia.
 
 ---
 
-## 17. Xuleta de dreceres
+## 17. Recerca: fitxes de recerca
+
+**Recerca** és la tercera eina, al costat de Phileas i Fàbula. Serveix per a
+la documentació d'una recerca: fitxes de fonts, de bibliografia, de persones i
+de llocs, notes de camp i transcripcions de treball. Les fitxes viuen en un
+**vault d'Obsidian** normal, i Recerca les llegeix i les escriu sense canviar
+res del format: el mateix vault s'obre a Obsidian al PC i a Recerca a la Pi.
+
+```bash
+recerca ~/Documents/Recerca      # obre el vault
+recerca --resum ~/Documents/Recerca
+```
+
+### Què entén
+
+- **Carpetes**: l'arbre del vault és el de les carpetes.
+- **Propietats** a la capçalera (YAML), també les llistes que escriu Obsidian:
+
+  ```yaml
+  ---
+  tipus: fons
+  arxiu: ACA
+  signatura: "ACA, Cancelleria, reg. 1234, f. 56v"
+  data: "1363"
+  tags: [fiscalitat, notarial]
+  aliases:
+    - Registre 1234
+  complementa: "[[Batlle 1988]]"
+  ---
+  ```
+
+  `tipus` dona una lletra a la llista (F fons, N nota de camp, B
+  bibliografia…). Una propietat amb un enllaç, com `complementa`,
+  `contradiu` o `cita`, és una **relació amb nom** i surt així a les notes que
+  hi enllacen.
+- **Etiquetes**: les de `tags` i les del text (`#fiscalitat`), també niades
+  (`#tema/subtema`), que es mostren en arbre.
+- **Enllaços**: `[[Nota]]`, `[[Nota|text]]`, `[[Nota#Secció]]`, el bloc
+  `[[Nota#^f56v]]` (un passatge marcat amb `^f56v` al final de la línia),
+  `[[Carpeta/Nota]]`, els àlies i els enllaços Markdown `[text](../Nota.md)`.
+  `![[imatge.png]]` és un adjunt, no un enllaç trencat.
+- Res del que hi ha dins de blocs de codi o de comentaris (`%% %%`) no compta.
+
+### L'índex
+
+La primera vegada, Recerca fa un índex a `.recerca/` dins del vault (unes
+quantes desenes de segons a la Pi per a 2.000 fitxes). Després, en obrir-lo,
+només llegeix el que ha canviat. L'índex es pot esborrar sense perdre res:
+els fitxers són la veritat. Obsidian no veu les carpetes que comencen amb punt.
+
+### La pantalla
+
+A partir de 110 columnes hi ha tres panells: la **navegació**, la **llista de
+fitxes** i el **visor**. Per sota, se'n veuen dos, i el de l'esquerra fa de
+navegació o de llista. Retorn passa d'un panell al següent, i ← torna enrere.
+
+| Tecla | Acció |
+|-------|-------|
+| `1` `2` `3` | navega per carpetes, per etiquetes o per tipus |
+| ↑ ↓ RePàg AvPàg Inici Fi | moure's |
+| Retorn / → | de la navegació a les fitxes, i de les fitxes al visor |
+| `/` | filtra les fitxes pel nom (sense majúscules ni accents) |
+| `o` | ordena per nom, data, modificació o paraules |
+| Tab / Maj+Tab | al visor, l'enllaç següent o l'anterior (també `]` i `[`) |
+| Retorn | al visor, segueix l'enllaç triat (si no n'hi ha cap, tria el primer) |
+| Retrocés | torna a la fitxa d'abans, a la mateixa posició |
+| `u` / `b` | les notes que hi enllacen (backlinks), amb el context |
+| `l` | els enllaços d'aquesta fitxa i on van a parar |
+| `t` | els enllaços trencats de tot el vault |
+| `z` | el visor a tota la pantalla |
+| `e` | edita la fitxa a Phileas, a la línia que es veu; en tornar, es torna a llegir |
+| `n` | fitxa nova a la carpeta triada, amb plantilla si n'hi ha |
+| `a` | anotació: una fitxa nova amb `anota: "[[Fitxa]]"` |
+| Supr | mou la fitxa a la paperera d'Obsidian (`.trash/`) |
+| `r` | a la Pi: rep el vault del PC (vegeu més avall) |
+| Ctrl+R | torna a llegir el vault |
+| Esc, F1, Ctrl+Q | menú, ajuda, sortir |
+
+Les fitxes noves porten `id` i `created` a la capçalera. Les plantilles són
+les de la carpeta de plantilles d'Obsidian (`.obsidian/templates.json`) o,
+si no, les de `plantilles/`, amb `{{title}}`, `{{date}}` i `{{time}}`.
+
+### Recerca a la Pi: rep
+
+La recerca es fa al PC, amb Obsidian, i la Pi en porta una **còpia**:
+
+1. Esc → BYOK → **Rep la recerca del PC** (o `rep` a la paleta). La primera
+   vegada tria **vault nou**, l'ordinador (el mateix d'«Envia a un
+   ordinador») i la carpeta del vault al PC. Demana la contrasenya del PC
+   una sola vegada.
+2. El vault arriba a `/data/recerca/NOM`. Esc → BYOK → **Recerca** l'obre.
+3. A la Pi només s'escriu a la carpeta **`_pi/`** del vault: les fitxes
+   noves (`n`) i les anotacions (`a`) hi van. Les altres fitxes, que són del
+   PC, no s'editen aquí.
+4. Cada `rep` (també la tecla **`r`** de Recerca) torna el vault al dia i
+   envia `_pi/` al PC. Al PC, a Obsidian, mou les fitxes de `_pi/` al seu
+   lloc: la vegada següent, desapareixen de `_pi/` a la Pi i hi arriben al
+   lloc nou.
+
+Les fonts (PDF, imatges) no viatgen: queden al PC. A les fitxes, la propietat
+`font` hi apunta.
+
+### Configuració
+
+Al phileasrc, com Phileas (també el tema):
+
+```ini
+recerca-vault = ~/Documents/Recerca   # el vault per defecte
+```
+
+`RECERCA_EDITOR` canvia l'editor de `e` (per defecte, Phileas).
+
+---
+
+## 18. Xuleta de dreceres
 
 ### Fitxer
 

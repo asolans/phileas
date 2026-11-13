@@ -296,11 +296,14 @@ fabula compila -o llibre.docx la-casa-del-pou   # el manuscrit en un sol documen
 fabula --diari la-casa-del-pou   # avui, ratxa, mitjana i previsió, en text
 ```
 
+La tecla `b` obre Recerca amb el vault de recerca del projecte (`recerca:` a
+`projecte.md`), i en sortir es torna a Fàbula.
+
 Les tecles i el format del projecte, al capítol 16 del [manual](MANUAL.md). Es
 compila amb `make fabula` (executable a `build/fabula`) i les proves són a
 `make test-fabula`.
 
-## Recerca (en desenvolupament)
+## Recerca (fitxes de recerca)
 
 **Recerca** és la tercera eina, per a fitxes de recerca en un vault d'Obsidian:
 carpetes, propietats, etiquetes, enllaços `[[ ]]` i backlinks, amb un índex
@@ -338,6 +341,13 @@ recerca --on-surt "Nom" VAULT    # notes que enllacen a «Nom»
 recerca --trencats VAULT         # enllaços que no apunten enlloc
 recerca --cerca "pau caspe" VAULT   # notes amb totes les paraules
 ```
+
+A la Pi, `rep` (menú BYOK → Rep la recerca del PC, o la tecla `r` de Recerca)
+porta una còpia d'un vault del PC a `/data/recerca/NOM` i torna al PC les fitxes
+escrites a la Pi, que sempre van a `_pi/`. Des de Phileas, l'ordre externa
+`externa-pantalla.recerca = recerca` l'obre; des de Fàbula, la tecla `b` (amb
+`recerca: CAMÍ` a `projecte.md`). En sortir, es torna a Phileas o a Fàbula.
+Capítol 17 del [manual](MANUAL.md).
 
 Es compila amb `make recerca` (executable a `build/recerca`), però abans cal
 posar l'amalgamació de SQLite a `recerca/sqlite/` (vegeu el `LLEGEIX.md` d'aquella
@@ -455,7 +465,9 @@ a la consola de Linux es mantinguin els colors de la consola.
 A la paleta, el que s'escriu després del nom d'una ordre externa se li passa
 com a arguments. Abans d'executar-la, Phileas desa el document si té canvis.
 Les ordres `externa-breu` mostren la darrera línia de la sortida a la barra
-d'estat; les `externa` deixen el terminal a l'ordre fins que acaba.
+d'estat; les `externa` deixen el terminal a l'ordre fins que acaba (i Retorn
+torna a Phileas); les `externa-pantalla` són per a programes de pantalla sencera,
+com Recerca, i en acabar tornen a Phileas directament.
 
 Una línia incorrecta no impedeix arrencar: s'ignora i la barra d'estat en
 dona l'avís. Des de la paleta, `recarregar-configuracio` torna a llegir el
@@ -529,6 +541,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.7.0**: **Recerca 0.1**, la tercera eina: fitxes de recerca en un vault d'Obsidian (carpetes, propietats, etiquetes niades, enllaços amb àlies, seccions i blocs `^id`, backlinks i relacions de propietat), amb un índex SQLite (FTS5) que es posa al dia sol; pantalla de navegació, llista i visor; editar a Phileas, fitxes noves amb plantilla, anotacions i paperera; a la Pi, `rep` porta un vault del PC i hi torna `_pi/`. Phileas: ordres `externa-pantalla.NOM` (programes de pantalla sencera, tornen sense Retorn) i Recerca i `rep` al menú BYOK. Fàbula 0.3.1: `b` obre Recerca (`recerca:` a `projecte.md`). Fàbula i Recerca fan servir els colors del tema com Phileas (el text atenuat a la consola i les línies `color-…` del phileasrc).
 - **2.6.0**: **Escriure net.** Cerca sense majúscules ni accents (`cafe` troba `cafè`); estadístiques del document o de la selecció (`estadistiques`: paraules, caràcters, frases, pàgines de 1.800, temps de lectura); `col.legi` → `col·legi` amb la tipografia i el diccionari català, `Alt+.` (punt volat) i `unicode NOM|CODI`; diccionari de projecte (`.diccionari.txt`, `p` als suggeriments); `revisar-aparellaments` (« » ( ) [ ] “ ” cometes i acotacions de diàleg sense tancar).
 - **2.5.0**: **Fàbula 0.3**. Diari d'escriptura (`.fabula/diari.csv`; `d` i `fabula --diari`: avui, setmana, mitjana, ratxa i previsió d'acabar segons l'objectiu i la data límit); línia temporal (`T`: escenes per data, amb marca ↶ als salts enrere); menú d'Esc agrupat per categories i amb desplaçament.
 - **2.4.0**: **Fàbula 0.2**. Instantànies dels fitxers (`.versions/`: automàtiques abans d'obrir, canviar l'estat o el títol, i a mà; `v` en recupera una); metadades (`pov`, `lloc`, `data`, `personatges`, `sinopsi`, `estat`) als capítols i, en un comentari sota la capçalera, a les escenes; taula (outliner) amb Tab, que s'ordena, s'edita i es filtra per qualsevol camp; enllaços `[[Nom]]` d'Obsidian (`u` on surt, `l` enllaços d'aquí, `t` trencats); cerca i substitució a tot el projecte (`f`, `R`), amb instantània prèvia; compilar el manuscrit (`C`, `fabula compila`) en un `.md` net o, amb pandoc, `.docx`/`.epub`/`.pdf`; `fabula --cerca`.

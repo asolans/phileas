@@ -1755,6 +1755,18 @@ static void run_interactive(Editor *e, const External *x, const char *cmd)
         ed_msg(e, "%s: fet", x->name);
 }
 
+/* De pantalla sencera (Recerca, Fàbula): en acabar torna directament */
+static void run_screen(Editor *e, const External *x, const char *cmd)
+{
+    int st;
+
+    ui_suspend();
+    st = system(cmd);
+    ui_resume();
+    if (!extern_failed(e, x, st, NULL))
+        ed_msg(e, "%s: fet", x->name);
+}
+
 static void run_external(Editor *e, const External *x, const char *args)
 {
     char *cmd;
@@ -1766,8 +1778,10 @@ static void run_external(Editor *e, const External *x, const char *args)
             return;
     }
     cmd = extern_command(x, args);
-    if (x->brief)
+    if (x->brief == 1)
         run_brief(e, x, cmd);
+    else if (x->brief == 2)
+        run_screen(e, x, cmd);
     else
         run_interactive(e, x, cmd);
     free(cmd);
