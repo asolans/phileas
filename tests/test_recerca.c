@@ -4,6 +4,7 @@
 #include "mdscan.h"
 #include "model.h"
 #include "nova.h"
+#include "rc.h"
 #include "vault.h"
 
 #include <locale.h>
@@ -71,6 +72,40 @@ static void test_fold(void)
     CHECK(eqfree(cm_fold("Œuvre Straße", strlen("Œuvre Straße")), "oeuvre strasse"));
     CHECK(eqfree(cm_lower("Història", strlen("Història")), "història"));
     CHECK(eqfree(cm_fold("a\xff" "b", 3), "a\xff" "b"));     /* byte invàlid: tal qual */
+    /* per caràcters (la cerca de Fàbula) */
+    CHECK(cm_lower_char(L'À') == L'à' && cm_lower_char(L'Q') == L'q');
+    CHECK(!strcmp(cm_strip_char(L'à'), "a") && !strcmp(cm_strip_char(L'æ'), "ae"));
+    CHECK(!strcmp(cm_strip_char(0xB7), "") && cm_strip_char(L'x') == NULL);
+}
+
+/* ---------- rc (el phileasrc comú) ---------- */
+
+static void test_rc(void)
+{
+    CmLook l;
+    char path[64];
+
+    cm_look_init(&l);
+    CHECK(!strcmp(l.tema, "terminal") && l.console == 1 && l.over[PAL_BAR] == CM_NO_COLOR);
+    CHECK(cm_look_key(&l, "color-barra", "vermell") && l.over[PAL_BAR] == 1);
+    CHECK(cm_look_key(&l, "tema", "sepia") && !strcmp(l.tema, "sepia"));
+    CHECK(l.over[PAL_BAR] == CM_NO_COLOR);       /* el tema anul·la els colors d'abans */
+    CHECK(cm_look_key(&l, "paleta-consola", "no") && l.console == 0);
+    CHECK(!cm_look_key(&l, "recerca-vault", "/x") && !cm_look_key(&l, "columnes", "60"));
+    CHECK(cm_rc_bool("sí") && cm_rc_bool("si") && cm_rc_bool("1") && !cm_rc_bool("no"));
+    {
+        char *home = getenv("HOME") ? strdup(getenv("HOME")) : NULL;
+
+        setenv("HOME", "/casa", 1);
+        cm_rc_path("~/tesi", path, sizeof path);
+        CHECK(!strcmp(path, "/casa/tesi"));
+        if (home)
+            setenv("HOME", home, 1);
+        free(home);
+    }
+    cm_rc_path("/data/recerca", path, sizeof path);
+    CHECK(!strcmp(path, "/data/recerca"));
+    CHECK(cm_ncolor_keys == 15 && !strcmp(cm_color_keys[0].key, "color-capcalera-1"));
 }
 
 /* ---------- front ---------- */
@@ -455,6 +490,7 @@ int main(void)
         return 1;
     }
     test_fold();
+    test_rc();
     test_front();
     test_scan();
     test_vault();

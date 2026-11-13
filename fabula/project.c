@@ -1,4 +1,5 @@
 #include "project.h"
+#include "fold.h"
 #include "yaml.h"
 
 #include "buffer.h"
@@ -66,40 +67,6 @@ int fk_name_cmp(const char *a, const char *b)
     return 0;
 }
 
-static const char *fold(wchar_t c)
-{
-    static const struct { const char *from; const char *to; } map[] = {
-        { "àáâäãå", "a" }, { "èéêë", "e" }, { "ìíîï", "i" }, { "òóôöõ", "o" },
-        { "ùúûü", "u" }, { "ç", "c" }, { "ñ", "n" }, { "·", "" }, { "œ", "oe" },
-        { "æ", "ae" }, { "ß", "ss" },
-    };
-    char enc[8] = { 0 };
-    size_t n = 0;
-
-    /* codifica c en UTF-8 */
-    if (c < 0x80)
-        enc[n++] = (char)c;
-    else if (c < 0x800) {
-        enc[n++] = (char)(0xC0 | (c >> 6));
-        enc[n++] = (char)(0x80 | (c & 0x3F));
-    } else
-        return NULL;
-    enc[n] = '\0';
-    if (c < 0x80)
-        return NULL;
-    for (size_t i = 0; i < sizeof map / sizeof *map; i++) {
-        const char *s = map[i].from;
-
-        while (*s) {
-            size_t k = utf8_decode(s, strlen(s), 0, &(wchar_t){ 0 });
-
-            if (k == n && !memcmp(s, enc, n))
-                return map[i].to;
-            s += k ? k : 1;
-        }
-    }
-    return NULL;
-}
 
 char *fk_slug(const char *title)
 {
@@ -115,8 +82,8 @@ char *fk_slug(const char *title)
         i += k ? k : 1;
         if (c == UTF8_INVALID)
             continue;
-        c = (wchar_t)towlower((wint_t)c);
-        rep = fold(c);
+        c = cm_lower_char(c);
+        rep = cm_strip_char(c);
         if (rep) {
             for (; *rep; rep++)
                 out[o++] = *rep;
@@ -144,29 +111,7 @@ char *fk_slug(const char *title)
 /* Minúscules i sense accents (el que fa fk_slug, però conservant la resta) */
 static char *foldstr(const char *s)
 {
-    size_t n = strlen(s), i = 0, o = 0;
-    char *out = xmalloc(4 * n + 1);
-
-    while (i < n) {
-        wchar_t c;
-        size_t k = utf8_decode(s, n, i, &c);
-
-        i += k ? k : 1;
-        if (c == UTF8_INVALID)
-            continue;
-        c = (wchar_t)towlower((wint_t)c);
-        {
-            const char *rep = fold(c);
-
-            if (rep)
-                for (; *rep; rep++)
-                    out[o++] = *rep;
-            else
-                o += utf8_encode(c, out + o);
-        }
-    }
-    out[o] = '\0';
-    return out;
+    return cm_fold(s, strlen(s));
 }
 
 void fk_fold_line(FoldBuf *fb, const char *s, size_t len)
@@ -205,8 +150,8 @@ void fk_fold_line(FoldBuf *fb, const char *s, size_t len)
             fb->e[o++] = e;
             continue;
         }
-        c = (wchar_t)towlower((wint_t)c);
-        rep = fold(c);
+        c = cm_lower_char(c);
+        rep = cm_strip_char(c);
         if (rep) {
             for (; *rep; rep++) {
                 fb->f[o] = *rep;

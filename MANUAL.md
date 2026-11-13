@@ -905,7 +905,7 @@ sortir una mica més alt.
 | `/` | filtra pel títol o la sinopsi, sense majúscules ni accents |
 | `b` | obre **Recerca** amb el vault de recerca del projecte (vegeu més avall); en sortir, torna a Fàbula |
 | Esc | esborra el filtre; sense filtre, obre el menú |
-| F1, Ctrl+Q | ajuda, sortir |
+| F1, Ctrl+Q | ajuda (si no hi cap, ↑ ↓ RePàg AvPàg la desplacen), sortir |
 
 Al retornar de Phileas, Fàbula torna a llegir només els fitxers que han canviat.
 
@@ -1187,7 +1187,7 @@ navegació o de llista. Retorn passa d'un panell al següent, i ← torna enrere
 | Supr | mou la fitxa a la paperera d'Obsidian (`.trash/`) |
 | `r` | a la Pi: rep el vault del PC (vegeu més avall) |
 | Ctrl+R | torna a llegir el vault |
-| Esc, F1, Ctrl+Q | menú, ajuda, sortir |
+| Esc, F1, Ctrl+Q | menú, ajuda (si no hi cap, ↑ ↓ RePàg AvPàg la desplacen), sortir |
 
 Les fitxes noves porten `id` i `created` a la capçalera. Les plantilles són
 les de la carpeta de plantilles d'Obsidian (`.obsidian/templates.json`) o,

@@ -1,5 +1,6 @@
 #include "rc.h"
 #include "fterm.h"
+#include "ui.h"
 #include "fview.h"
 #include "project.h"
 #include "compile.h"
@@ -167,49 +168,16 @@ static void quit_hook(int sig)
     _exit(128 + sig);
 }
 
-/* Tema i paleta de la consola, com a Phileas: «tema =» i «paleta-consola =» del
- * phileasrc del sistema i després el de l'usuari. */
-static short color_over[PAL_N];     /* «color-…» del phileasrc, com a Phileas */
-
-static void read_rc(const char *path, char *tema, size_t tsz, int *console)
+/* Tema, paleta i colors del phileasrc (del sistema i de l'usuari), com a Phileas */
+static void rc_cb(const char *k, const char *v, void *ud)
 {
-    FILE *f = fopen(path, "r");
-    char line[256];
-
-    if (!f)
-        return;
-    while (fgets(line, sizeof line, f)) {
-        char *eq = strchr(line, '='), *k = line, *v;
-        size_t l;
-
-        if (line[0] == '#' || !eq)
-            continue;
-        *eq = '\0';
-        v = eq + 1;
-        while (*k == ' ' || *k == '\t')
-            k++;
-        for (l = strlen(k); l && (k[l - 1] == ' ' || k[l - 1] == '\t'); l--)
-            k[l - 1] = '\0';
-        while (*v == ' ' || *v == '\t')
-            v++;
-        for (l = strlen(v); l && (v[l - 1] == '\n' || v[l - 1] == '\r' || v[l - 1] == ' '); l--)
-            v[l - 1] = '\0';
-        if (!strcmp(k, "tema")) {
-            snprintf(tema, tsz, "%s", v);
-            cm_rc_color_reset(color_over);
-        } else if (cm_rc_color(k, v, color_over))
-            ;
-        else if (!strcmp(k, "paleta-consola"))
-            *console = !(!strcmp(v, "no") || !strcmp(v, "false") || !strcmp(v, "0"));
-    }
-    fclose(f);
+    cm_look_key(ud, k, v);
 }
 
 int main(int argc, char **argv)
 {
-    char tema[64] = "terminal", err[300], cfg[512], path[PATH_MAX], rcpath[640];
-    int console = 1;
-    const Theme *th;
+    char err[300], path[PATH_MAX];
+    CmLook look;
     const char *dir = ".";
     Project p;
 
@@ -264,22 +232,9 @@ int main(int argc, char **argv)
         fprintf(stderr, "fabula: %s\n", err);
         return 1;
     }
-    cm_rc_color_reset(color_over);
-    read_rc("/etc/phileas/phileasrc", tema, sizeof tema, &console);
-    config_dir(cfg, sizeof cfg);
-    snprintf(rcpath, sizeof rcpath, "%s/phileasrc", cfg);
-    read_rc(rcpath, tema, sizeof tema, &console);
-    th = theme_find(tema);
-    if (!th)
-        th = theme_at(0);
-
-    {
-        short pal[PAL_N];
-
-        theme_palette(th, pal);
-        cm_rc_apply(pal, color_over);
-        ft_init_pal(th, console, pal);
-    }
+    cm_look_init(&look);
+    cm_rc_read(rc_cb, &look);
+    cm_look_start(&look);
     key_quit_hook = quit_hook;
     key_signals();
     fview_run(&p);

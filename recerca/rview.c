@@ -4,6 +4,7 @@
 #include "front.h"
 #include "fterm.h"
 #include "launch.h"
+#include "ui.h"
 #include "mdscan.h"
 #include "model.h"
 #include "nova.h"
@@ -17,8 +18,6 @@
 #include <string.h>
 #include <strings.h>
 #include <time.h>
-
-#define K_FN(k) (KEY_FLAG_FN | (k))
 
 enum { F_NAV, F_LIST, F_DOC, F_BACK };
 
@@ -92,68 +91,6 @@ typedef struct {
     char     msg[4400];
     RviewOpts opt;
 } RView;
-
-/* ---------- dibuix bàsic ---------- */
-
-static int put(int y, int x, const char *s, int maxw, attr_t a)
-{
-    size_t n = strlen(s), i = 0, end = 0;
-    int w = 0, wend = 0;
-
-    if (maxw <= 0)
-        return 0;
-    while (i < n) {
-        wchar_t c;
-        size_t k = utf8_decode(s, n, i, &c);
-        int cw = c == UTF8_INVALID ? 1 : utf8_width(c, w);
-
-        if (cw < 0)
-            cw = 1;
-        if (w + cw > maxw)
-            break;
-        w += cw;
-        i += k ? k : 1;
-        if (w <= maxw - 1) {
-            end = i;
-            wend = w;
-        }
-    }
-    attron(a);
-    if (i >= n) {
-        mvaddnstr(y, x, s, (int)n);
-    } else {
-        mvaddnstr(y, x, s, (int)end);
-        mvaddstr(y, x + wend, "…");
-        w = wend + 1;
-    }
-    attroff(a);
-    return w;
-}
-
-static int text_width(const char *s)
-{
-    size_t n = strlen(s), i = 0;
-    int w = 0;
-
-    while (i < n) {
-        wchar_t c;
-        size_t k = utf8_decode(s, n, i, &c);
-        int cw = c == UTF8_INVALID ? 1 : utf8_width(c, w);
-
-        w += cw < 0 ? 1 : cw;
-        i += k ? k : 1;
-    }
-    return w;
-}
-
-static void blank(int y, int x, int w, attr_t a)
-{
-    attron(a);
-    move(y, x);
-    for (int i = 0; i < w; i++)
-        addch(' ');
-    attroff(a);
-}
 
 static void sep_line(int x, int y0, int y1)
 {
@@ -537,8 +474,8 @@ static void scroll_into(long *top, long sel, int rows)
 
 static void pane_title(int y, int x, int w, const char *s, int focused)
 {
-    blank(y, x, w, focused ? ft_attr(FT_SEL) : 0);
-    put(y, x + 1, s, w - 1, focused ? ft_attr(FT_SEL) : ft_attr(FT_HEAD));
+    cm_blank(y, x, w, focused ? ft_attr(FT_SEL) : 0);
+    cm_put(y, x + 1, s, w - 1, focused ? ft_attr(FT_SEL) : ft_attr(FT_HEAD));
 }
 
 static void paint_nav(RView *rv, const Lay *l)
@@ -556,19 +493,19 @@ static void paint_nav(RView *rv, const Lay *l)
         char cnt[32];
         int ind, cw;
 
-        blank(y, l->nav_x, l->nav_w, 0);
+        cm_blank(y, l->nav_x, l->nav_w, 0);
         if (i >= (long)rv->m.nnav)
             continue;
         a = i == rv->nav_sel ? (rv->focus == F_NAV ? ft_attr(FT_SEL) : A_BOLD) : 0;
         if (a)
-            blank(y, l->nav_x, l->nav_w, a);
+            cm_blank(y, l->nav_x, l->nav_w, a);
         vault_fmt_num(cnt, sizeof cnt, (long long)rv->m.nav[i].count);
-        cw = text_width(cnt);
+        cw = cm_width(cnt);
         ind = 1 + 2 * (rv->m.nav[i].depth > 0 ? rv->m.nav[i].depth - 1 : 0);
         if (ind > l->nav_w / 2)
             ind = l->nav_w / 2;
-        put(y, l->nav_x + ind, rv->m.nav[i].label, l->nav_w - ind - cw - 2, a);
-        put(y, l->nav_x + l->nav_w - cw - 1, cnt, cw, a ? a : ft_attr(FT_DIM));
+        cm_put(y, l->nav_x + ind, rv->m.nav[i].label, l->nav_w - ind - cw - 2, a);
+        cm_put(y, l->nav_x + l->nav_w - cw - 1, cnt, cw, a ? a : ft_attr(FT_DIM));
     }
 }
 
@@ -591,24 +528,24 @@ static void paint_list(RView *rv, const Lay *l)
         attr_t a;
         char lt[2];
 
-        blank(y, l->list_x, l->list_w, 0);
+        cm_blank(y, l->list_x, l->list_w, 0);
         if (i >= (long)rv->nlist)
             continue;
         n = &rv->m.notes[rv->list[i]];
         a = i == rv->list_sel ? (rv->focus == F_LIST ? ft_attr(FT_SEL) : A_BOLD) : 0;
         if (a)
-            blank(y, l->list_x, l->list_w, a);
+            cm_blank(y, l->list_x, l->list_w, a);
         lt[0] = model_type_letter(n->tipus);
         lt[1] = '\0';
-        put(y, l->list_x + 1, lt, 1, a ? a : ft_attr(FT_DIM));
+        cm_put(y, l->list_x + 1, lt, 1, a ? a : ft_attr(FT_DIM));
         dw = l->list_w > 30 ? 10 : 0;          /* columna fixa: AAAA-MM-DD */
-        put(y, l->list_x + 3, n->nom, l->list_w - 4 - (dw ? dw + 1 : 0), a);
+        cm_put(y, l->list_x + 3, n->nom, l->list_w - 4 - (dw ? dw + 1 : 0), a);
         if (dw && n->data[0]) {
-            int tw = text_width(n->data);
+            int tw = cm_width(n->data);
 
             if (tw > dw)
                 tw = dw;
-            put(y, l->list_x + l->list_w - tw - 1, n->data, tw, a ? a : ft_attr(FT_DIM));
+            cm_put(y, l->list_x + l->list_w - tw - 1, n->data, tw, a ? a : ft_attr(FT_DIM));
         }
     }
 }
@@ -678,12 +615,12 @@ static void paint_doc(RView *rv, const Lay *l)
         long k = d->top + r;
         int y = l->y0 + 1 + r;
 
-        blank(y, l->doc_x, l->doc_w, 0);
+        cm_blank(y, l->doc_x, l->doc_w, 0);
         if (!d->buf || k >= (long)d->nrows)
             continue;
         switch (d->rows[k].kind) {
         case R_PROP:
-            put(y, l->doc_x + 1, d->props[d->rows[k].idx], w, ft_attr(FT_DIM));
+            cm_put(y, l->doc_x + 1, d->props[d->rows[k].idx], w, ft_attr(FT_DIM));
             break;
         case R_RULE:
             attron(ft_attr(FT_DIM));
@@ -704,7 +641,7 @@ static void paint_doc(RView *rv, const Lay *l)
 
         snprintf(pos, sizeof pos, " %ld%% ", (long)(100 * (d->top + rows) / (long)d->nrows) > 100 ? 100 :
                  (long)(100 * (d->top + rows) / (long)d->nrows));
-        put(l->doc_y1, l->doc_x + l->doc_w - text_width(pos) - 1, pos, text_width(pos), ft_attr(FT_DIM));
+        cm_put(l->doc_y1, l->doc_x + l->doc_w - cm_width(pos) - 1, pos, cm_width(pos), ft_attr(FT_DIM));
     }
 }
 
@@ -726,23 +663,23 @@ static void paint_back(RView *rv, const Lay *l)
         attr_t a;
         char head[300];
 
-        blank(y, l->doc_x, l->doc_w, 0);
+        cm_blank(y, l->doc_x, l->doc_w, 0);
         if (i >= (long)rv->nback) {
             if (!rv->nback && r == 0)
-                put(y, l->doc_x + 1, "Cap nota no hi enllaça.", l->doc_w - 2, ft_attr(FT_DIM));
+                cm_put(y, l->doc_x + 1, "Cap nota no hi enllaça.", l->doc_w - 2, ft_attr(FT_DIM));
             continue;
         }
         b = &rv->back[i];
         a = i == rv->back_sel && rv->focus == F_BACK ? ft_attr(FT_SEL) : 0;
         if (a)
-            blank(y, l->doc_x, l->doc_w, a);
+            cm_blank(y, l->doc_x, l->doc_w, a);
         if (b->relacio)
             snprintf(head, sizeof head, "%s · %s", b->nom ? b->nom : "", b->relacio);
         else
             snprintf(head, sizeof head, "%s:%d", b->nom ? b->nom : "", b->linia);
-        x = l->doc_x + 1 + put(y, l->doc_x + 1, head, l->doc_w / 2, a ? a : A_BOLD);
+        x = l->doc_x + 1 + cm_put(y, l->doc_x + 1, head, l->doc_w / 2, a ? a : A_BOLD);
         if (!b->relacio && b->context)
-            put(y, x + 1, b->context, l->doc_x + l->doc_w - x - 2, a ? a : ft_attr(FT_DIM));
+            cm_put(y, x + 1, b->context, l->doc_x + l->doc_w - x - 2, a ? a : ft_attr(FT_DIM));
     }
 }
 
@@ -751,9 +688,9 @@ static void status(RView *rv)
     const char *hint;
     char s[400];
 
-    blank(LINES - 1, 0, COLS, ft_attr(FT_BAR));
+    cm_blank(LINES - 1, 0, COLS, ft_attr(FT_BAR));
     if (rv->msg[0]) {
-        put(LINES - 1, 1, rv->msg, COLS - 2, ft_attr(FT_BAR));
+        cm_put(LINES - 1, 1, rv->msg, COLS - 2, ft_attr(FT_BAR));
         return;
     }
     switch (rv->focus) {
@@ -763,7 +700,7 @@ static void status(RView *rv)
     default:     hint = "↑↓ tria · Retorn obre la nota · Tab · Esc menú · F1"; break;
     }
     snprintf(s, sizeof s, "%s", hint);
-    put(LINES - 1, 1, s, COLS - 2, ft_attr(FT_BAR));
+    cm_put(LINES - 1, 1, s, COLS - 2, ft_attr(FT_BAR));
 }
 
 static void header(RView *rv)
@@ -773,8 +710,8 @@ static void header(RView *rv)
 
     vault_fmt_num(n, sizeof n, (long long)rv->m.n);
     snprintf(s, sizeof s, "Recerca · %s · %s fitxes", base && base[1] ? base + 1 : root, n);
-    blank(0, 0, COLS, ft_attr(FT_BAR));
-    put(0, 1, s, COLS - 2, ft_attr(FT_BAR));
+    cm_blank(0, 0, COLS, ft_attr(FT_BAR));
+    cm_put(0, 1, s, COLS - 2, ft_attr(FT_BAR));
 }
 
 static void paint(RView *rv)
@@ -795,6 +732,12 @@ static void paint(RView *rv)
     if (l.back_y0 >= 0)
         paint_back(rv, &l);
     status(rv);
+}
+
+/* paint() per als diàlegs de comu/ui */
+static void paint_cb(void *ud)
+{
+    paint(ud);
 }
 
 /* ---------- canvis d'estat ---------- */
@@ -968,7 +911,7 @@ static int pick(RView *rv, const char *title, char **lines, size_t n, const char
         mvaddstr(y0, x0 + w - 1, "┐");
         mvaddstr(y0 + rows + 1, x0 + w - 1, "┘");
         attroff(ft_attr(FT_DIM));
-        put(y0, x0 + 2, title, w - 4, ft_attr(FT_HEAD));
+        cm_put(y0, x0 + 2, title, w - 4, ft_attr(FT_HEAD));
         for (int r = 0; r < rows; r++) {
             long i = top + r;
             int y = y0 + 1 + r;
@@ -978,14 +921,14 @@ static int pick(RView *rv, const char *title, char **lines, size_t n, const char
             mvaddstr(y, x0, "│");
             mvaddstr(y, x0 + w - 1, "│");
             attroff(ft_attr(FT_DIM));
-            blank(y, x0 + 1, w - 2, a);
+            cm_blank(y, x0 + 1, w - 2, a);
             if (!n && r == 0)
-                put(y, x0 + 2, empty, w - 4, ft_attr(FT_DIM));
+                cm_put(y, x0 + 2, empty, w - 4, ft_attr(FT_DIM));
             else if (i < (long)n)
-                put(y, x0 + 2, lines[i], w - 4, a);
+                cm_put(y, x0 + 2, lines[i], w - 4, a);
         }
-        blank(LINES - 1, 0, COLS, ft_attr(FT_BAR));
-        put(LINES - 1, 1, "↑↓ tria · Retorn obre · Esc torna", COLS - 2, ft_attr(FT_BAR));
+        cm_blank(LINES - 1, 0, COLS, ft_attr(FT_BAR));
+        cm_put(LINES - 1, 1, "↑↓ tria · Retorn obre · Esc torna", COLS - 2, ft_attr(FT_BAR));
         refresh();
         key = key_read();
         if (key < 0 || key == K_FN(KEY_RESIZE))
@@ -1082,7 +1025,7 @@ static void act_broken(RView *rv)
 
 static int menu_run(RView *rv)
 {
-    static const struct { const char *label, *hint; int key; } items[] = {
+    static const CmMenuItem items[] = {
         { "Navega", NULL, 0 },
         { "Per carpetes", "1", '1' },
         { "Per etiquetes", "2", '2' },
@@ -1109,91 +1052,8 @@ static int menu_run(RView *rv)
         { "Ajuda", "F1", K_FN(KEY_F(1)) },
         { "Surt", "Ctrl+Q", 17 },
     };
-    const int n = (int)(sizeof items / sizeof *items);
-    int sel = 1, w = 0, top = 0;
 
-    for (int i = 0; i < n; i++) {
-        int lw = text_width(items[i].label) + 2 + (items[i].hint ? text_width(items[i].hint) : 0) + 4;
-
-        if (lw > w)
-            w = lw;
-    }
-    if (w > COLS - 2)
-        w = COLS - 2;
-    for (;;) {
-        int x0 = 1, y0 = 2, key, rows = LINES - y0 - 3, dir = 0;
-
-        if (rows > n)
-            rows = n;
-        if (rows < 3)
-            rows = 3;
-        if (sel - 1 < top && sel > 0 && !items[sel - 1].key)
-            top = sel - 1;
-        if (sel < top)
-            top = sel;
-        if (sel >= top + rows)
-            top = sel - rows + 1;
-        if (top + rows > n)
-            top = n - rows;
-        if (top < 0)
-            top = 0;
-        paint(rv);
-        attron(ft_attr(FT_DIM));
-        mvaddstr(y0, x0, "┌");
-        mvaddstr(y0 + 1 + rows, x0, "└");
-        for (int c = 0; c < w; c++) {
-            mvaddstr(y0, x0 + 1 + c, "─");
-            mvaddstr(y0 + 1 + rows, x0 + 1 + c, "─");
-        }
-        mvaddstr(y0, x0 + w + 1, "┐");
-        mvaddstr(y0 + 1 + rows, x0 + w + 1, "┘");
-        attroff(ft_attr(FT_DIM));
-        for (int r = 0; r < rows; r++) {
-            int i = top + r, y = y0 + 1 + r;
-            attr_t a = i == sel ? ft_attr(FT_SEL) : 0;
-
-            attron(ft_attr(FT_DIM));
-            mvaddstr(y, x0, "│");
-            mvaddstr(y, x0 + w + 1, "│");
-            attroff(ft_attr(FT_DIM));
-            blank(y, x0 + 1, w, a);
-            if (!items[i].key) {
-                put(y, x0 + 2, items[i].label, w - 2, ft_attr(FT_HEAD));
-            } else {
-                int hw = text_width(items[i].hint);
-
-                put(y, x0 + 4, items[i].label, w - 4, a);
-                put(y, x0 + w - hw - 1, items[i].hint, hw, a ? a : ft_attr(FT_DIM));
-            }
-        }
-        if (top > 0)
-            put(y0, x0 + w - 2, "▲", 1, ft_attr(FT_DIM));
-        if (top + rows < n)
-            put(y0 + 1 + rows, x0 + w - 2, "▼", 1, ft_attr(FT_DIM));
-        refresh();
-        key = key_read();
-        if (key < 0 || key == K_FN(KEY_RESIZE))
-            continue;
-        if (key == 27 || key == K_FN(KEY_F(10)))
-            return -1;
-        if (key == K_FN(KEY_UP))
-            dir = -1;
-        else if (key == K_FN(KEY_DOWN))
-            dir = 1;
-        else if (key == K_FN(KEY_HOME)) {
-            sel = 0;
-            dir = 1;
-        } else if (key == K_FN(KEY_END)) {
-            sel = n;
-            dir = -1;
-        } else if (key == '\n' && items[sel].key)
-            return items[sel].key;
-        if (dir) {
-            do
-                sel = (sel + dir + n) % n;
-            while (!items[sel].key);
-        }
-    }
+    return cm_menu(items, (int)(sizeof items / sizeof *items), paint_cb, rv);
 }
 
 static void help(void)
@@ -1230,12 +1090,7 @@ static void help(void)
         "  Premeu una tecla per tornar.",
     };
 
-    erase();
-    for (size_t i = 0; i < sizeof lines / sizeof *lines && (int)i < LINES; i++)
-        put((int)i, 1, lines[i], COLS - 2, i == 0 ? ft_attr(FT_HEAD) : 0);
-    refresh();
-    while (key_read() < 0)
-        ;
+    cm_help(lines, sizeof lines / sizeof *lines);
 }
 
 static void reload(RView *rv)
@@ -1278,68 +1133,6 @@ static void reload(RView *rv)
 }
 
 /* ---------- escriure ---------- */
-
-static int prompt_line(RView *rv, const char *label, const char *initial, char *buf, size_t sz)
-{
-    size_t l;
-
-    snprintf(buf, sz, "%s", initial ? initial : "");
-    l = strlen(buf);
-    for (;;) {
-        char shown[600];
-        int col, key;
-
-        paint(rv);
-        snprintf(shown, sizeof shown, " %s%s", label, buf);
-        blank(LINES - 1, 0, COLS, ft_attr(FT_BAR));
-        put(LINES - 1, 0, shown, COLS, ft_attr(FT_BAR));
-        col = text_width(shown);
-        curs_set(1);
-        move(LINES - 1, col < COLS ? col : COLS - 1);
-        refresh();
-        key = key_read();
-        if (key < 0 || key == K_FN(KEY_RESIZE))
-            continue;
-        if (key == '\n') {
-            curs_set(0);
-            return 1;
-        } else if (key == 27) {
-            curs_set(0);
-            return 0;
-        } else if (key == 21) {                         /* Ctrl+U */
-            buf[l = 0] = '\0';
-        } else if (key == K_FN(KEY_BACKSPACE) || key == 127 || key == 8) {
-            while (l && ((unsigned char)buf[l - 1] & 0xC0) == 0x80)
-                l--;
-            if (l)
-                buf[--l] = '\0';
-        } else if (key >= 32 && !(key & (KEY_FLAG_FN | KEY_FLAG_ALT))) {
-            char enc[4];
-            size_t k = utf8_encode((wchar_t)key, enc);
-
-            if (l + k < sz) {
-                memcpy(buf + l, enc, k);
-                buf[l += k] = '\0';
-            }
-        }
-    }
-}
-
-static int confirm(RView *rv, const char *question)
-{
-    char shown[700];
-    int key;
-
-    paint(rv);
-    snprintf(shown, sizeof shown, " %s (s/n) ", question);
-    blank(LINES - 1, 0, COLS, ft_attr(FT_BAR));
-    put(LINES - 1, 0, shown, COLS, ft_attr(FT_BAR));
-    refresh();
-    do
-        key = key_read();
-    while (key < 0 || key == K_FN(KEY_RESIZE));
-    return key == 's' || key == 'S' || key == 'y' || key == 'Y';
-}
 
 /* A la rèplica només es pot escriure dins de la carpeta d'entrada */
 static int writable(const RView *rv, const char *rel)
@@ -1522,7 +1315,7 @@ static void act_new(RView *rv)
         char label[600];
 
         snprintf(label, sizeof label, "Fitxa nova a %s/: ", *carpeta ? carpeta : "(arrel)");
-        if (!prompt_line(rv, label, NULL, titol, sizeof titol) || !titol[0])
+        if (!cm_prompt(label, NULL, titol, sizeof titol, paint_cb, rv) || !titol[0])
             return;
     }
     plantilla = choose_template(rv);
@@ -1544,7 +1337,7 @@ static void act_annotate(RView *rv)
     snprintf(carpeta, sizeof carpeta, "%s", rv->opt.replica ? rv->opt.entrada : n->carpeta);
     now_str(ara, sizeof ara);
     snprintf(ini, sizeof ini, "Anotació a %s %.10s", nom, ara);
-    if (!prompt_line(rv, "Anotació: ", ini, titol, sizeof titol) || !titol[0])
+    if (!cm_prompt("Anotació: ", ini, titol, sizeof titol, paint_cb, rv) || !titol[0])
         return;
     create_and_edit(rv, carpeta, titol, NULL, nom);
 }
@@ -1563,7 +1356,7 @@ static void act_trash(RView *rv)
         return;
     }
     snprintf(q, sizeof q, "Moure «%s» a la paperera (.trash/)?", n->nom);
-    if (!confirm(rv, q))
+    if (!cm_confirm(q, paint_cb, rv))
         return;
     rel = xstrdup(n->cami);
     if (nova_paperera(vault_root(rv->v), rel, dest, sizeof dest, err, sizeof err)) {

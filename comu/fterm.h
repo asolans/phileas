@@ -1,12 +1,12 @@
-#ifndef FABULA_FTERM_H
-#define FABULA_FTERM_H
+#ifndef COMU_FTERM_H
+#define COMU_FTERM_H
 
 #define NCURSES_WIDECHAR 1
 #include <curses.h>
 
 #include "theme.h"
 
-/* Terminal de Fàbula: ncurses, colors del tema (el mateix de Phileas) i, a la
+/* Terminal de Fàbula i Recerca: ncurses, colors del tema (el mateix de Phileas) i, a la
  * consola de Linux, la paleta rgb del tema. */
 enum { FT_TEXT, FT_BAR, FT_SEL, FT_HEAD, FT_DIM, FT_WARN, FT_MENU, FT_N };
 

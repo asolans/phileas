@@ -7,7 +7,7 @@
 #include <wctype.h>
 
 /* Minúscula d'un caràcter llatí, sense locale */
-static wchar_t lower(wchar_t c)
+wchar_t cm_lower_char(wchar_t c)
 {
     if (c < 0x80)
         return (c >= 'A' && c <= 'Z') ? c + 32 : c;
@@ -27,7 +27,7 @@ static wchar_t lower(wchar_t c)
 }
 
 /* Equivalent sense accents d'una minúscula, o NULL si es queda igual */
-static const char *strip(wchar_t c)
+const char *cm_strip_char(wchar_t c)
 {
     switch (c) {
     case 0xE0: case 0xE1: case 0xE2: case 0xE3: case 0xE4: case 0xE5: return "a";
@@ -73,9 +73,9 @@ static char *convert(const char *s, size_t len, int fold)
             continue;
         }
         i += k;
-        c = lower(c);
+        c = cm_lower_char(c);
         if (fold) {
-            const char *r = strip(c);
+            const char *r = cm_strip_char(c);
 
             if (r) {
                 size_t n = strlen(r);

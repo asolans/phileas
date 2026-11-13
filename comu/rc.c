@@ -4,6 +4,7 @@
 #include "util.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static void read_file(const char *path, cm_rc_fn fn, void *ud)
@@ -45,10 +46,7 @@ void cm_rc_read(cm_rc_fn fn, void *ud)
     read_file(path, fn, ud);
 }
 
-static const struct {
-    const char *key;
-    int pal;
-} color_keys[] = {
+const CmColorKey cm_color_keys[] = {
     { "color-capcalera-1", PAL_H1 }, { "color-capcalera-2", PAL_H2 },
     { "color-capcalera-3", PAL_H3 }, { "color-codi", PAL_CODE },
     { "color-cita", PAL_QUOTE },     { "color-error", PAL_ERROR },
@@ -58,15 +56,16 @@ static const struct {
     { "color-seleccio", PAL_SEL },   { "color-seleccio-fons", PAL_SEL_BG },
     { "color-menu", PAL_MENU },      { "color-menu-fons", PAL_MENU_BG },
 };
+const size_t cm_ncolor_keys = sizeof cm_color_keys / sizeof *cm_color_keys;
 
 int cm_rc_color(const char *key, const char *value, short over[PAL_N])
 {
-    for (size_t i = 0; i < sizeof color_keys / sizeof *color_keys; i++)
-        if (!strcmp(key, color_keys[i].key)) {
+    for (size_t i = 0; i < cm_ncolor_keys; i++)
+        if (!strcmp(key, cm_color_keys[i].key)) {
             short c = theme_color_parse(value);
 
             if (c != -2)
-                over[color_keys[i].pal] = c;
+                over[cm_color_keys[i].pal] = c;
             return 1;
         }
     return 0;
@@ -83,4 +82,41 @@ void cm_rc_apply(short pal[PAL_N], const short over[PAL_N])
     for (int i = 0; i < PAL_N; i++)
         if (over[i] != CM_NO_COLOR)
             pal[i] = over[i];
+}
+
+void cm_look_init(CmLook *l)
+{
+    snprintf(l->tema, sizeof l->tema, "terminal");
+    l->console = 1;
+    cm_rc_color_reset(l->over);
+}
+
+int cm_look_key(CmLook *l, const char *key, const char *value)
+{
+    if (!strcmp(key, "tema")) {
+        snprintf(l->tema, sizeof l->tema, "%s", value);
+        cm_rc_color_reset(l->over);     /* un tema nou anul·la els colors d'abans */
+        return 1;
+    }
+    if (!strcmp(key, "paleta-consola")) {
+        l->console = !(!strcmp(value, "no") || !strcmp(value, "false") || !strcmp(value, "0"));
+        return 1;
+    }
+    return cm_rc_color(key, value, l->over);
+}
+
+int cm_rc_bool(const char *v)
+{
+    return !strcmp(v, "si") || !strcmp(v, "sí") || !strcmp(v, "yes") || !strcmp(v, "true") ||
+           !strcmp(v, "1");
+}
+
+void cm_rc_path(const char *v, char *out, size_t size)
+{
+    const char *home = getenv("HOME");
+
+    if (v[0] == '~' && (v[1] == '/' || !v[1]) && home)
+        snprintf(out, size, "%s%s", home, v + 1);
+    else
+        snprintf(out, size, "%s", v);
 }

@@ -5,6 +5,7 @@
 #include "diary.h"
 #include "find.h"
 #include "launch.h"
+#include "ui.h"
 #include "table.h"
 #include "timeline.h"
 #include "yaml.h"
@@ -19,8 +20,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-#define K_FN(k) (KEY_FLAG_FN | (k))
 
 typedef struct {
     Project *p;
@@ -40,65 +39,6 @@ typedef struct {
 
 /* ---------- dibuix ---------- */
 
-/* Escriu s a (y, x) sense passar de maxw columnes; si s'ha de tallar, acaba en
- * «…». Retorna les columnes ocupades. */
-static int put(int y, int x, const char *s, int maxw, attr_t a)
-{
-    size_t n = strlen(s), i = 0, end = 0;
-    int w = 0, wend = 0;
-
-    if (maxw <= 0)
-        return 0;
-    while (i < n) {
-        wchar_t c;
-        size_t k = utf8_decode(s, n, i, &c);
-        int cw = c == UTF8_INVALID ? 1 : utf8_width(c, w);
-
-        if (w + cw > maxw)
-            break;
-        w += cw;
-        i += k ? k : 1;
-        if (w <= maxw - 1) {
-            end = i;
-            wend = w;
-        }
-    }
-    attron(a);
-    if (i >= n) {
-        mvaddnstr(y, x, s, (int)n);
-    } else {
-        mvaddnstr(y, x, s, (int)end);
-        mvaddstr(y, x + wend, "…");
-        w = wend + 1;
-    }
-    attroff(a);
-    return w;
-}
-
-static int text_width(const char *s)
-{
-    size_t n = strlen(s), i = 0;
-    int w = 0;
-
-    while (i < n) {
-        wchar_t c;
-        size_t k = utf8_decode(s, n, i, &c);
-
-        w += c == UTF8_INVALID ? 1 : utf8_width(c, w);
-        i += k ? k : 1;
-    }
-    return w;
-}
-
-static void fill(int y, attr_t a)
-{
-    attron(a);
-    move(y, 0);
-    for (int x = 0; x < COLS; x++)
-        addch(' ');
-    attroff(a);
-}
-
 static void hrule(int y)
 {
     attron(ft_attr(FT_DIM));
@@ -114,7 +54,7 @@ static void header(const Project *p)
     long daily = project_daily_needed(p, time(NULL));
     int lw;
 
-    fill(0, ft_attr(FT_BAR));
+    cm_blank(0, 0, COLS, ft_attr(FT_BAR));
     snprintf(left, sizeof left, " %s", p->titol);
     fk_fmt_num(project_words(p), w, sizeof w);
     if (p->objectiu > 0) {
@@ -135,22 +75,22 @@ static void header(const Project *p)
     } else {
         snprintf(right, sizeof right, "%s paraules", w);
     }
-    lw = text_width(left);
-    if (lw + text_width(right) + 3 > COLS) {      /* sense el ritme diari */
+    lw = cm_width(left);
+    if (lw + cm_width(right) + 3 > COLS) {      /* sense el ritme diari */
         char *dot = strstr(right, " · ");
 
         if (dot)
             *dot = '\0';
     }
-    if (lw + text_width(right) + 3 > COLS && p->objectiu > 0)
+    if (lw + cm_width(right) + 3 > COLS && p->objectiu > 0)
         snprintf(right, sizeof right, "%ld %%",
                  (long)(100.0 * (double)project_words(p) / (double)p->objectiu + 0.5));
     {
-        int rw = text_width(right);
+        int rw = cm_width(right);
 
-        put(0, 0, left, COLS - rw - 2, ft_attr(FT_BAR) | A_BOLD);
+        cm_put(0, 0, left, COLS - rw - 2, ft_attr(FT_BAR) | A_BOLD);
         if (rw + 1 < COLS)
-            put(0, COLS - rw - 1, right, rw, ft_attr(FT_BAR));
+            cm_put(0, COLS - rw - 1, right, rw, ft_attr(FT_BAR));
     }
 }
 
@@ -166,7 +106,7 @@ static void draw_row(const View *v, long i, int y)
     const char *mark = n->nkids ? (n->open || v->filter[0] ? "▾ " : "▸ ") : "  ";
 
     if (selected)
-        fill(y, base);
+        cm_blank(y, 0, COLS, base);
     else
         attrset(A_NORMAL);
     if (x >= COLS)
@@ -182,14 +122,14 @@ static void draw_row(const View *v, long i, int y)
         snprintf(buf, sizeof buf, "%s (%zu)", n->title, n->nkids);
     else
         snprintf(buf, sizeof buf, "%s", n->title);
-    put(y, x, buf, title_w, base);
+    cm_put(y, x, buf, title_w, base);
     if (n->kind != FK_GROUP || n == v->p->manuscrit) {
         fk_fmt_num(n->words, num, sizeof num);
         if (words_x > x + 4)
-            put(y, words_x + words_w - 1 - text_width(num), num, words_w - 1, base);
+            cm_put(y, words_x + words_w - 1 - cm_width(num), num, words_w - 1, base);
     }
     if (show_estat && n->estat)
-        put(y, COLS - estat_w + 1, n->estat, estat_w - 2,
+        cm_put(y, COLS - estat_w + 1, n->estat, estat_w - 2,
             selected ? base : n->estat_set ? 0 : ft_attr(FT_DIM));
 }
 
@@ -208,7 +148,7 @@ static void footer_detail(const View *v, int y0)
     if (n && n->sinopsi && n->sinopsi[0]) {
         s = n->sinopsi;
         len = strlen(s);
-        if (text_width(s) <= maxw) {
+        if (cm_width(s) <= maxw) {
             snprintf(line[0], sizeof line[0], "%s", s);
         } else {
             /* talla per l'últim espai que hi cap */
@@ -231,11 +171,11 @@ static void footer_detail(const View *v, int y0)
             snprintf(line[0], sizeof line[0], "%.*s", (int)cut, s);
             snprintf(line[1], sizeof line[1], "%s", s + cut + (s[cut] == ' '));
         }
-        put(y0, 1, line[0], maxw, 0);
+        cm_put(y0, 1, line[0], maxw, 0);
         if (line[1][0])
-            put(y0 + 1, 1, line[1], maxw, 0);
+            cm_put(y0 + 1, 1, line[1], maxw, 0);
     } else if (n) {
-        put(y0, 1, "(sense sinopsi)", maxw, ft_attr(FT_DIM));
+        cm_put(y0, 1, "(sense sinopsi)", maxw, ft_attr(FT_DIM));
     }
 }
 
@@ -243,7 +183,7 @@ static void status(const View *v)
 {
     char buf[256];
 
-    fill(LINES - 1, ft_attr(FT_BAR));
+    cm_blank(LINES - 1, 0, COLS, ft_attr(FT_BAR));
     if (v->editing) {
         snprintf(buf, sizeof buf, " Filtra: %s_   (Retorn accepta · Esc esborra)", v->filter);
     } else if (v->msg[0]) {
@@ -255,7 +195,7 @@ static void status(const View *v)
     } else {
         snprintf(buf, sizeof buf, " n nou · r reanomena · e estat · Tab taula · / filtra · F1 ajuda");
     }
-    put(LINES - 1, 0, buf, COLS, ft_attr(FT_BAR));
+    cm_put(LINES - 1, 0, buf, COLS, ft_attr(FT_BAR));
 }
 
 static int list_rows(void)
@@ -303,7 +243,7 @@ static void table_header(const View *v, const Layout *l)
 {
     int y = 2;
 
-    fill(y, 0);
+    cm_blank(y, 0, COLS, 0);
     for (int c = 0; c < TC_N; c++) {
         char name[48];
 
@@ -311,7 +251,7 @@ static void table_header(const View *v, const Layout *l)
             continue;
         snprintf(name, sizeof name, "%s%s", table_col_name(c),
                  c == v->sortcol ? (v->sortdesc ? " ▼" : " ▲") : "");
-        put(y, l->col[c], name, l->w[c],
+        cm_put(y, l->col[c], name, l->w[c],
             c == v->tcol ? ft_attr(FT_HEAD) | A_UNDERLINE : ft_attr(FT_DIM));
     }
 }
@@ -324,7 +264,7 @@ static void table_row(const View *v, long i, int y, const Layout *l)
     char buf[300];
 
     if (selected)
-        fill(y, ft_attr(FT_SEL));
+        cm_blank(y, 0, COLS, ft_attr(FT_SEL));
     for (int c = 0; c < TC_N; c++) {
         attr_t a = selected ? ft_attr(FT_SEL) : 0;
         int x, w, tw;
@@ -349,10 +289,10 @@ static void table_row(const View *v, long i, int y, const Layout *l)
         if (c == v->tcol)
             a |= A_UNDERLINE;
         if (c == TC_WORDS) {
-            tw = text_width(buf);
-            put(y, x + w - tw, buf, tw < w ? tw : w, a);
+            tw = cm_width(buf);
+            cm_put(y, x + w - tw, buf, tw < w ? tw : w, a);
         } else {
-            put(y, x, buf, w, a);
+            cm_put(y, x, buf, w, a);
         }
     }
 }
@@ -382,7 +322,7 @@ static void paint_table(View *v)
         v->ttop = 0;
     table_header(v, &l);
     if (!v->tab.n) {
-        put(4, 2, v->filter[0] ? "Cap resultat." : "El manuscrit és buit.", COLS - 3, ft_attr(FT_DIM));
+        cm_put(4, 2, v->filter[0] ? "Cap resultat." : "El manuscrit és buit.", COLS - 3, ft_attr(FT_DIM));
     } else {
         for (int r = 0; r < h && v->ttop + r < (long)v->tab.n; r++)
             table_row(v, v->ttop + r, 3 + r, &l);
@@ -417,7 +357,7 @@ static void paint(View *v)
     if (v->top < 0)
         v->top = 0;
     if (!v->flat.n) {
-        put(3, 2, v->filter[0] ? "Cap resultat." : "El projecte és buit.", COLS - 3, ft_attr(FT_DIM));
+        cm_put(3, 2, v->filter[0] ? "Cap resultat." : "El projecte és buit.", COLS - 3, ft_attr(FT_DIM));
     } else {
         for (int r = 0; r < h && v->top + r < (long)v->flat.n; r++)
             draw_row(v, v->top + r, 2 + r);
@@ -427,6 +367,12 @@ static void paint(View *v)
         footer_detail(v, LINES - 3);
     }
     status(v);
+}
+
+/* paint() per als diàlegs de comu/ui */
+static void paint_cb(void *ud)
+{
+    paint(ud);
 }
 
 static void draw(View *v)
@@ -479,7 +425,6 @@ static void toggle(View *v, FNode *n)
     }
 }
 
-static int confirm(const char *question);
 static void refresh_select(View *v, const char *path);
 
 /* Instantània automàtica abans de tocar un fitxer (com a molt una per hora);
@@ -522,8 +467,8 @@ static int versions_dialog(View *v, const FNode *n, const FVersion *ver, size_t 
     int w = 52;
 
     snprintf(head, sizeof head, " Versions de «%s» ", n->title);
-    if (text_width(head) + 2 > w)
-        w = text_width(head) + 2;
+    if (cm_width(head) + 2 > w)
+        w = cm_width(head) + 2;
     if (w > COLS - 2)
         w = COLS - 2;
     for (;;) {
@@ -540,7 +485,7 @@ static int versions_dialog(View *v, const FNode *n, const FVersion *ver, size_t 
             addstr("─");
         addstr("┐");
         attroff(ft_attr(FT_DIM));
-        put(y0, x0 + 1, head, w, ft_attr(FT_HEAD));
+        cm_put(y0, x0 + 1, head, w, ft_attr(FT_HEAD));
         for (int r = 0; r < visible; r++) {
             const FVersion *e = &ver[top + r];
             struct tm tm;
@@ -561,7 +506,7 @@ static int versions_dialog(View *v, const FNode *n, const FVersion *ver, size_t 
             for (int c = 0; c < w; c++)
                 addch(' ');
             attroff(a);
-            put(y0 + 1 + r, x0 + 2, row, w - 2, a);
+            cm_put(y0 + 1 + r, x0 + 2, row, w - 2, a);
         }
         attron(ft_attr(FT_DIM));
         mvaddstr(y0 + 1 + visible, x0, "└");
@@ -569,7 +514,7 @@ static int versions_dialog(View *v, const FNode *n, const FVersion *ver, size_t 
             addstr("─");
         addstr("┘");
         attroff(ft_attr(FT_DIM));
-        put(y0 + 2 + visible, x0, " Retorn recupera la versió · Esc tanca", COLS - 2, ft_attr(FT_DIM));
+        cm_put(y0 + 2 + visible, x0, " Retorn recupera la versió · Esc tanca", COLS - 2, ft_attr(FT_DIM));
         refresh();
         key = key_read();
         if (key < 0 || key == K_FN(KEY_RESIZE))
@@ -618,7 +563,7 @@ static void act_versions(View *v)
         localtime_r(&ver[pick].when, &tm);
         strftime(when, sizeof when, "%Y-%m-%d %H:%M:%S", &tm);
         snprintf(q, sizeof q, "Recuperar la versió de %s? L'estat actual es desa abans.", when);
-        if (confirm(q)) {
+        if (cm_confirm(q, NULL, NULL)) {
             snprintf(path, sizeof path, "%s", n->path);
             if (project_restore(v->p, n, &ver[pick], time(NULL), err, sizeof err) != 0)
                 snprintf(v->msg, sizeof v->msg, "%s", err);
@@ -687,69 +632,6 @@ static void open_in_editor(View *v, FNode *n)
     open_file_line(v, file, n->kind == FK_SCENE ? n->line + 1 : 0, scene);
 }
 
-/* Línia d'entrada a la barra d'estat. Retorna 1 si s'accepta (Retorn) i 0 si
- * es cancel·la (Esc); buf conserva el text. */
-static int prompt_line(const char *label, const char *initial, char *buf, size_t sz)
-{
-    size_t l;
-
-    snprintf(buf, sz, "%s", initial ? initial : "");
-    l = strlen(buf);
-    for (;;) {
-        char shown[400];
-        int col;
-        int key;
-
-        snprintf(shown, sizeof shown, " %s%s", label, buf);
-        fill(LINES - 1, ft_attr(FT_BAR));
-        put(LINES - 1, 0, shown, COLS, ft_attr(FT_BAR));
-        col = text_width(shown);
-        curs_set(1);
-        move(LINES - 1, col < COLS ? col : COLS - 1);
-        refresh();
-        key = key_read();
-        if (key < 0 || key == K_FN(KEY_RESIZE))
-            continue;
-        if (key == '\n') {
-            curs_set(0);
-            return 1;
-        } else if (key == 27) {
-            curs_set(0);
-            return 0;
-        } else if (key == 21) {                         /* Ctrl+U */
-            buf[l = 0] = '\0';
-        } else if (key == K_FN(KEY_BACKSPACE) || key == 127 || key == 8) {
-            while (l && ((unsigned char)buf[l - 1] & 0xC0) == 0x80)
-                l--;
-            if (l)
-                buf[--l] = '\0';
-        } else if (key >= 32 && !(key & (KEY_FLAG_FN | KEY_FLAG_ALT))) {
-            char enc[4];
-            size_t k = utf8_encode((wchar_t)key, enc);
-
-            if (l + k < sz) {
-                memcpy(buf + l, enc, k);
-                buf[l += k] = '\0';
-            }
-        }
-    }
-}
-
-static int confirm(const char *question)
-{
-    char shown[400];
-    int key;
-
-    snprintf(shown, sizeof shown, " %s (s/n) ", question);
-    fill(LINES - 1, ft_attr(FT_BAR));
-    put(LINES - 1, 0, shown, COLS, ft_attr(FT_BAR));
-    refresh();
-    do
-        key = key_read();
-    while (key < 0 || key == K_FN(KEY_RESIZE));
-    return key == 's' || key == 'S' || key == 'y' || key == 'Y';
-}
-
 /* Torna a llegir el projecte després d'un canvi als fitxers i selecciona el
  * fitxer del camí (si n'hi ha), desplegant-ne el grup. */
 /* Torna a llegir el projecte i selecciona el fitxer del camí i, si scene > 0,
@@ -804,7 +686,7 @@ static void act_new(View *v)
 
     snprintf(label, sizeof label, chapter ? "Títol del nou capítol: " : "Títol de la nova fitxa (%s): ",
              g ? g->title : "");
-    if (!prompt_line(label, "", title, sizeof title))
+    if (!cm_prompt(label, "", title, sizeof title, NULL, NULL))
         return;
     if (project_new_item(v->p, g, title, path, sizeof path, err, sizeof err) != 0) {
         snprintf(v->msg, sizeof v->msg, "%s", err);
@@ -826,7 +708,7 @@ static void act_rename(View *v)
                  "Només es reanomenen capítols i fitxes.");
         return;
     }
-    if (!prompt_line("Títol nou: ", n->title, title, sizeof title))
+    if (!cm_prompt("Títol nou: ", n->title, title, sizeof title, NULL, NULL))
         return;
     snprintf(oldp, sizeof oldp, "%s", n->path);
     auto_snapshot(v, n);
@@ -850,7 +732,7 @@ static void act_trash(View *v)
         return;
     }
     snprintf(q, sizeof q, "Moure «%s» a la paperera?", n->title);
-    if (!confirm(q))
+    if (!cm_confirm(q, NULL, NULL))
         return;
     keep = v->sel;
     if (project_trash(v->p, n, err, sizeof err) != 0) {
@@ -918,7 +800,7 @@ static int pick_list_ex(View *v, const char *title, char **lines, size_t n, cons
             addstr("─");
         addstr("┐");
         attroff(ft_attr(FT_DIM));
-        put(y0, x0 + 1, title, w, ft_attr(FT_HEAD));
+        cm_put(y0, x0 + 1, title, w, ft_attr(FT_HEAD));
         for (int r = 0; r < visible; r++) {
             attr_t a = top + r == sel ? ft_attr(FT_SEL) : 0;
 
@@ -931,7 +813,7 @@ static int pick_list_ex(View *v, const char *title, char **lines, size_t n, cons
             for (int c = 0; c < w; c++)
                 addch(' ');
             attroff(a);
-            put(y0 + 1 + r, x0 + 2, lines[top + r], w - 2, a);
+            cm_put(y0 + 1 + r, x0 + 2, lines[top + r], w - 2, a);
         }
         attron(ft_attr(FT_DIM));
         mvaddstr(y0 + 1 + visible, x0, "└");
@@ -939,7 +821,7 @@ static int pick_list_ex(View *v, const char *title, char **lines, size_t n, cons
             addstr("─");
         addstr("┘");
         attroff(ft_attr(FT_DIM));
-        put(y0 + 2 + visible, x0, footer, COLS - 2, ft_attr(FT_DIM));
+        cm_put(y0 + 2 + visible, x0, footer, COLS - 2, ft_attr(FT_DIM));
         refresh();
         key = key_read();
         if (key < 0 || key == K_FN(KEY_RESIZE))
@@ -1177,9 +1059,9 @@ static void act_find(View *v, int replace)
     char needle[200], repl[200] = "", err[240];
     unsigned opts = replace ? FF_WORD : FF_ICASE;
 
-    if (!prompt_line(replace ? "Substitueix: " : "Cerca al projecte: ", "", needle, sizeof needle) || !needle[0])
+    if (!cm_prompt(replace ? "Substitueix: " : "Cerca al projecte: ", "", needle, sizeof needle, NULL, NULL) || !needle[0])
         return;
-    if (replace && !prompt_line("per (buit = esborrar): ", "", repl, sizeof repl))
+    if (replace && !cm_prompt("per (buit = esborrar): ", "", repl, sizeof repl, NULL, NULL))
         return;
     for (;;) {
         FFind f;
@@ -1264,7 +1146,7 @@ static void act_find(View *v, int replace)
 
                     snprintf(q, sizeof q, "Substituir %zu coincidències en %zu fitxers? Se'n fa una instantània abans.",
                              marked, files);
-                    if (confirm(q)) {
+                    if (cm_confirm(q, NULL, NULL)) {
                         if (find_replace(v->p, &f, sel, repl, time(NULL), &files, &count, err, sizeof err) != 0) {
                             snprintf(v->msg, sizeof v->msg, "%.190s", err);
                             refresh_select(v, NULL);
@@ -1293,7 +1175,7 @@ static void act_compile(View *v)
 
     snprintf(initial, sizeof initial, "%s.md", slug);
     free(slug);
-    if (!prompt_line("Compila a (.md, .docx, .epub, .pdf…): ", initial, name, sizeof name) || !name[0])
+    if (!cm_prompt("Compila a (.md, .docx, .epub, .pdf…): ", initial, name, sizeof name, NULL, NULL) || !name[0])
         return;
     if (name[0] == '/' || name[0] == '.' || strchr(name, '/'))
         snprintf(path, sizeof path, "%s", name);
@@ -1416,7 +1298,7 @@ static void act_research(View *v)
 
 static int menu_run(View *v)
 {
-    static const struct { const char *label, *hint; int key; } items[] = {
+    static const CmMenuItem items[] = {
         { "Fitxers", NULL, 0 },
         { "Obre a Phileas", "Retorn", '\n' },
         { "Nou capítol o fitxa", "n", 'n' },
@@ -1447,98 +1329,8 @@ static int menu_run(View *v)
         { "Ajuda", "F1", K_FN(KEY_F(1)) },
         { "Surt", "Ctrl+Q", 17 },
     };
-    const int n = (int)(sizeof items / sizeof *items);
-    int sel = 1, w = 0, top = 0;
 
-    for (int i = 0; i < n; i++) {
-        int lw = text_width(items[i].label) + 2 + (items[i].hint ? text_width(items[i].hint) : 0) + 4;
-
-        if (lw > w)
-            w = lw;
-    }
-    if (w > COLS - 2)
-        w = COLS - 2;
-    for (;;) {
-        int x0 = 1, y0 = 2, key, rows = LINES - y0 - 3, dir = 0;
-
-        if (rows > n)
-            rows = n;
-        if (rows < 3)
-            rows = 3;
-        /* que la selecció (i la capçalera de damunt) sigui visible */
-        if (sel - 1 < top && sel > 0 && !items[sel - 1].key)
-            top = sel - 1;
-        if (sel < top)
-            top = sel;
-        if (sel >= top + rows)
-            top = sel - rows + 1;
-        if (top + rows > n)
-            top = n - rows;
-        if (top < 0)
-            top = 0;
-        paint(v);
-        attrset(A_NORMAL);
-        attron(ft_attr(FT_DIM));
-        mvaddstr(y0, x0, "┌");
-        for (int c = 0; c < w; c++)
-            addstr("─");
-        addstr("┐");
-        mvaddstr(y0 + 1 + rows, x0, "└");
-        for (int c = 0; c < w; c++)
-            addstr("─");
-        addstr("┘");
-        attroff(ft_attr(FT_DIM));
-        for (int r = 0; r < rows; r++) {
-            int i = top + r, y = y0 + 1 + r;
-            int head = !items[i].key;
-            attr_t a = i == sel ? ft_attr(FT_SEL) : 0;
-
-            attron(ft_attr(FT_DIM));
-            mvaddstr(y, x0, "│");
-            mvaddstr(y, x0 + w + 1, "│");
-            attroff(ft_attr(FT_DIM));
-            attron(a);
-            move(y, x0 + 1);
-            for (int c = 0; c < w; c++)
-                addch(' ');
-            attroff(a);
-            if (head) {
-                put(y, x0 + 2, items[i].label, w - 2, ft_attr(FT_HEAD));
-            } else {
-                int hw = text_width(items[i].hint);
-
-                put(y, x0 + 4, items[i].label, w - 4, a);
-                put(y, x0 + w - hw - 1, items[i].hint, hw, a ? a : ft_attr(FT_DIM));
-            }
-        }
-        if (top > 0)
-            put(y0, x0 + w - 2, "▲", 1, ft_attr(FT_DIM));
-        if (top + rows < n)
-            put(y0 + 1 + rows, x0 + w - 2, "▼", 1, ft_attr(FT_DIM));
-        refresh();
-        key = key_read();
-        if (key < 0 || key == K_FN(KEY_RESIZE))
-            continue;
-        if (key == 27 || key == K_FN(KEY_F(10)))
-            return -1;
-        if (key == K_FN(KEY_UP))
-            dir = -1;
-        else if (key == K_FN(KEY_DOWN))
-            dir = 1;
-        else if (key == K_FN(KEY_HOME)) {
-            sel = 0;
-            dir = 1;
-        } else if (key == K_FN(KEY_END)) {
-            sel = n;
-            dir = -1;
-        } else if (key == '\n' && items[sel].key)
-            return items[sel].key;
-        if (dir) {          /* salta les capçaleres, amb tornada */
-            do
-                sel = (sel + dir + n) % n;
-            while (!items[sel].key);
-        }
-    }
+    return cm_menu(items, (int)(sizeof items / sizeof *items), paint_cb, v);
 }
 
 static void help(void)
@@ -1572,11 +1364,7 @@ static void help(void)
         "  Premeu una tecla per tornar.",
     };
 
-    erase();
-    for (size_t i = 0; i < sizeof lines / sizeof *lines && (int)i < LINES; i++)
-        put((int)i, 1, lines[i], COLS - 2, i == 0 ? ft_attr(FT_HEAD) : 0);
-    refresh();
-    key_read();
+    cm_help(lines, sizeof lines / sizeof *lines);
 }
 
 static size_t scene_ordinal(const FNode *n)
@@ -1649,7 +1437,7 @@ static void edit_column(View *v)
     }
     table_cell(&v->tab, n, v->tcol, cell, sizeof cell);
     snprintf(label, sizeof label, "%s de «%.40s» (buit = treure'l): ", table_col_name(v->tcol), n->title);
-    if (!prompt_line(label, cell, value, sizeof value))
+    if (!cm_prompt(label, cell, value, sizeof value, NULL, NULL))
         return;
     set_meta_current(v, n, key, value);
 }

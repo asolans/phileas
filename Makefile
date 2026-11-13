@@ -15,13 +15,13 @@ endif
 SRC  = $(wildcard src/*.c)
 OBJ  = $(SRC:src/%.c=build/%.o)
 # Mòduls sense dependència de ncurses, que es poden provar aïlladament
-CORE = build/autosave.o build/calaix.o build/theme.o build/complete.o build/config.o build/editor.o build/spell.o build/dirlist.o build/utf8.o build/buffer.o build/wrap.o build/md.o build/outline.o build/todo.o build/footnote.o build/history.o build/undo.o build/search.o build/util.o build/chars.o build/stats.o build/pairs.o
+CORE = build/autosave.o build/calaix.o build/theme.o build/complete.o build/config.o build/editor.o build/spell.o build/dirlist.o build/utf8.o build/buffer.o build/wrap.o build/md.o build/outline.o build/todo.o build/footnote.o build/history.o build/undo.o build/search.o build/util.o build/chars.o build/stats.o build/pairs.o build/comu_rc.o
 
-phileas: $(OBJ)
+phileas: $(OBJ) build/comu_rc.o
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 build/%.o: src/%.c | build
-	$(CC) $(CFLAGS) -MMD -MP -c -o $@ $<
+	$(CC) $(CFLAGS) -Isrc -Icomu -MMD -MP -c -o $@ $<
 
 build:
 	mkdir -p build
@@ -30,13 +30,13 @@ test: build/test_phileas
 	./build/test_phileas
 
 build/test_phileas: tests/test.c $(CORE)
-	$(CC) $(CFLAGS) -Isrc $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -Isrc -Icomu $(LDFLAGS) -o $@ $^
 
 
 # ---- Fàbula (eina companya, fabula/): objectes compartits de src/ i propis ----
 FSHARED = build/utf8.o build/util.o build/md.o build/buffer.o build/undo.o build/outline.o
-FOBJ    = build/fabula_yaml.o build/fabula_project.o build/fabula_find.o build/fabula_compile.o build/fabula_diary.o build/fabula_timeline.o
-FUI     = build/fabula_flat.o build/fabula_table.o build/fabula_fterm.o build/fabula_fview.o build/fabula_launch.o build/fabula_main.o build/comu_rc.o
+FOBJ    = build/comu_yaml.o build/comu_fold.o build/fabula_project.o build/fabula_find.o build/fabula_compile.o build/fabula_diary.o build/fabula_timeline.o
+FUI     = build/fabula_flat.o build/fabula_table.o build/comu_fterm.o build/comu_ui.o build/fabula_fview.o build/comu_launch.o build/fabula_main.o build/comu_rc.o
 FSHARED_UI = build/theme.o build/keys.o
 
 .PHONY: fabula test-fabula
@@ -50,7 +50,7 @@ build/fabula_%.o: fabula/%.c | build
 	$(CC) $(CFLAGS) -Isrc -Ifabula -Icomu -MMD -MP -c -o $@ $<
 
 build/test_fabula: tests/test_fabula.c $(FOBJ) build/fabula_flat.o build/fabula_table.o $(FSHARED)
-	$(CC) $(CFLAGS) -Isrc -Ifabula $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -Isrc -Ifabula -Icomu $(LDFLAGS) -o $@ $^
 
 test-fabula: build/test_fabula
 	./build/test_fabula
@@ -91,8 +91,12 @@ manual:
 	mkdir -p dist
 	pandoc -f gfm MANUAL.md -o dist/MANUAL.pdf -H packaging/manual-cap.tex -V lang=ca -V geometry:margin=2.5cm --toc
 
+# clean no toca dist/ (els paquets i les notes de les versions); distclean, sí
 clean:
-	rm -rf build phileas dist
+	rm -rf build phileas
+
+distclean: clean
+	rm -rf dist
 
 -include $(OBJ:.o=.d)
 -include $(wildcard build/fabula_*.d)
@@ -101,9 +105,9 @@ SQLDEF  = -DSQLITE_ENABLE_FTS5 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSIO
           -DSQLITE_DEFAULT_MEMSTATUS=0 -DSQLITE_DQS=0 -DSQLITE_OMIT_DEPRECATED \
           -DSQLITE_DEFAULT_WAL_SYNCHRONOUS=1
 RCOMU   = build/comu_fold.o build/comu_mdscan.o build/comu_front.o build/comu_rc.o
-ROBJ    = $(RCOMU) build/recerca_vault.o build/recerca_model.o build/recerca_nova.o build/fabula_yaml.o build/recerca_sqlite3.o build/utf8.o build/util.o build/theme.o
-RUI     = build/recerca_rview.o build/recerca_main.o build/fabula_fterm.o build/fabula_launch.o build/keys.o
-RINC    = -Isrc -Icomu -Irecerca -Irecerca/sqlite -Ifabula
+ROBJ    = $(RCOMU) build/recerca_vault.o build/recerca_model.o build/recerca_nova.o build/comu_yaml.o build/recerca_sqlite3.o build/utf8.o build/util.o build/theme.o
+RUI     = build/recerca_rview.o build/recerca_main.o build/comu_fterm.o build/comu_ui.o build/comu_launch.o build/keys.o
+RINC    = -Isrc -Icomu -Irecerca -Irecerca/sqlite
 
 .PHONY: recerca test-recerca
 # L'executable és build/recerca (el nom «recerca» és el de la carpeta de fonts)
@@ -125,4 +129,4 @@ test-recerca: build/test_recerca
 -include $(wildcard build/recerca_*.d build/comu_*.d)
 
 
-.PHONY: test debug clean install install-desktop deb dist manual
+.PHONY: test debug clean distclean install install-desktop deb dist manual

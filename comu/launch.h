@@ -1,5 +1,5 @@
-#ifndef FABULA_LAUNCH_H
-#define FABULA_LAUNCH_H
+#ifndef COMU_LAUNCH_H
+#define COMU_LAUNCH_H
 
 #include <stddef.h>
 

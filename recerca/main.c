@@ -2,6 +2,7 @@
  * Un vault d'Obsidian i un índex SQLite (FTS5) a VAULT/.recerca/. */
 #include "fold.h"
 #include "fterm.h"
+#include "ui.h"
 #include "rc.h"
 #include "rview.h"
 #include "theme.h"
@@ -225,9 +226,7 @@ static int cerca(Vault *v, const char *q)
 }
 
 typedef struct {
-    char tema[64];
-    short over[PAL_N];  /* «color-…» del phileasrc */
-    int  console;
+    CmLook look;        /* tema, paleta i «color-…» del phileasrc */
     char vault[4096];
     int  replica;
     char entrada[256];
@@ -237,21 +236,12 @@ static void rc_cb(const char *k, const char *v, void *ud)
 {
     Rc *rc = ud;
 
-    if (!strcmp(k, "tema")) {
-        snprintf(rc->tema, sizeof rc->tema, "%s", v);
-        cm_rc_color_reset(rc->over);
-    } else if (cm_rc_color(k, v, rc->over))
+    if (cm_look_key(&rc->look, k, v))
         ;
-    else if (!strcmp(k, "paleta-consola"))
-        rc->console = !(!strcmp(v, "no") || !strcmp(v, "false") || !strcmp(v, "0"));
-    else if (!strcmp(k, "recerca-vault")) {
-        if (v[0] == '~' && (v[1] == '/' || !v[1]) && getenv("HOME"))
-            snprintf(rc->vault, sizeof rc->vault, "%s%s", getenv("HOME"), v + 1);
-        else
-            snprintf(rc->vault, sizeof rc->vault, "%s", v);
-    }
+    else if (!strcmp(k, "recerca-vault"))
+        cm_rc_path(v, rc->vault, sizeof rc->vault);
     else if (!strcmp(k, "recerca-replica"))
-        rc->replica = !strcmp(v, "si") || !strcmp(v, "sí") || !strcmp(v, "yes") || !strcmp(v, "true") || !strcmp(v, "1");
+        rc->replica = cm_rc_bool(v);
     else if (!strcmp(k, "recerca-entrada"))
         snprintf(rc->entrada, sizeof rc->entrada, "%s", v);
 }
@@ -275,16 +265,10 @@ static void progres_pantalla(size_t fet, size_t total, void *ud)
 
 static int pantalla(Vault *v, const Rc *rc)
 {
-    const Theme *th = theme_find(rc->tema);
     VaultSync s;
     char err[512];
-    short pal[PAL_N];
 
-    if (!th)
-        th = theme_at(0);
-    theme_palette(th, pal);
-    cm_rc_apply(pal, rc->over);
-    ft_init_pal(th, rc->console, pal);
+    cm_look_start(&rc->look);
     key_quit_hook = quit_hook;
     key_signals();
     progres_pantalla(0, 0, NULL);
@@ -326,7 +310,7 @@ static int pantalla(Vault *v, const Rc *rc)
 int main(int argc, char **argv)
 {
     const char *op = NULL, *arg = NULL, *dir = NULL;
-    Rc rc = { "terminal", { 0 }, 1, "", 0, "" };
+    Rc rc = { .replica = 0 };
     char err[512];
     Vault *v;
     int r = 0;
@@ -360,7 +344,7 @@ int main(int argc, char **argv)
             dir = a;
     }
 
-    cm_rc_color_reset(rc.over);
+    cm_look_init(&rc.look);
     cm_rc_read(rc_cb, &rc);
     if (!dir)
         dir = rc.vault[0] ? rc.vault : ".";

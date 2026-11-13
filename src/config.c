@@ -1,4 +1,5 @@
 #include "config.h"
+#include "rc.h"
 #include "theme.h"
 #include "util.h"
 
@@ -91,19 +92,6 @@ static int parse_color(const char *v, short *out, char *err, size_t errsz)
     return 0;
 }
 
-static const struct {
-    const char *key;
-    int pal;
-} color_keys[] = {
-    { "color-capcalera-1", PAL_H1 }, { "color-capcalera-2", PAL_H2 },
-    { "color-capcalera-3", PAL_H3 }, { "color-codi", PAL_CODE },
-    { "color-cita", PAL_QUOTE },     { "color-error", PAL_ERROR },
-    { "color-marcadors", PAL_MARK },
-    { "color-text", PAL_TEXT },      { "color-fons", PAL_BG },
-    { "color-barra", PAL_BAR },      { "color-barra-fons", PAL_BAR_BG },
-    { "color-seleccio", PAL_SEL },   { "color-seleccio-fons", PAL_SEL_BG },
-    { "color-menu", PAL_MENU },      { "color-menu-fons", PAL_MENU_BG },
-};
 
 int config_set(Editor *e, const char *key, const char *v, char *err, size_t errsz)
 {
@@ -139,9 +127,9 @@ int config_set(Editor *e, const char *key, const char *v, char *err, size_t errs
             return config_extern_hook(name, v, brief, err, errsz);
         return 0;
     }
-    for (size_t i = 0; i < sizeof color_keys / sizeof *color_keys; i++)
-        if (!strcmp(key, color_keys[i].key))
-            return parse_color(v, &e->palette[color_keys[i].pal], err, errsz);
+    for (size_t i = 0; i < cm_ncolor_keys; i++)
+        if (!strcmp(key, cm_color_keys[i].key))
+            return parse_color(v, &e->palette[cm_color_keys[i].pal], err, errsz);
 
     if (!strcmp(key, "tema")) {
         const Theme *t = theme_find(v);
@@ -703,10 +691,10 @@ void config_template(FILE *f, const Editor *e)
             "# blanc-clar o cap (el del terminal). Sense colors, la barra i la\n"
             "# selecció van en vídeo invers. Els comentats són els del tema.\n",
             theme_at((size_t)e->theme)->name, e->console_palette ? "si" : "no");
-    for (size_t i = 0; i < sizeof color_keys / sizeof *color_keys; i++) {
-        int pal = color_keys[i].pal;
+    for (size_t i = 0; i < cm_ncolor_keys; i++) {
+        int pal = cm_color_keys[i].pal;
 
-        fprintf(f, "%s%s = %s\n", e->palette[pal] == th[pal] ? "# " : "", color_keys[i].key,
+        fprintf(f, "%s%s = %s\n", e->palette[pal] == th[pal] ? "# " : "", cm_color_keys[i].key,
                 theme_color_name(e->palette[pal]));
     }
     fputs("\n"

@@ -530,9 +530,11 @@ cadena musl de Buildroot.
 | `config.c` | fitxers de configuració |
 | `utf8.c`, `util.c` | UTF-8 i utilitats |
 
-Fàbula és a `fabula/` (`project.c` el projecte i els fitxers, `yaml.c` la capçalera, `flat.c` les files de l'arbre, `fview.c` la pantalla, `fterm.c` el terminal, `launch.c` l'editor) i reutilitza `buffer`, `outline`, `md`, `utf8`, `keys` i `theme` de `src/`. Les proves són a `tests/test_fabula.c`.
+El codi comú de Phileas, Fàbula i Recerca és a `comu/`: `rc.c` (lectura del phileasrc, l'aspecte —tema, paleta i colors— i la taula de les claus `color-…`, que també fa servir `config.c`), `fold.c` (minúscules i sense accents, per a les cerques i els enllaços), `yaml.c` (llegir i canviar claus de la capçalera), `front.c` (propietats YAML d'Obsidian, també les llistes en bloc), `mdscan.c` (enllaços, etiquetes i blocs `^id`), `fterm.c` (el terminal de Fàbula i Recerca), `ui.c` (menú d'Esc, línia d'entrada, confirmació i ajuda) i `launch.c` (obrir un fitxer a l'editor i tornar).
 
-Recerca és a `recerca/` (`vault.c` l'índex SQLite i la sincronització, `model.c` el que mostra la pantalla, `rview.c` la pantalla, `main.c` les ordres; fa servir el `fterm` de Fàbula) i fa servir el codi comú de `comu/`: `front.c` (propietats YAML d'Obsidian, també les llistes en bloc), `mdscan.c` (enllaços, etiquetes i blocs `^id`), `fold.c` (minúscules i sense accents) i `rc.c` (lectura del phileasrc). Les proves són a `tests/test_recerca.c`.
+Fàbula és a `fabula/` (`project.c` el projecte i els fitxers, `flat.c` les files de l'arbre, `fview.c` la pantalla) i reutilitza `buffer`, `outline`, `md`, `utf8`, `keys` i `theme` de `src/`. Les proves són a `tests/test_fabula.c`.
+
+Recerca és a `recerca/` (`vault.c` l'índex SQLite i la sincronització, `model.c` el que mostra la pantalla, `rview.c` la pantalla, `main.c` les ordres). Les proves són a `tests/test_recerca.c`.
 
 Els mòduls que no depenen de ncurses es proven a `tests/test.c`. A `tools/`
 hi ha eines per a les proves interactives: `ptyrun.c` (executa Phileas en un
@@ -544,6 +546,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **En desenvolupament**: codi comú de Phileas, Fàbula i Recerca a `comu/` (lector del phileasrc, colors, accents, menú, diàlegs, terminal), sense canvis visibles. L'ajuda (F1) de Fàbula i de Recerca es desplaça amb ↑ ↓ RePàg AvPàg quan no hi cap (abans es tallava). Fàbula treu els accents amb les mateixes regles que Recerca (ara també ý, ÿ i ŀ). `make clean` ja no esborra `dist/` (ho fa `make distclean`).
 - **2.7.2**: `desar-configuracio` ja no esborra les claus de Recerca (`recerca-vault`…): conserva totes les línies que Phileas no escriu, i Phileas accepta sense error les claus `recerca-…` i `fabula-…` del phileasrc. A la imatge BYOK: Fàbula al menú BYOK (tria un projecte de `/data/projectes` o en crea un); `exporta` copia al pendrive `BYOK/textos`, `BYOK/projectes` i les fitxes `_pi/` de cada vault; el bàner de la consola mostra Fàbula, Recerca i `rep`.
 - **2.7.1**: Fàbula 0.3.2 i Recerca 0.1.1: el text normal fa servir els colors del tema (amb els temes clars sortia amb els del terminal, blanc sobre negre). A la imatge BYOK: `envia` pregunta la carpeta de destinació a l'ordinador (per defecte, la darrera) i hi deixa `textos/` i `projectes/` (`/data/projectes`); `rep` pot treure un vault de la llista.
 - **2.7.0**: **Recerca 0.1**, la tercera eina: fitxes de recerca en un vault d'Obsidian (carpetes, propietats, etiquetes niades, enllaços amb àlies, seccions i blocs `^id`, backlinks i relacions de propietat), amb un índex SQLite (FTS5) que es posa al dia sol; pantalla de navegació, llista i visor; editar a Phileas, fitxes noves amb plantilla, anotacions i paperera; a la Pi, `rep` porta un vault del PC i hi torna `_pi/`. Phileas: ordres `externa-pantalla.NOM` (programes de pantalla sencera, tornen sense Retorn) i Recerca i `rep` al menú BYOK. Fàbula 0.3.1: `b` obre Recerca (`recerca:` a `projecte.md`). Fàbula i Recerca fan servir els colors del tema com Phileas (el text atenuat a la consola i les línies `color-…` del phileasrc).

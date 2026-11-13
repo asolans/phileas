@@ -1,5 +1,5 @@
-#ifndef FABULA_YAML_H
-#define FABULA_YAML_H
+#ifndef COMU_YAML_H
+#define COMU_YAML_H
 
 #include <stddef.h>
 

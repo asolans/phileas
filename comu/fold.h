@@ -2,9 +2,9 @@
 #define COMU_FOLD_H
 
 #include <stddef.h>
+#include <wchar.h>
 
-/* Normalització de text per comparar (codi comú de Recerca; Fàbula s'hi
- * passarà més endavant). No depèn del locale: les minúscules de l'alfabet
+/* Normalització de text per comparar (codi comú de Recerca i Fàbula). No depèn del locale: les minúscules de l'alfabet
  * llatí es fan aquí mateix.
  *
  * cm_lower: només minúscules. És la comparació d'Obsidian per resoldre
@@ -15,5 +15,12 @@
  * copien tal qual. */
 char *cm_lower(const char *s, size_t len);
 char *cm_fold(const char *s, size_t len);
+
+/* Les mateixes regles per a un sol caràcter (per a qui ha de saber d'on ve
+ * cada byte, com la cerca de Fàbula): cm_lower_char en fa la minúscula, i
+ * cm_strip_char dona l'equivalent sense accents d'una minúscula («a», «ae»,
+ * «» per al punt volat…), o NULL si es queda igual. */
+wchar_t     cm_lower_char(wchar_t c);
+const char *cm_strip_char(wchar_t c);
 
 #endif
