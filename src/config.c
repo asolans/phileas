@@ -264,6 +264,9 @@ int config_set(Editor *e, const char *key, const char *v, char *err, size_t errs
             return -1;
         }
         e->nlangs = k;
+    } else if (!strncmp(key, "recerca-", 8) || !strncmp(key, "fabula-", 7)) {
+        /* Claus de Recerca i de Fàbula, que comparteixen el phileasrc:
+         * Phileas no les fa servir, però no són errors */
     } else {
         snprintf(err, errsz, "opció desconeguda «%s»", key);
         return -1;
@@ -512,6 +515,26 @@ int config_store(const char *path, const char *key, const char *value)
     return 0;
 }
 
+/* 1 si alguna línia de la plantilla tpl escriu la clau (també comentada:
+ * «# clau = valor»). Les línies de l'usuari amb aquestes claus se substitueixen
+ * pel valor actual; les altres es conserven. */
+static int template_has_key(const char *tpl, const char *key)
+{
+    char k[128];
+
+    for (const char *p = tpl; p && *p; ) {
+        const char *s = p, *end = strchr(p, '\n');
+
+        while (*s == ' ' || *s == '\t' || *s == '#')
+            s++;
+        line_key(s, k, sizeof k);
+        if (*k && !strcmp(k, key))
+            return 1;
+        p = end ? end + 1 : NULL;
+    }
+    return 0;
+}
+
 int config_save_all(const char *path, const Editor *e)
 {
     char *old = NULL, *tmp, *bak, k[128];
@@ -545,14 +568,30 @@ int config_save_all(const char *path, const Editor *e)
     if (!err && !(f = fopen(tmp, "w")))
         err = errno;
     if (!err) {
-        config_template(f, e);
-        /* Les dreceres i les ordres externes del fitxer anterior */
+        char *tpl = NULL;
+        size_t tlen = 0;
+        FILE *mf = open_memstream(&tpl, &tlen);
+
+        if (mf) {
+            config_template(mf, e);
+            fclose(mf);
+        }
+        if (!tpl) {
+            err = ENOMEM;
+            fclose(f);
+            unlink(tmp);
+            goto out;
+        }
+        fputs(tpl, f);
+        /* Del fitxer anterior: les dreceres, les ordres externes i les claus
+         * que Phileas no escriu (les de Recerca i Fàbula, per exemple) */
         for (const char *p = old; p && *p; ) {
             const char *end = strchr(p, '\n');
 
             n = end ? (size_t)(end - p) + 1 : strlen(p);
             line_key(p, k, sizeof k);
-            if (!strncmp(k, "tecla.", 6) || !strncmp(k, "externa", 7)) {
+            if (!strncmp(k, "tecla.", 6) || !strncmp(k, "externa", 7) ||
+                (*k && !template_has_key(tpl, k))) {
                 if (!kept++)
                     fputs("\n# Del fitxer anterior\n", f);
                 fwrite(p, 1, n, f);
@@ -561,6 +600,7 @@ int config_save_all(const char *path, const Editor *e)
             }
             p += n;
         }
+        free(tpl);
         if (fflush(f) != 0 || fsync(fileno(f)) != 0)
             err = errno;
         fclose(f);
@@ -569,6 +609,7 @@ int config_save_all(const char *path, const Editor *e)
         if (err)
             unlink(tmp);
     }
+out:
     free(old);
     free(tmp);
     free(bak);

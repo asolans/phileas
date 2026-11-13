@@ -274,7 +274,8 @@ El projecte BYOK té una imatge pròpia per a la **Raspberry Pi 1B**, feta
 amb Buildroot. Arrenca en pocs segons directament a Phileas, amb els
 diccionaris de català i castellà, i un sistema de només lectura que no es
 fa malbé si es talla el corrent. Té ordres per canviar la mida de la lletra,
-girar la pantalla, exportar al pendrive i enviar els textos a un ordinador.
+girar la pantalla, exportar al pendrive i enviar els textos a un ordinador,
+i hi obre Fàbula i Recerca des del menú BYOK.
 Aquesta imatge no forma part d'aquest repositori.
 
 Per compilar Phileas per a una altra imatge de Buildroot o amb una cadena
@@ -418,7 +419,9 @@ enfocament, màquina d'escriure, tema i tipografia) es desen soles al fitxer
 de l'usuari. Per tenir-lo complet, amb totes les
 opcions i els valors actuals, dins Phileas: Ctrl+P `desar-configuracio` (o
 Esc → Ajuda i configuració → Desa la configuració). Conserva les línies
-`tecla.` i `externa` que hi hagués, i deixa l'anterior a `phileasrc.anterior`.
+`tecla.` i `externa` que hi hagués i les claus que Phileas no fa servir (les
+de Recerca i Fàbula, `recerca-…` i `fabula-…`, que Phileas accepta sense
+error), i deixa l'anterior a `phileasrc.anterior`.
 `phileas --config` escriu el mateix a la sortida; no el redirigiu al mateix
 `phileasrc`, que el shell buida abans que Phileas el llegeixi.
 
@@ -541,6 +544,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.7.2**: `desar-configuracio` ja no esborra les claus de Recerca (`recerca-vault`…): conserva totes les línies que Phileas no escriu, i Phileas accepta sense error les claus `recerca-…` i `fabula-…` del phileasrc. A la imatge BYOK: Fàbula al menú BYOK (tria un projecte de `/data/projectes` o en crea un); `exporta` copia al pendrive `BYOK/textos`, `BYOK/projectes` i les fitxes `_pi/` de cada vault; el bàner de la consola mostra Fàbula, Recerca i `rep`.
 - **2.7.1**: Fàbula 0.3.2 i Recerca 0.1.1: el text normal fa servir els colors del tema (amb els temes clars sortia amb els del terminal, blanc sobre negre). A la imatge BYOK: `envia` pregunta la carpeta de destinació a l'ordinador (per defecte, la darrera) i hi deixa `textos/` i `projectes/` (`/data/projectes`); `rep` pot treure un vault de la llista.
 - **2.7.0**: **Recerca 0.1**, la tercera eina: fitxes de recerca en un vault d'Obsidian (carpetes, propietats, etiquetes niades, enllaços amb àlies, seccions i blocs `^id`, backlinks i relacions de propietat), amb un índex SQLite (FTS5) que es posa al dia sol; pantalla de navegació, llista i visor; editar a Phileas, fitxes noves amb plantilla, anotacions i paperera; a la Pi, `rep` porta un vault del PC i hi torna `_pi/`. Phileas: ordres `externa-pantalla.NOM` (programes de pantalla sencera, tornen sense Retorn) i Recerca i `rep` al menú BYOK. Fàbula 0.3.1: `b` obre Recerca (`recerca:` a `projecte.md`). Fàbula i Recerca fan servir els colors del tema com Phileas (el text atenuat a la consola i les línies `color-…` del phileasrc).
 - **2.6.0**: **Escriure net.** Cerca sense majúscules ni accents (`cafe` troba `cafè`); estadístiques del document o de la selecció (`estadistiques`: paraules, caràcters, frases, pàgines de 1.800, temps de lectura); `col.legi` → `col·legi` amb la tipografia i el diccionari català, `Alt+.` (punt volat) i `unicode NOM|CODI`; diccionari de projecte (`.diccionari.txt`, `p` als suggeriments); `revisar-aparellaments` (« » ( ) [ ] “ ” cometes i acotacions de diàleg sense tancar).

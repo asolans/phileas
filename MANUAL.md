@@ -1,6 +1,6 @@
 # Manual d'ús de Phileas
 
-*Versió 2.7.1*
+*Versió 2.7.2*
 
 Aquest manual t'acompanya pas a pas: des d'obrir Phileas per primera vegada
 fins a organitzar un llibre llarg. No cal llegir-lo de dalt a baix. Si només
@@ -657,7 +657,9 @@ autodesat = 20
 Les opcions que canvies des dels menús (tema, màquina d'escriure, enfocament,
 tipografia, columna centrada) **es desen soles**. Per tenir el fitxer complet,
 amb comentaris i totes les opcions: **Ctrl+P** → `desar-configuracio`. L'anterior
-es guarda a `phileasrc.anterior`. Si edites el fitxer a mà amb Phileas
+es guarda a `phileasrc.anterior`. Les línies que Phileas no escriu (dreceres,
+ordres externes i les claus de Recerca i Fàbula, com `recerca-vault`) es
+conserven al final, sota «Del fitxer anterior». Si edites el fitxer a mà amb Phileas
 obert, **Ctrl+P** → `recarregar-configuracio` el torna a llegir.
 
 ### Canviar una tecla
@@ -729,17 +731,22 @@ Esc → **BYOK** (només a la Pi):
 |-------|--------|
 | Lletra més gran / més petita | canvia la mida de la lletra de la pantalla |
 | Gira la pantalla | gira la imatge (útil si el monitor està en vertical) |
-| Exporta al pendrive | copia els textos a un pendrive USB |
+| Exporta al pendrive | copia els textos, els projectes i les fitxes de recerca fetes a la Pi a un pendrive USB |
 | Envia a un ordinador | copia els textos i els projectes, per la xarxa, a un ordinador Linux |
+| Fàbula (projectes) | obre Fàbula ([capítol 16](#16-fàbula-organitzar-un-llibre)): tria un projecte de `/data/projectes` o en crea un de nou; en sortir, torna a Phileas |
 | Recerca | obre Recerca amb els vaults de recerca de la Pi ([capítol 17](#17-recerca-fitxes-de-recerca)); en sortir, torna a Phileas |
 | Rep la recerca del PC | porta un vault d'Obsidian del PC a la Pi i hi torna les fitxes escrites a la Pi |
 
-També són ordres de la paleta: `lletra`, `gira`, `exporta`, `envia`, `recerca`, `rep`.
+També són ordres de la paleta: `lletra`, `gira`, `exporta`, `envia`, `fabula`, `recerca`, `rep`.
 
 ### Passar els textos a l'ordinador
 
 - **Amb un pendrive:** endolla'l, Esc → BYOK → Exporta al pendrive, i
-  desendolla'l quan acabi.
+  desendolla'l quan acabi. Al pendrive, dins de `BYOK/`, hi trobaràs
+  `textos/`, `projectes/` i `recerca/<vault>/_pi/` (les fitxes de recerca
+  escrites a la Pi). No esborra mai res del pendrive. Fins a la 2.7.1 els
+  textos anaven directament a `BYOK/`: aquesta còpia antiga s'hi queda, i
+  la pots esborrar a l'ordinador.
 - **Per la xarxa:** Esc → BYOK → Envia a un ordinador. Es mostra un menú
   amb els ordinadors aparellats; després demana la **carpeta de destinació**
   dins del teu home (per exemple `Documents/Escriure`; per defecte, la darrera

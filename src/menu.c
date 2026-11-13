@@ -141,6 +141,7 @@ static const MenuItem byok_known[] = {
     { 'e', "Exporta al pendrive",  "exporta", NULL, NULL },
     { 'n', "Envia a un ordinador", "envia",   NULL, NULL },
     SEP,
+    { 'f', "Fàbula (projectes)",   "fabula",  NULL, NULL },
     { 'c', "Recerca",              "recerca", NULL, NULL },
     { 'b', "Rep la recerca del PC", "rep",    NULL, NULL },
 };

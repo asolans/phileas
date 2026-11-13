@@ -1572,6 +1572,9 @@ static void test_config(void)
     CHECK(SET("idiomes", "a b c d e") < 0);
     CHECK(SET("diccionari", "../x") < 0);
     CHECK(SET("colums", "60") < 0 && strstr(err, "desconeguda"));
+    /* Les claus de les altres eines no són errors */
+    CHECK(SET("recerca-vault", "/data/recerca/tesi") == 0);
+    CHECK(SET("recerca-replica", "si") == 0 && SET("fabula-x", "1") == 0);
     config_bind_hook = fake_bind;
     CHECK(SET("tecla.ctrl-t", "maquina-escriure") == 0 && !strcmp(last_bind, "ctrl-t=maquina-escriure"));
     CHECK(SET("tecla.ctrl-h", "") == 0 && !strcmp(last_bind, "ctrl-h="));
@@ -1641,9 +1644,13 @@ static void test_config(void)
     SET("tipografia", "si");
     SET("apostrof-tipografic", "sí");
     f = fopen(user, "w");
-    fputs("centrar = no\ntecla.f9 = colors\nexterna-breu.dia = date\n", f);
+    fputs("centrar = no\ntecla.f9 = colors\nexterna-breu.dia = date\n"
+          "recerca-vault = /data/recerca/tesi\n", f);
     fclose(f);
     CHECK(config_save_all(user, &e) == 0);
+    /* Les claus de Recerca es conserven; les de Phileas, amb el valor actual */
+    CHECK(strstr(slurp(user), "\nrecerca-vault = /data/recerca/tesi\n") != NULL);
+    CHECK(strstr(slurp(user), "centrar = no") == NULL);
     ed_free(&e);
     ed_init(&e, 72);
     CHECK(config_load(&e, NULL, user, msg, sizeof msg) == 0);
@@ -1653,7 +1660,8 @@ static void test_config(void)
     CHECK(e.focus == FOCUS_SENTENCE && e.typo == 1 && e.typo_apos == 1);
     CHECK(strstr(slurp(user), "\ntecla.f9 = colors\nexterna-breu.dia = date\n") != NULL);
     snprintf(sys, sizeof sys, "%.500s.anterior", user);
-    CHECK(!strcmp(slurp(sys), "centrar = no\ntecla.f9 = colors\nexterna-breu.dia = date\n"));
+    CHECK(!strcmp(slurp(sys), "centrar = no\ntecla.f9 = colors\nexterna-breu.dia = date\n"
+                              "recerca-vault = /data/recerca/tesi\n"));
     unlink(sys);
     ed_free(&e);
 #undef SET
