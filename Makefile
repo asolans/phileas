@@ -91,5 +91,32 @@ clean:
 
 -include $(OBJ:.o=.d)
 -include $(wildcard build/fabula_*.d)
+# ---- Recerca (recerca/, codi comú a comu/): SQLite amalgamat amb FTS5 ----
+SQLDEF  = -DSQLITE_ENABLE_FTS5 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION \
+          -DSQLITE_DEFAULT_MEMSTATUS=0 -DSQLITE_DQS=0 -DSQLITE_OMIT_DEPRECATED \
+          -DSQLITE_DEFAULT_WAL_SYNCHRONOUS=1
+RCOMU   = build/comu_fold.o build/comu_mdscan.o build/comu_front.o
+ROBJ    = $(RCOMU) build/recerca_vault.o build/recerca_sqlite3.o build/utf8.o build/util.o
+RINC    = -Isrc -Icomu -Irecerca -Irecerca/sqlite
+
+.PHONY: recerca test-recerca
+# L'executable és build/recerca (el nom «recerca» és el de la carpeta de fonts)
+recerca: build/recerca
+build/recerca: $(ROBJ) build/recerca_main.o
+	$(CC) $(LDFLAGS) -o $@ $^ -lm
+recerca/sqlite/sqlite3.c recerca/sqlite/sqlite3.h:
+	@echo "Falta l'SQLite: vegeu recerca/sqlite/LLEGEIX.md"; exit 1
+build/recerca_sqlite3.o: recerca/sqlite/sqlite3.c | build
+	$(CC) $(OPT) $(SQLDEF) -c -o $@ $<
+build/recerca_%.o: recerca/%.c recerca/sqlite/sqlite3.h | build
+	$(CC) $(CFLAGS) $(RINC) -MMD -MP -c -o $@ $<
+build/comu_%.o: comu/%.c | build
+	$(CC) $(CFLAGS) $(RINC) -MMD -MP -c -o $@ $<
+build/test_recerca: tests/test_recerca.c $(ROBJ)
+	$(CC) $(CFLAGS) $(RINC) $(LDFLAGS) -o $@ $^ -lm
+test-recerca: build/test_recerca
+	./build/test_recerca
+-include $(wildcard build/recerca_*.d build/comu_*.d)
+
 
 .PHONY: test debug clean install install-desktop deb dist manual

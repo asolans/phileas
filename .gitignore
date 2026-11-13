@@ -3,3 +3,7 @@ build/
 phileas
 tools/terminfo/
 dist/
+
+# Recerca: l'SQLite (amalgamació) es baixa de sqlite.org; vegeu recerca/sqlite/LLEGEIX.md
+recerca/sqlite/sqlite3.c
+recerca/sqlite/sqlite3.h

@@ -300,6 +300,26 @@ Les tecles i el format del projecte, al capítol 16 del [manual](MANUAL.md). Es
 compila amb `make fabula` (executable a `build/fabula`) i les proves són a
 `make test-fabula`.
 
+## Recerca (en desenvolupament)
+
+**Recerca** és la tercera eina, per a fitxes de recerca en un vault d'Obsidian:
+carpetes, propietats, etiquetes, enllaços `[[ ]]` i backlinks, amb un índex
+SQLite (FTS5) a `VAULT/.recerca/index.db` que es posa al dia sol i es pot
+esborrar sense perdre res. De moment només té les ordres de text; la pantalla
+de navegació arribarà amb Recerca 0.1.
+
+```bash
+recerca --indexa VAULT           # posa l'índex al dia
+recerca --resum VAULT            # fitxes, tipus, etiquetes i enllaços
+recerca --on-surt "Nom" VAULT    # notes que enllacen a «Nom»
+recerca --trencats VAULT         # enllaços que no apunten enlloc
+recerca --cerca "pau caspe" VAULT   # notes amb totes les paraules
+```
+
+Es compila amb `make recerca` (executable a `build/recerca`), però abans cal
+posar l'amalgamació de SQLite a `recerca/sqlite/` (vegeu el `LLEGEIX.md` d'aquella
+carpeta). Les proves es passen amb `make test-recerca`.
+
 ## Ús
 
 ```
@@ -473,6 +493,8 @@ cadena musl de Buildroot.
 | `utf8.c`, `util.c` | UTF-8 i utilitats |
 
 Fàbula és a `fabula/` (`project.c` el projecte i els fitxers, `yaml.c` la capçalera, `flat.c` les files de l'arbre, `fview.c` la pantalla, `fterm.c` el terminal, `launch.c` l'editor) i reutilitza `buffer`, `outline`, `md`, `utf8`, `keys` i `theme` de `src/`. Les proves són a `tests/test_fabula.c`.
+
+Recerca és a `recerca/` (`vault.c` l'índex SQLite i la sincronització, `main.c` les ordres) i fa servir el codi comú de `comu/`: `front.c` (propietats YAML d'Obsidian, també les llistes en bloc), `mdscan.c` (enllaços, etiquetes i blocs `^id`) i `fold.c` (minúscules i sense accents). Les proves són a `tests/test_recerca.c`.
 
 Els mòduls que no depenen de ncurses es proven a `tests/test.c`. A `tools/`
 hi ha eines per a les proves interactives: `ptyrun.c` (executa Phileas en un
