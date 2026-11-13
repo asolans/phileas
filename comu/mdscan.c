@@ -263,6 +263,8 @@ static void scan_line(const char *l, size_t n, size_t line, State *st, cm_ref_fn
 
                 if (z) {
                     r.kind = CM_LINK;
+                    r.start = p - l;
+                    r.len = z - p;
                     fn(&r, ud);
                     p = z;
                     continue;
@@ -275,6 +277,8 @@ static void scan_line(const char *l, size_t n, size_t line, State *st, cm_ref_fn
 
                 if (z) {
                     r.kind = CM_LINK;
+                    r.start = p - l;
+                    r.len = z - p;
                     fn(&r, ud);
                     p = z;
                     continue;
@@ -284,6 +288,8 @@ static void scan_line(const char *l, size_t n, size_t line, State *st, cm_ref_fn
 
                 if (z) {
                     r.kind = CM_LINK;
+                    r.start = p - l;
+                    r.len = z - p;
                     fn(&r, ud);
                     p = z;
                     continue;
@@ -303,6 +309,8 @@ static void scan_line(const char *l, size_t n, size_t line, State *st, cm_ref_fn
                 }
                 if (q > p + 1 && cm_tag_valid(p + 1, q - p - 1)) {
                     r.kind = CM_TAG;
+                    r.start = p - l;
+                    r.len = q - p;
                     r.target = p + 1;
                     r.target_len = q - p - 1;
                     r.section = r.alias = NULL;
@@ -327,6 +335,8 @@ static void scan_line(const char *l, size_t n, size_t line, State *st, cm_ref_fn
                     ;
                 if (q > p + 1 && t == end) {
                     r.kind = CM_BLOCK;
+                    r.start = p - l;
+                    r.len = q - p;
                     r.target = p + 1;
                     r.target_len = q - p - 1;
                     r.section = r.alias = NULL;

@@ -1,8 +1,14 @@
 /* Recerca: eina de recerca de terminal, germana de Phileas i Fàbula.
  * Un vault d'Obsidian i un índex SQLite (FTS5) a VAULT/.recerca/. */
 #include "fold.h"
+#include "fterm.h"
+#include "rc.h"
+#include "rview.h"
+#include "theme.h"
 #include "vault.h"
 #include "version.h"
+
+#include "keys.h"
 
 #include <locale.h>
 #include <stdio.h>
@@ -16,7 +22,8 @@ static void ajuda(void)
          "\n"
          "Ús: recerca [OPCIÓ] [VAULT]\n"
          "\n"
-         "VAULT és la carpeta del vault (per defecte, la carpeta actual).\n"
+         "VAULT és la carpeta del vault (per defecte, «recerca-vault =» del phileasrc,\n"
+         "o si no la carpeta actual). Sense opcions, obre la pantalla de navegació.\n"
          "L'índex és a VAULT/.recerca/index.db: es posa al dia sol cada vegada\n"
          "(només les notes noves o canviades) i es pot esborrar sense perdre res.\n"
          "\n"
@@ -29,7 +36,7 @@ static void ajuda(void)
          "  -h, --help        aquesta ajuda\n"
          "  -v, --version     versió\n"
          "\n"
-         "La pantalla de navegació arribarà a Recerca 0.1 (R1.2).");
+         "A la pantalla, F1 mostra les tecles i Esc el menú. El tema és el de Phileas.");
 }
 
 static int tty;
@@ -212,9 +219,65 @@ static int cerca(Vault *v, const char *q)
     return 0;
 }
 
+typedef struct {
+    char tema[64];
+    int  console;
+    char vault[4096];
+} Rc;
+
+static void rc_cb(const char *k, const char *v, void *ud)
+{
+    Rc *rc = ud;
+
+    if (!strcmp(k, "tema"))
+        snprintf(rc->tema, sizeof rc->tema, "%s", v);
+    else if (!strcmp(k, "paleta-consola"))
+        rc->console = !(!strcmp(v, "no") || !strcmp(v, "false") || !strcmp(v, "0"));
+    else if (!strcmp(k, "recerca-vault"))
+        snprintf(rc->vault, sizeof rc->vault, "%s", v);
+}
+
+static void quit_hook(int sig)
+{
+    ft_end();
+    _exit(128 + sig);
+}
+
+static void progres_pantalla(size_t fet, size_t total, void *ud)
+{
+    char s[128];
+
+    (void)ud;
+    snprintf(s, sizeof s, " Indexant el vault: %zu de %zu fitxes… ", fet, total);
+    erase();
+    mvaddstr(LINES / 2, COLS > (int)strlen(s) ? (COLS - (int)strlen(s)) / 2 : 0, s);
+    refresh();
+}
+
+static int pantalla(Vault *v, const Rc *rc)
+{
+    const Theme *th = theme_find(rc->tema);
+    VaultSync s;
+    char err[512];
+
+    ft_init(th ? th : theme_at(0), rc->console);
+    key_quit_hook = quit_hook;
+    key_signals();
+    progres_pantalla(0, 0, NULL);
+    if (vault_sync(v, 0, progres_pantalla, NULL, &s, err, sizeof err)) {
+        ft_end();
+        fprintf(stderr, "recerca: %s\n", err);
+        return 1;
+    }
+    rview_run(v);
+    ft_end();
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
-    const char *op = NULL, *arg = NULL, *dir = ".";
+    const char *op = NULL, *arg = NULL, *dir = NULL;
+    Rc rc = { "terminal", 1, "" };
     char err[512];
     Vault *v;
     int r = 0;
@@ -248,14 +311,20 @@ int main(int argc, char **argv)
             dir = a;
     }
 
+    cm_rc_read(rc_cb, &rc);
+    if (!dir)
+        dir = rc.vault[0] ? rc.vault : ".";
     v = vault_open(dir, err, sizeof err);
     if (!v) {
         fprintf(stderr, "recerca: %s\n", err);
         return 1;
     }
     if (!op) {
-        r = sincronitza(v, 0, 1) || resum(v);
-        puts("\n(La pantalla de navegació arribarà amb Recerca 0.1.)");
+        if (!isatty(0) || !isatty(1)) {
+            fprintf(stderr, "recerca: la pantalla necessita un terminal (vegeu --help)\n");
+            r = 1;
+        } else
+            r = pantalla(v, &rc);
     } else if (!strcmp(op, "--indexa"))
         r = sincronitza(v, 0, 1);
     else if (!strcmp(op, "--refes"))

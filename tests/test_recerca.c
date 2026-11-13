@@ -2,6 +2,7 @@
 #include "fold.h"
 #include "front.h"
 #include "mdscan.h"
+#include "model.h"
 #include "vault.h"
 
 #include <locale.h>
@@ -139,7 +140,7 @@ typedef struct {
     int kind[32];
     char t[32][64], sec[32][32], al[32][32];
     int block[32], embed[32];
-    size_t line[32];
+    size_t line[32], start[32], len[32];
     int n;
 } Refs;
 
@@ -156,6 +157,8 @@ static void ref_cb(const CmRef *r, void *ud)
     x->block[x->n] = r->block;
     x->embed[x->n] = r->embed;
     x->line[x->n] = r->line;
+    x->start[x->n] = r->start;
+    x->len[x->n] = r->len;
     x->n++;
 }
 
@@ -184,6 +187,8 @@ static void test_scan(void)
             fprintf(stderr, "  %d: %d «%s»\n", i, x.kind[i], x.t[i]);
     CHECK(x.n == 15);
     CHECK(x.kind[0] == CM_LINK && !strcmp(x.t[0], "Nota") && x.line[0] == 11);
+    CHECK(x.start[0] == 5 && x.len[0] == 8);           /* «[[Nota]]» */
+    CHECK(x.start[4] == strlen("Bloc [[N#^b1]], incrustat ") && x.len[4] == strlen("![[Imatge.png]]"));
     CHECK(!strcmp(x.t[1], "Carpeta/Altra") && !strcmp(x.al[1], "amb text"));
     CHECK(!strcmp(x.t[2], "N") && !strcmp(x.sec[2], "Secció") && !x.block[2]);
     CHECK(!strcmp(x.t[3], "N") && !strcmp(x.sec[3], "b1") && x.block[3]);
@@ -317,6 +322,43 @@ static void test_vault(void)
     CHECK(sinc(v, &s) == 0 && s.canviades == 1);
     CHECK(q1(v, "SELECT count(*) FROM enllacos WHERE pleg='pere iii' AND a IS NULL") == 0);
 
+    /* resolució d'un sol enllaç i model de la pantalla */
+    CHECK(vault_resolve(v, NULL, "Pere III", 8) == q1(v, "SELECT id FROM fitxes WHERE uid='p1'"));
+    CHECK(vault_resolve(v, NULL, "fons/aca/corts de montsó", strlen("fons/aca/corts de montsó")) > 0);
+    CHECK(vault_resolve(v, NULL, "Mapa.png", 8) == -1);
+    CHECK(vault_resolve(v, NULL, "Res", 3) == 0);
+    {
+        Model m;
+        size_t *l, n;
+
+        memset(&m, 0, sizeof m);
+        CHECK(model_load(&m, vault_db(v)) == 0 && m.n == 3);
+        /* carpetes: Totes, Fons, Fons/ACA, Persones, (a l'arrel) */
+        CHECK(m.nnav == 5 && !m.nav[0].key && m.nav[0].count == 3);
+        CHECK(!strcmp(m.nav[1].key, "Fons") && m.nav[1].count == 1 && m.nav[1].depth == 1);
+        CHECK(!strcmp(m.nav[2].key, "Fons/ACA") && m.nav[2].depth == 2 && !strcmp(m.nav[2].label, "ACA"));
+        CHECK(!strcmp(m.nav[4].key, "") && m.nav[4].count == 1);
+        n = model_list(&m, &m.nav[4], "", SORT_NOM, &l);
+        CHECK(n == 1 && !strcmp(m.notes[l[0]].cami, "Corts.md"));
+        free(l);
+        n = model_list(&m, NULL, "montso", SORT_NOM, &l);      /* filtre sense accents */
+        CHECK(n == 1 && !strcmp(m.notes[l[0]].nom, "Corts de Montsó"));
+        free(l);
+        n = model_list(&m, NULL, "", SORT_DATA, &l);           /* sense data, al final */
+        CHECK(n == 3 && !strcmp(m.notes[l[0]].data, "1363") && !m.notes[l[2]].data[0]);
+        free(l);
+        model_set_mode(&m, NAV_ETIQUETES);
+        CHECK(m.nnav == 3 && !strcmp(m.nav[1].key, "corts") && !strcmp(m.nav[2].key, "fiscalitat"));
+        n = model_list(&m, &m.nav[2], "", SORT_NOM, &l);
+        CHECK(n == 1);
+        free(l);
+        model_set_mode(&m, NAV_TIPUS);
+        CHECK(m.nnav == 3 && !strcmp(m.nav[1].key, "fons") && !strcmp(m.nav[2].label, "(sense tipus)"));
+        CHECK(model_type_letter("nota de camp") == 'N' && model_type_letter("fons") == 'F' && model_type_letter("") == ' ');
+        CHECK(model_find(&m, m.notes[1].id) == 1 && model_find(&m, 999999) == -1);
+        model_free(&m);
+    }
+
     /* refer de zero */
     CHECK(vault_sync(v, 1, NULL, NULL, &s, err, sizeof err) == 0 && s.noves == 3);
 
@@ -329,6 +371,29 @@ static void test_vault(void)
     vault_close(v);
 
     CHECK(vault_open("/no/existeix", err, sizeof err) == NULL);
+}
+
+/* Enllaços Markdown relatius a la carpeta de la nota (en un vault a part) */
+static void test_relatiu(void)
+{
+    char root[600], err[256];
+    Vault *v;
+    VaultSync s;
+
+    put("rel/Persones/Pere el Cerimoniós.md", "Rei.\n");
+    put("rel/Fons/ACA/Corts de Montsó.md", "Corts.\n");
+    put("rel/Fons/ACA/Relatiu.md", "[a](../../Persones/Pere%20el%20Cerimoniós.md) [b](./Corts%20de%20Montsó.md) "
+                                   "[c](../Res.md)\n");
+    snprintf(root, sizeof root, "%s/rel", tmpdir);
+    v = vault_open(root, err, sizeof err);
+    CHECK(v && sinc(v, &s) == 0 && s.noves == 3);
+    if (!v)
+        return;
+    CHECK(q1(v, "SELECT count(*) FROM enllacos WHERE a IS NOT NULL") == 2);
+    CHECK(q1(v, "SELECT count(*) FROM enllacos WHERE pleg='fons/res' AND a IS NULL") == 1);
+    CHECK(vault_resolve(v, "Fons/ACA/Relatiu.md", "../../Persones/Pere el Cerimoniós.md",
+                        strlen("../../Persones/Pere el Cerimoniós.md")) > 0);
+    vault_close(v);
 }
 
 int main(void)
@@ -344,6 +409,7 @@ int main(void)
     test_front();
     test_scan();
     test_vault();
+    test_relatiu();
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", tmpdir);
     if (system(cmd)) {
     }

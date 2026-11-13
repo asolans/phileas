@@ -21,7 +21,7 @@
 
 #define VAULT_DIR    ".recerca"
 #define VAULT_DB     ".recerca/index.db"
-#define VAULT_SCHEMA "1"
+#define VAULT_SCHEMA "3"
 
 typedef struct Vault Vault;
 
@@ -47,6 +47,12 @@ int vault_sync(Vault *v, int refes, vault_progress_fn fn, void *ud, VaultSync *o
 /* Reindexa una sola nota (camí relatiu a l'arrel), p. ex. en tornar de
  * Phileas. Si ja no existeix, la treu. Torna a resoldre els enllaços. */
 int vault_reindex(Vault *v, const char *rel, char *err, size_t errsz);
+
+/* La nota on apunta un enllaç [[target]] escrit a la nota from (camí relatiu
+ * a l'arrel, per als enllaços «../x.md»; pot ser NULL), amb les mateixes
+ * regles que l'índex: id > 0; 0 si no n'hi ha cap (trencat); -1 si és un
+ * adjunt (imatge, PDF…). */
+long long vault_resolve(Vault *v, const char *from, const char *target, size_t len);
 
 sqlite3    *vault_db(const Vault *v);
 const char *vault_root(const Vault *v);

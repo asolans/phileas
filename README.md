@@ -305,10 +305,20 @@ compila amb `make fabula` (executable a `build/fabula`) i les proves són a
 **Recerca** és la tercera eina, per a fitxes de recerca en un vault d'Obsidian:
 carpetes, propietats, etiquetes, enllaços `[[ ]]` i backlinks, amb un índex
 SQLite (FTS5) a `VAULT/.recerca/index.db` que es posa al dia sol i es pot
-esborrar sense perdre res. De moment només té les ordres de text; la pantalla
-de navegació arribarà amb Recerca 0.1.
+esborrar sense perdre res.
+
+La pantalla (`recerca VAULT`) té tres panells: la navegació per carpetes, per
+etiquetes (`#tema/subtema` en arbre) o per tipus (`1` `2` `3`); la llista de
+fitxes, que es filtra amb `/` i s'ordena amb `o`; i el visor, de només lectura,
+amb les propietats a dalt. Retorn passa de la navegació a les fitxes i d'aquí al
+visor; al visor, Tab i Maj+Tab trien un enllaç (també `]` i `[`), Retorn el segueix
+i Retrocés torna enrere. `u` i `b` mostren les notes que hi enllacen, `l` els
+enllaços de la fitxa, `t` els trencats de tot el vault i `z` amplia el visor. Per
+sota de 110 columnes es veuen dos panells. Esc obre el menú i F1, l'ajuda. El vault per
+defecte es pot posar al phileasrc (`recerca-vault = /ruta/al/vault`).
 
 ```bash
+recerca VAULT                    # la pantalla
 recerca --indexa VAULT           # posa l'índex al dia
 recerca --resum VAULT            # fitxes, tipus, etiquetes i enllaços
 recerca --on-surt "Nom" VAULT    # notes que enllacen a «Nom»
@@ -494,7 +504,7 @@ cadena musl de Buildroot.
 
 Fàbula és a `fabula/` (`project.c` el projecte i els fitxers, `yaml.c` la capçalera, `flat.c` les files de l'arbre, `fview.c` la pantalla, `fterm.c` el terminal, `launch.c` l'editor) i reutilitza `buffer`, `outline`, `md`, `utf8`, `keys` i `theme` de `src/`. Les proves són a `tests/test_fabula.c`.
 
-Recerca és a `recerca/` (`vault.c` l'índex SQLite i la sincronització, `main.c` les ordres) i fa servir el codi comú de `comu/`: `front.c` (propietats YAML d'Obsidian, també les llistes en bloc), `mdscan.c` (enllaços, etiquetes i blocs `^id`) i `fold.c` (minúscules i sense accents). Les proves són a `tests/test_recerca.c`.
+Recerca és a `recerca/` (`vault.c` l'índex SQLite i la sincronització, `model.c` el que mostra la pantalla, `rview.c` la pantalla, `main.c` les ordres; fa servir el `fterm` de Fàbula) i fa servir el codi comú de `comu/`: `front.c` (propietats YAML d'Obsidian, també les llistes en bloc), `mdscan.c` (enllaços, etiquetes i blocs `^id`), `fold.c` (minúscules i sense accents) i `rc.c` (lectura del phileasrc). Les proves són a `tests/test_recerca.c`.
 
 Els mòduls que no depenen de ncurses es proven a `tests/test.c`. A `tools/`
 hi ha eines per a les proves interactives: `ptyrun.c` (executa Phileas en un

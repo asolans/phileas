@@ -30,6 +30,7 @@ typedef struct {
     int         embed;         /* enllaç: ![[ ]] */
     const char *ctx;           /* la línia sencera on és */
     size_t      ctx_len;
+    size_t      start, len;    /* posició (bytes) i llargada de la marca sencera dins de ctx */
 } CmRef;
 
 typedef void (*cm_ref_fn)(const CmRef *r, void *ud);

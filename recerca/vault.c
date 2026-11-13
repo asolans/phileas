@@ -364,8 +364,43 @@ typedef struct {
     long long   id;
     const char *relacio;     /* clau YAML quan es llegeixen les propietats */
     size_t      relacio_len;
+    const char *carpeta;     /* carpeta de la nota (per als camins relatius) */
+    size_t      carpeta_len;
     int         errors;
 } Ctx;
+
+/* «./x» i «../x» (enllaços Markdown relatius) → camí des de l'arrel del vault.
+ * Retorna NULL si el destí no és relatiu. */
+static char *relatiu_a(const char *carpeta, size_t carpeta_len, const char *t, size_t n)
+{
+    char *out;
+    size_t o;
+
+    if (!(n >= 2 && t[0] == '.' && (t[1] == '/' || (n >= 3 && t[1] == '.' && t[2] == '/'))))
+        return NULL;
+    out = xmalloc(carpeta_len + n + 2);
+    memcpy(out, carpeta, carpeta_len);
+    o = carpeta_len;
+    while (n) {
+        if (n >= 2 && t[0] == '.' && t[1] == '/') {
+            t += 2;
+            n -= 2;
+        } else if (n >= 3 && t[0] == '.' && t[1] == '.' && t[2] == '/') {
+            while (o && out[o - 1] != '/')      /* puja una carpeta */
+                o--;
+            if (o)
+                o--;
+            t += 3;
+            n -= 3;
+        } else
+            break;
+    }
+    if (o)
+        out[o++] = '/';
+    memcpy(out + o, t, n);
+    out[o + n] = '\0';
+    return out;
+}
 
 /* [[imatge.png]], [[document.pdf]]: un adjunt, no una nota (no és trencat) */
 static int te_extensio_no_md(const char *t, size_t n)
@@ -385,15 +420,30 @@ static int te_extensio_no_md(const char *t, size_t n)
     return 1;
 }
 
-/* Context: la línia, retallada a ~200 bytes sense partir un caràcter */
-static size_t context_len(const char *s, size_t n)
+/* Context d'un enllaç: ~200 bytes de la línia al voltant de la marca (des de
+ * 60 bytes abans), sense partir cap caràcter. *off rep on comença. */
+static size_t context_win(const char *s, size_t n, size_t start, size_t *off)
 {
-    if (n <= 200)
-        return n;
-    n = 200;
-    while (n && ((unsigned char)s[n] & 0xC0) == 0x80)
-        n--;
-    return n;
+    size_t a = start > 60 ? start - 60 : 0, len;
+
+    while (a && ((unsigned char)s[a] & 0xC0) == 0x80)
+        a--;
+    if (a) {                                    /* comença en una paraula sencera */
+        size_t sp = a;
+
+        while (sp < start && s[sp] != ' ')
+            sp++;
+        if (sp < start)
+            a = sp + 1;
+    }
+    len = n - a;
+    if (len > 200) {
+        len = 200;
+        while (len && ((unsigned char)s[a + len] & 0xC0) == 0x80)
+            len--;
+    }
+    *off = a;
+    return len;
 }
 
 static void tag(Ctx *c, const char *t, size_t n, size_t linia)
@@ -431,8 +481,10 @@ static void ref_cb(const CmRef *r, void *ud)
         c->errors += pas(c->s->bloc) != 0;
         break;
     case CM_LINK: {
-        char *pleg = cm_lower(r->target, r->target_len);
+        char *rel = relatiu_a(c->carpeta, c->carpeta_len, r->target, r->target_len);
+        char *pleg = rel ? cm_lower(rel, strlen(rel)) : cm_lower(r->target, r->target_len);
 
+        free(rel);
         sqlite3_bind_int64(e, 1, c->id);
         sqlite3_bind_int64(e, 2, (long long)r->line);
         sqlite3_bind_text(e, 3, r->target, (int)r->target_len, SQLITE_TRANSIENT);
@@ -446,7 +498,11 @@ static void ref_cb(const CmRef *r, void *ud)
             sqlite3_bind_text(e, 8, c->relacio, (int)c->relacio_len, SQLITE_TRANSIENT);
         sqlite3_bind_int(e, 9, r->embed);
         sqlite3_bind_int(e, 10, te_extensio_no_md(r->target, r->target_len));
-        sqlite3_bind_text(e, 11, r->ctx, (int)context_len(r->ctx, r->ctx_len), SQLITE_TRANSIENT);
+        {
+            size_t off, cl = context_win(r->ctx, r->ctx_len, r->start, &off);
+
+            sqlite3_bind_text(e, 11, r->ctx + off, (int)cl, SQLITE_TRANSIENT);
+        }
         c->errors += pas(e) != 0;
         free(pleg);
         break;
@@ -550,6 +606,8 @@ static int indexa(Vault *v, Sents *s, const Entrada *en)
     c.errors = 0;
     c.relacio = NULL;
     c.relacio_len = 0;
+    c.carpeta = en->rel;
+    c.carpeta_len = carpeta_fi ? (size_t)(carpeta_fi - en->rel) : 0;
 
     /* propietats, etiquetes i àlies de la capçalera, relacions amb tipus */
     props_txt = xmalloc(pl + 1);
@@ -807,4 +865,37 @@ int vault_reindex(Vault *v, const char *rel, char *err, size_t errsz)
         return -1;
     }
     return exec(v, "COMMIT", err, errsz);
+}
+
+long long vault_resolve(Vault *v, const char *from, const char *target, size_t len)
+{
+    sqlite3_stmt *s;
+    char *pleg, *rel = NULL;
+    long long id = 0;
+
+    if (te_extensio_no_md(target, len))
+        return -1;
+    if (len >= 3 && !strncmp(target + len - 3, ".md", 3))
+        len -= 3;
+    if (from) {
+        const char *sl = strrchr(from, '/');
+
+        rel = relatiu_a(from, sl ? (size_t)(sl - from) : 0, target, len);
+    }
+    pleg = rel ? cm_lower(rel, strlen(rel)) : cm_lower(target, len);
+    free(rel);
+    if (sqlite3_prepare_v2(v->db,
+            "SELECT COALESCE("
+            "  CASE WHEN instr(?1, '/') = 0"
+            "    THEN (SELECT id FROM fitxes f WHERE f.nom_min = ?1 ORDER BY length(f.cami), f.cami LIMIT 1)"
+            "    ELSE (SELECT id FROM fitxes f WHERE f.cami_min = ?1"
+            "          OR substr(f.cami_min, -length(?1) - 1) = '/' || ?1 ORDER BY length(f.cami) LIMIT 1) END,"
+            "  (SELECT fitxa FROM alies WHERE alies.pleg = ?1 LIMIT 1), 0)", -1, &s, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(s, 1, pleg, -1, SQLITE_STATIC);
+        if (sqlite3_step(s) == SQLITE_ROW)
+            id = sqlite3_column_int64(s, 0);
+        sqlite3_finalize(s);
+    }
+    free(pleg);
+    return id;
 }
