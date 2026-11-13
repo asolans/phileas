@@ -229,7 +229,7 @@ int main(int argc, char **argv)
             return 0;
         }
         if (!strcmp(a, "-v") || !strcmp(a, "--version")) {
-            puts("Recerca " RECERCA_VERSION);
+            printf("Recerca %s (SQLite %s)\n", RECERCA_VERSION, sqlite3_libversion());
             return 0;
         }
         if (!strcmp(a, "--indexa") || !strcmp(a, "--refes") || !strcmp(a, "--resum") || !strcmp(a, "--trencats"))
