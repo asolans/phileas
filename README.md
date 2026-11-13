@@ -274,7 +274,7 @@ El projecte BYOK té una imatge pròpia per a la **Raspberry Pi 1B**, feta
 amb Buildroot. Arrenca en pocs segons directament a Phileas, amb els
 diccionaris de català i castellà, i un sistema de només lectura que no es
 fa malbé si es talla el corrent. Té ordres per canviar la mida de la lletra,
-girar la pantalla, exportar al pendrive i enviar els textos a un ordinador,
+girar la pantalla, exportar al pendrive i sincronitzar-ho tot amb un ordinador,
 i hi obre Fàbula i Recerca des del menú BYOK.
 Aquesta imatge no forma part d'aquest repositori.
 
@@ -555,6 +555,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
+- **2.9.0**: a la imatge BYOK, **una ordre per a l'intercanvi amb l'ordinador**: `ordinador` (menú BYOK → Ordinador: sincronitza…) tria l'ordinador i fa «sincronitza-ho tot» (puja textos i projectes a la darrera carpeta i porta i torna els vaults de recerca d'aquell ordinador), només puja, o gestiona els vaults; també hi aparella ordinadors nous. `envia` i `rep` comparteixen la xarxa (`/usr/lib/byok/xarxa.sh`) i tenen modes sense menú (`envia [--darrera] NOM`, `envia --nou`, `rep --ordinador NOM`). Phileas: Ordinador al menú BYOK.
 - **2.8.0**: **una configuració per a les tres eines.** Opcions comunes `editor` (l'editor de Fàbula i Recerca; `FABULA_EDITOR` i `RECERCA_EDITOR` hi manen), `textos`, `projectes` i `recerques`; la plantilla de `desar-configuracio` té les seccions Comú, Phileas i Recerca, amb els valors de totes tres; `phileas --valor CLAU`. Fàbula i Recerca llegeixen els comentaris del final de línia com Phileas, i `phileas-importa-calaix` també llegeix `/etc/phileas/phileasrc`. A la imatge BYOK, els llocs surten del phileasrc (`/usr/lib/byok/llocs.sh`). Fàbula 0.3.3, Recerca 0.1.2. També, codi comú de Phileas, Fàbula i Recerca a `comu/` (lector del phileasrc, colors, accents, menú, diàlegs, terminal), sense canvis visibles. L'ajuda (F1) de Fàbula i de Recerca es desplaça amb ↑ ↓ RePàg AvPàg quan no hi cap (abans es tallava). Fàbula treu els accents amb les mateixes regles que Recerca (ara també ý, ÿ i ŀ). `make clean` ja no esborra `dist/` (ho fa `make distclean`).
 - **2.7.2**: `desar-configuracio` ja no esborra les claus de Recerca (`recerca-vault`…): conserva totes les línies que Phileas no escriu, i Phileas accepta sense error les claus `recerca-…` i `fabula-…` del phileasrc. A la imatge BYOK: Fàbula al menú BYOK (tria un projecte de `/data/projectes` o en crea un); `exporta` copia al pendrive `BYOK/textos`, `BYOK/projectes` i les fitxes `_pi/` de cada vault; el bàner de la consola mostra Fàbula, Recerca i `rep`.
 - **2.7.1**: Fàbula 0.3.2 i Recerca 0.1.1: el text normal fa servir els colors del tema (amb els temes clars sortia amb els del terminal, blanc sobre negre). A la imatge BYOK: `envia` pregunta la carpeta de destinació a l'ordinador (per defecte, la darrera) i hi deixa `textos/` i `projectes/` (`/data/projectes`); `rep` pot treure un vault de la llista.

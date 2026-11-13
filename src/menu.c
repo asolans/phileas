@@ -138,6 +138,7 @@ static const MenuItem byok_known[] = {
     { 'p', "Lletra més petita",    "lletra",  "-",  NULL },
     { 'r', "Gira la pantalla",     "gira",    NULL, NULL },
     SEP,
+    { 'o', "Ordinador: sincronitza…", "ordinador", NULL, NULL },
     { 'e', "Exporta al pendrive",  "exporta", NULL, NULL },
     { 'n', "Envia a un ordinador", "envia",   NULL, NULL },
     SEP,

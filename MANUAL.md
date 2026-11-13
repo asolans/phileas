@@ -1,6 +1,6 @@
 # Manual d'ús de Phileas
 
-*Versió 2.8.0*
+*Versió 2.9.0*
 
 Aquest manual t'acompanya pas a pas: des d'obrir Phileas per primera vegada
 fins a organitzar un llibre llarg. No cal llegir-lo de dalt a baix. Si només
@@ -751,13 +751,14 @@ Esc → **BYOK** (només a la Pi):
 |-------|--------|
 | Lletra més gran / més petita | canvia la mida de la lletra de la pantalla |
 | Gira la pantalla | gira la imatge (útil si el monitor està en vertical) |
+| Ordinador: sincronitza… | tot l'intercanvi amb un ordinador de la xarxa: puja els textos i els projectes, porta i torna la recerca, i aparella ordinadors nous (vegeu més avall) |
 | Exporta al pendrive | copia els textos, els projectes i les fitxes de recerca fetes a la Pi a un pendrive USB |
 | Envia a un ordinador | copia els textos i els projectes, per la xarxa, a un ordinador Linux |
 | Fàbula (projectes) | obre Fàbula ([capítol 16](#16-fàbula-organitzar-un-llibre)): tria un projecte de `/data/projectes` o en crea un de nou; en sortir, torna a Phileas |
 | Recerca | obre Recerca amb els vaults de recerca de la Pi ([capítol 17](#17-recerca-fitxes-de-recerca)); en sortir, torna a Phileas |
 | Rep la recerca del PC | porta un vault d'Obsidian del PC a la Pi i hi torna les fitxes escrites a la Pi |
 
-També són ordres de la paleta: `lletra`, `gira`, `exporta`, `envia`, `fabula`, `recerca`, `rep`.
+També són ordres de la paleta: `lletra`, `gira`, `ordinador`, `exporta`, `envia`, `fabula`, `recerca`, `rep`.
 
 ### Passar els textos a l'ordinador
 
@@ -767,7 +768,18 @@ També són ordres de la paleta: `lletra`, `gira`, `exporta`, `envia`, `fabula`,
   escrites a la Pi). No esborra mai res del pendrive. Fins a la 2.7.1 els
   textos anaven directament a `BYOK/`: aquesta còpia antiga s'hi queda, i
   la pots esborrar a l'ordinador.
-- **Per la xarxa:** Esc → BYOK → Envia a un ordinador. Es mostra un menú
+- **Per la xarxa, tot de cop:** Esc → BYOK → **Ordinador: sincronitza…**. Tria
+  l'ordinador (la llista diu quins vaults de recerca té) i, després:
+  1. **Sincronitza-ho tot:** puja els textos i els projectes a la darrera
+     carpeta de destinació (la primera vegada la pregunta) i, si aquest
+     ordinador té vaults de recerca, hi torna les fitxes de `_pi/` i en porta
+     la còpia al dia. Si un vault falla, els altres continuen.
+  2. **Només puja els textos i els projectes**, preguntant la carpeta.
+  3. **Vaults de recerca:** rebre'n un, afegir-ne o treure'n (el menú de `rep`).
+
+  A la llista d'ordinadors, l'última opció **aparella un ordinador nou**.
+  Les ordres `envia` i `rep` continuen funcionant soles.
+- **Per la xarxa, només els textos:** Esc → BYOK → Envia a un ordinador. Es mostra un menú
   amb els ordinadors aparellats; després demana la **carpeta de destinació**
   dins del teu home (per exemple `Documents/Escriure`; per defecte, la darrera
   que has triat). Hi deixa dues carpetes: `textos/` (els de `/data/textos`) i

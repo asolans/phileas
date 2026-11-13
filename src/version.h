@@ -2,6 +2,6 @@
 #define PHILEAS_VERSION_H
 
 /* El Makefile la llegeix d'aquí per als paquets (make deb, make dist) */
-#define PHILEAS_VERSION  "2.8.0"
+#define PHILEAS_VERSION  "2.9.0"
 
 #endif
