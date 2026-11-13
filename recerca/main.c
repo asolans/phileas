@@ -397,6 +397,16 @@ int main(int argc, char **argv)
         cm_dirs_free(vs, n);
         dir = triat;
     }
+    if (!dir && !rc.vault[0] && access(".obsidian", F_OK) != 0 && access(VAULT_DIR, F_OK) != 0) {
+        /* Sense vault, la carpeta actual només si ho és: si no, s'indexaria
+         * qualsevol carpeta (p. ex. el home, en obrir Recerca des de Phileas) */
+        fprintf(stderr, "Recerca: no sé quin vault obrir. La carpeta actual no és un vault\n"
+                "(no té .obsidian/ ni .recerca/). Pots:\n"
+                "  - obrir-ne un: recerca CARPETA (o «recerca .» per a la carpeta actual);\n"
+                "  - posar al phileasrc «recerca-vault = CARPETA» (el vault de sempre) o\n"
+                "    «recerques = CARPETA» (una carpeta amb vaults, per triar-ne un).\n");
+        return 1;
+    }
     if (!dir)
         dir = rc.vault[0] ? rc.vault : ".";
     v = vault_open(dir, err, sizeof err);

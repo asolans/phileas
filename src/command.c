@@ -1844,6 +1844,16 @@ static void run_screen(Editor *e, const External *x, const char *cmd)
 
     ui_suspend();
     st = system(cmd);
+    /* Si ha acabat amb error, el que ha escrit es queda a la pantalla fins
+     * que es prem Retorn: si no, Phileas el tapava i no se sabia per què */
+    if (st == -1 || !WIFEXITED(st) || WEXITSTATUS(st) != 0) {
+        char ch;
+
+        fputs("\nPrem Retorn per tornar a Phileas.", stdout);
+        fflush(stdout);
+        while (read(STDIN_FILENO, &ch, 1) == 1 && ch != '\n' && ch != '\r')
+            ;
+    }
     ui_resume();
     if (!extern_failed(e, x, st, NULL))
         ed_msg(e, "%s: fet", x->name);

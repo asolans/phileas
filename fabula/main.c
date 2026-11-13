@@ -185,21 +185,27 @@ static void rc_cb(const char *k, const char *v, void *ud)
         cm_rc_path(v, projectes, sizeof projectes);
 }
 
-/* Sense projecte (ni argument ni projecte.md a la carpeta actual) i amb
- * «projectes =» al phileasrc: tria un projecte d'aquella carpeta o en crea un
- * de nou. El terminal ja està iniciat. Retorna 1 amb el camí a out, 0 si es
- * cancel·la i -1 amb el motiu a err. */
+/* Sense projecte (ni argument ni projecte.md a la carpeta actual): tria un
+ * projecte de la carpeta de «projectes =» del phileasrc (o, si no n'hi ha,
+ * de la carpeta actual) o en crea un de nou. El terminal ja està iniciat.
+ * Retorna 1 amb el camí a out, 0 si es cancel·la i -1 amb el motiu a err. */
 static int choose_project(char *out, size_t outsz, char *err, size_t errsz)
 {
+    int fixed = projectes[0] != '\0';
     char **v, title[PATH_MAX + 64];
     size_t n;
     int r;
 
-    mkdir(projectes, 0755);                 /* la primera vegada pot no existir */
+    if (!projectes[0] && !getcwd(projectes, sizeof projectes))
+        snprintf(projectes, sizeof projectes, ".");
+    else
+        mkdir(projectes, 0755);             /* la primera vegada pot no existir */
     n = cm_dirs(projectes, "projecte.md", &v);
     snprintf(title, sizeof title, "Fàbula · projectes de %s", projectes);
     r = cm_choose(title, (const char *const *)v, n, "Projecte nou…",
-                  "Encara no hi ha cap projecte.");
+                  fixed ? "Encara no hi ha cap projecte."
+                        : "Cap projecte en aquesta carpeta. (Per tenir-los sempre en una mateixa "
+                          "carpeta: «projectes = CARPETA» al phileasrc.)");
     if (r >= 0 && (size_t)r < n && (size_t)snprintf(out, outsz, "%s/%s", projectes, v[r]) >= outsz) {
         snprintf(err, errsz, "camí massa llarg");
         cm_dirs_free(v, n);
@@ -236,8 +242,8 @@ int main(int argc, char **argv)
              "     fabula compila [-o FITXER] [--puja] [--separa-escenes] [--amb-notes] [--amb-enllacos] [CARPETA]\n"
              "                     el manuscrit en un sol document (.md, o .docx/.epub/.pdf amb pandoc)\n\n"
              "Obre el projecte literari de CARPETA (la que té projecte.md; per defecte, la\n"
-             "carpeta actual). Sense CARPETA i fora d'un projecte, amb «projectes =» al\n"
-             "phileasrc, deixa triar un projecte d'aquella carpeta o crear-ne un. «nou» crea la carpeta del projecte (TÍTOL en minúscules i amb\n"
+             "carpeta actual). Sense CARPETA i fora d'un projecte, deixa triar un projecte\n"
+             "de la carpeta de «projectes =» del phileasrc (o de l'actual) o crear-ne un. «nou» crea la carpeta del projecte (TÍTOL en minúscules i amb\n"
              "guions) dins de DIRECTORI (per defecte, l'actual) i l'obre.\n\n"
              "Retorn obre el capítol o la fitxa a Phileas (o a l'editor de «editor =» del\n"
              "phileasrc, o de FABULA_EDITOR, que hi mana).\n"
@@ -278,7 +284,7 @@ int main(int argc, char **argv)
     cm_look_init(&look);
     cm_rc_read(rc_cb, &look);
     key_quit_hook = quit_hook;
-    if (argc == 1 && projectes[0] && access("projecte.md", F_OK) != 0) {
+    if (argc == 1 && access("projecte.md", F_OK) != 0 && isatty(0) && isatty(1)) {
         int r;
 
         cm_look_start(&look);

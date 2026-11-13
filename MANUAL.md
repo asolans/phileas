@@ -1,6 +1,6 @@
 # Manual d'ús de Phileas
 
-*Versió 2.10.0*
+*Versió 2.10.1*
 
 Aquest manual t'acompanya pas a pas: des d'obrir Phileas per primera vegada
 fins a organitzar un llibre llarg. No cal llegir-lo de dalt a baix. Si només
@@ -905,9 +905,19 @@ fabula                            # obre el de la carpeta actual
 fabula --resum la-casa-del-pou    # el resum en text, sense pantalla
 ```
 
-Des de Phileas: **Esc → Eines → Fàbula** (o `fabula` a la paleta). Si al
-`phileasrc` hi ha `projectes = CARPETA` i no ets dins d'un projecte, Fàbula
-mostra la llista dels projectes d'aquella carpeta i «Projecte nou…». En
+Des de Phileas: **Esc → Eines → Fàbula** (o `fabula` a la paleta). Si no ets
+dins d'un projecte, Fàbula mostra la llista dels projectes i «Projecte nou…».
+Els projectes són a la carpeta de `projectes = CARPETA` del `phileasrc` (a la
+Pi, `/data/projectes`); si no n'hi ha, a la carpeta actual. Per tenir-los
+sempre junts, posa-hi la carpeta, per exemple:
+
+```ini
+projectes = ~/Documents/Literatura/projectes
+```
+
+A l'ordinador, no facis servir la carpeta on `envia` deixa els projectes de la
+Pi: l'enviament només va de la Pi a l'ordinador, i podria trepitjar el que hi
+canviessis. En
 sortir de Fàbula, tornes a Phileas; si el document que tenies obert s'ha
 canviat mentrestant, Phileas el torna a llegir.
 
@@ -1179,7 +1189,9 @@ recerca --resum ~/Documents/Recerca
 Des de Phileas: **Esc → Eines → Recerca** (o `recerca` a la paleta). Sense
 vault a la línia d'ordres ni `recerca-vault`, i amb `recerques = CARPETA` al
 `phileasrc`, Recerca obre el vault d'aquella carpeta o, si n'hi ha més d'un,
-te'l deixa triar. Esc o Ctrl+P obren el menú.
+te'l deixa triar. Si no hi ha res d'això, només obre la carpeta actual si és un
+vault (amb `.obsidian/` o `.recerca/`); si no, explica què cal posar al
+`phileasrc`. Esc o Ctrl+P obren el menú.
 
 ### Què entén
 
