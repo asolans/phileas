@@ -320,7 +320,7 @@ i Retrocés torna enrere. `u` i `b` mostren les notes que hi enllacen, `l` els
 enllaços de la fitxa, `t` els trencats de tot el vault i `z` amplia el visor. Per
 sota de 110 columnes es veuen dos panells. Esc obre el menú i F1, l'ajuda.
 
-`e` obre la fitxa a Phileas (o a l'editor de `RECERCA_EDITOR`) a la línia que es
+`e` obre la fitxa a Phileas (o a l'editor de `editor =` del phileasrc, o de `RECERCA_EDITOR`) a la línia que es
 veu, i en tornar la torna a llegir. `n` crea una fitxa nova a la carpeta triada,
 amb una plantilla de la carpeta de plantilles d'Obsidian si n'hi ha; `a` hi fa una
 anotació (una fitxa nova amb `anota: "[[Fitxa]]"`), i `Supr` la mou a la
@@ -424,6 +424,15 @@ de Recerca i Fàbula, `recerca-…` i `fabula-…`, que Phileas accepta sense
 error), i deixa l'anterior a `phileasrc.anterior`.
 `phileas --config` escriu el mateix a la sortida; no el redirigiu al mateix
 `phileasrc`, que el shell buida abans que Phileas el llegeixi.
+
+El `phileasrc` és el de les tres eines (`comu/rc.c` el llegeix per a Fàbula i
+Recerca, amb les mateixes regles, també per als comentaris). La plantilla té
+tres seccions: **Comú** (`editor`, que obren Fàbula i Recerca; `textos`,
+`projectes` i `recerques`, els llocs que fan servir els triadors i les ordres
+de la BYOK; el tema i els colors també són comuns), **Phileas** i
+**Recerca** (`recerca-vault`, `recerca-replica`, `recerca-entrada`).
+`phileas --valor CLAU` escriu el valor d'una opció (els dos fitxers, amb `~`
+expandit; codi 1 si no hi és): és com el llegeixen els scripts.
 
 Al mateix directori hi ha `historial`: una línia per document obert (`LÍNIA
 BYTE CAMÍ`, el més recent primer, fins a 100), que es desa en canviar de
@@ -546,7 +555,7 @@ desenvolupament són a [`SEGUIMENT.md`](SEGUIMENT.md).
 
 ## Versions
 
-- **En desenvolupament**: codi comú de Phileas, Fàbula i Recerca a `comu/` (lector del phileasrc, colors, accents, menú, diàlegs, terminal), sense canvis visibles. L'ajuda (F1) de Fàbula i de Recerca es desplaça amb ↑ ↓ RePàg AvPàg quan no hi cap (abans es tallava). Fàbula treu els accents amb les mateixes regles que Recerca (ara també ý, ÿ i ŀ). `make clean` ja no esborra `dist/` (ho fa `make distclean`).
+- **2.8.0**: **una configuració per a les tres eines.** Opcions comunes `editor` (l'editor de Fàbula i Recerca; `FABULA_EDITOR` i `RECERCA_EDITOR` hi manen), `textos`, `projectes` i `recerques`; la plantilla de `desar-configuracio` té les seccions Comú, Phileas i Recerca, amb els valors de totes tres; `phileas --valor CLAU`. Fàbula i Recerca llegeixen els comentaris del final de línia com Phileas, i `phileas-importa-calaix` també llegeix `/etc/phileas/phileasrc`. A la imatge BYOK, els llocs surten del phileasrc (`/usr/lib/byok/llocs.sh`). Fàbula 0.3.3, Recerca 0.1.2. També, codi comú de Phileas, Fàbula i Recerca a `comu/` (lector del phileasrc, colors, accents, menú, diàlegs, terminal), sense canvis visibles. L'ajuda (F1) de Fàbula i de Recerca es desplaça amb ↑ ↓ RePàg AvPàg quan no hi cap (abans es tallava). Fàbula treu els accents amb les mateixes regles que Recerca (ara també ý, ÿ i ŀ). `make clean` ja no esborra `dist/` (ho fa `make distclean`).
 - **2.7.2**: `desar-configuracio` ja no esborra les claus de Recerca (`recerca-vault`…): conserva totes les línies que Phileas no escriu, i Phileas accepta sense error les claus `recerca-…` i `fabula-…` del phileasrc. A la imatge BYOK: Fàbula al menú BYOK (tria un projecte de `/data/projectes` o en crea un); `exporta` copia al pendrive `BYOK/textos`, `BYOK/projectes` i les fitxes `_pi/` de cada vault; el bàner de la consola mostra Fàbula, Recerca i `rep`.
 - **2.7.1**: Fàbula 0.3.2 i Recerca 0.1.1: el text normal fa servir els colors del tema (amb els temes clars sortia amb els del terminal, blanc sobre negre). A la imatge BYOK: `envia` pregunta la carpeta de destinació a l'ordinador (per defecte, la darrera) i hi deixa `textos/` i `projectes/` (`/data/projectes`); `rep` pot treure un vault de la llista.
 - **2.7.0**: **Recerca 0.1**, la tercera eina: fitxes de recerca en un vault d'Obsidian (carpetes, propietats, etiquetes niades, enllaços amb àlies, seccions i blocs `^id`, backlinks i relacions de propietat), amb un índex SQLite (FTS5) que es posa al dia sol; pantalla de navegació, llista i visor; editar a Phileas, fitxes noves amb plantilla, anotacions i paperera; a la Pi, `rep` porta un vault del PC i hi torna `_pi/`. Phileas: ordres `externa-pantalla.NOM` (programes de pantalla sencera, tornen sense Retorn) i Recerca i `rep` al menú BYOK. Fàbula 0.3.1: `b` obre Recerca (`recerca:` a `projecte.md`). Fàbula i Recerca fan servir els colors del tema com Phileas (el text atenuat a la consola i les línies `color-…` del phileasrc).

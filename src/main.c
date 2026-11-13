@@ -4,6 +4,7 @@
 #include "editor.h"
 #include "history.h"
 #include "keys.h"
+#include "rc.h"
 #include "render.h"
 #include "spell.h"
 #include "tui.h"
@@ -45,6 +46,7 @@ static void usage(FILE *f)
 {
     fputs("Ús: phileas [-c COLUMNES] [-a SEGONS] [-d IDIOMA] [+LÍNIA] [FITXER]\n"
           "     phileas --config\n"
+          "     phileas --valor CLAU\n"
           "\n"
           "Si FITXER no existeix i no té extensió, es crea amb .md (nota → nota.md).\n"
           "\n"
@@ -56,6 +58,8 @@ static void usage(FILE *f)
           "  --config  escriu la configuració completa amb els valors actuals (no la\n"
           "            redirigiu al mateix phileasrc: el shell el buida abans de llegir-lo;\n"
           "            per desar-la, dins Phileas, Ctrl+P desar-configuracio)\n"
+          "  --valor CLAU  escriu el valor d'una opció del phileasrc, amb ~ expandit\n"
+          "            (codi 1 si no hi és); el fan servir els scripts de la BYOK\n"
           "  +LÍNIA    obre el document amb el cursor a la línia (paràgraf) LÍNIA, la\n"
           "            primera és la 1; va davant de la posició recordada\n"
           "  -h        mostra aquesta ajuda\n"
@@ -98,6 +102,19 @@ int main(int argc, char **argv)
     setlocale(LC_ALL, "");
     /* La configuració completa amb els valors actuals (els del sistema i
      * els de l'usuari), per fer-se un phileasrc sense perdre'n cap */
+    /* El valor d'una opció del phileasrc (per als scripts: envia, exporta…) */
+    if (argc > 1 && !strcmp(argv[1], "--valor")) {
+        char val[4096];
+
+        if (argc != 3) {
+            fputs("Ús: phileas --valor CLAU\n", stderr);
+            return 2;
+        }
+        if (!cm_rc_get(argv[2], val, sizeof val))
+            return 1;
+        puts(val);
+        return 0;
+    }
     if (argc > 1 && !strcmp(argv[1], "--config")) {
         ed_init(&e, 72);
         if (config_load_files(&e, CONFIG_SYSTEM, NULL, cfg_msg, sizeof cfg_msg))

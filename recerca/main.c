@@ -3,6 +3,7 @@
 #include "fold.h"
 #include "fterm.h"
 #include "ui.h"
+#include "launch.h"
 #include "rc.h"
 #include "rview.h"
 #include "theme.h"
@@ -38,7 +39,8 @@ static void ajuda(void)
          "  -v, --version     versió\n"
          "\n"
          "A la pantalla, F1 mostra les tecles i Esc el menú. El tema és el de Phileas.\n"
-         "«e» edita a Phileas (o a l'editor de RECERCA_EDITOR). Al phileasrc:\n"
+         "«e» edita a Phileas. Al phileasrc:\n"
+         "  editor = ORDRE              un altre editor (RECERCA_EDITOR hi mana)\n"
          "  recerca-vault = CARPETA     el vault per defecte\n"
          "  recerca-replica = si        el vault és una còpia del PC: només s'escriu\n"
          "  recerca-entrada = _pi       a aquesta carpeta (fitxes noves i anotacions)\n"
@@ -238,6 +240,8 @@ static void rc_cb(const char *k, const char *v, void *ud)
 
     if (cm_look_key(&rc->look, k, v))
         ;
+    else if (!strcmp(k, "editor"))
+        launch_set_editor(v);
     else if (!strcmp(k, "recerca-vault"))
         cm_rc_path(v, rc->vault, sizeof rc->vault);
     else if (!strcmp(k, "recerca-replica"))

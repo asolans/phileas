@@ -1575,6 +1575,9 @@ static void test_config(void)
     /* Les claus de les altres eines no són errors */
     CHECK(SET("recerca-vault", "/data/recerca/tesi") == 0);
     CHECK(SET("recerca-replica", "si") == 0 && SET("fabula-x", "1") == 0);
+    /* Les comunes i les de Recerca es guarden per a la plantilla */
+    CHECK(SET("editor", "vim") == 0 && !strcmp(e.shared[CM_K_EDITOR], "vim"));
+    CHECK(!strcmp(e.shared[CM_K_RECERCA_VAULT], "/data/recerca/tesi"));
     config_bind_hook = fake_bind;
     CHECK(SET("tecla.ctrl-t", "maquina-escriure") == 0 && !strcmp(last_bind, "ctrl-t=maquina-escriure"));
     CHECK(SET("tecla.ctrl-h", "") == 0 && !strcmp(last_bind, "ctrl-h="));
@@ -1651,6 +1654,10 @@ static void test_config(void)
     /* Les claus de Recerca es conserven; les de Phileas, amb el valor actual */
     CHECK(strstr(slurp(user), "\nrecerca-vault = /data/recerca/tesi\n") != NULL);
     CHECK(strstr(slurp(user), "centrar = no") == NULL);
+    /* ... una sola vegada, i la plantilla no l'escriu com a exemple */
+    CHECK(strstr(strstr(slurp(user), "recerca-vault = /data/recerca/tesi") + 1,
+                 "recerca-vault =") == NULL);
+    CHECK(strstr(slurp(user), "# recerca-vault") == NULL);
     ed_free(&e);
     ed_init(&e, 72);
     CHECK(config_load(&e, NULL, user, msg, sizeof msg) == 0);

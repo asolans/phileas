@@ -10,10 +10,17 @@
 
 #define MAX_ARGS 12
 
+static char editor_rc[1024];
+
+void launch_set_editor(const char *cmd)
+{
+    snprintf(editor_rc, sizeof editor_rc, "%s", cmd ? cmd : "");
+}
+
 int launch_editor(const char *path, size_t line, char *err, size_t errsz)
 {
     const char *env = getenv("FABULA_EDITOR");
-    char *cmd = strdup(env && *env ? env : "phileas"), plus[32];
+    char *cmd = strdup(env && *env ? env : editor_rc[0] ? editor_rc : "phileas"), plus[32];
     char *argv[MAX_ARGS + 3];
     int n = 0, status = 0;
     pid_t pid;
@@ -26,7 +33,7 @@ int launch_editor(const char *path, size_t line, char *err, size_t errsz)
         argv[n++] = t;
     if (n == 0) {
         free(cmd);
-        snprintf(err, errsz, "FABULA_EDITOR és buit");
+        snprintf(err, errsz, "l'editor és buit");
         return -1;
     }
     if (line) {
@@ -52,7 +59,7 @@ int launch_editor(const char *path, size_t line, char *err, size_t errsz)
         if (pid < 0)
             snprintf(err, errsz, "no s'ha pogut crear el procés: %s", strerror(errno));
         else if (rc == 127)
-            snprintf(err, errsz, "no s'ha pogut executar «%s» (es pot canviar amb FABULA_EDITOR)", argv[0]);
+            snprintf(err, errsz, "no s'ha pogut executar «%s» (es pot canviar amb «editor =» al phileasrc)", argv[0]);
         else if (rc != 0)
             snprintf(err, errsz, "«%s» ha acabat amb el codi %d", argv[0], rc);
         else

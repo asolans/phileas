@@ -252,6 +252,14 @@ int config_set(Editor *e, const char *key, const char *v, char *err, size_t errs
             return -1;
         }
         e->nlangs = k;
+    } else if ((n = cm_shared_key(key)) >= 0) {
+        /* Claus comunes i de Recerca: Phileas no les fa servir, però les
+         * conserva per escriure-les a la plantilla */
+        if (strlen(v) >= sizeof e->shared[n]) {
+            snprintf(err, errsz, "valor massa llarg per a «%s»", key);
+            return -1;
+        }
+        snprintf(e->shared[n], sizeof e->shared[n], "%s", v);
     } else if (!strncmp(key, "recerca-", 8) || !strncmp(key, "fabula-", 7)) {
         /* Claus de Recerca i de Fàbula, que comparteixen el phileasrc:
          * Phileas no les fa servir, però no són errors */
@@ -505,18 +513,21 @@ int config_store(const char *path, const char *key, const char *value)
 
 /* 1 si alguna línia de la plantilla tpl escriu la clau (també comentada:
  * «# clau = valor»). Les línies de l'usuari amb aquestes claus se substitueixen
- * pel valor actual; les altres es conserven. */
+ * pel valor actual; les altres es conserven. Les claus comunes i de Recerca
+ * comentades són exemples (no estaven definides): no compten. */
 static int template_has_key(const char *tpl, const char *key)
 {
     char k[128];
+    int shared = cm_shared_key(key) >= 0;
 
     for (const char *p = tpl; p && *p; ) {
         const char *s = p, *end = strchr(p, '\n');
+        int commented = 0;
 
         while (*s == ' ' || *s == '\t' || *s == '#')
-            s++;
+            commented |= *s++ == '#';
         line_key(s, k, sizeof k);
-        if (*k && !strcmp(k, key))
+        if (*k && !strcmp(k, key) && !(shared && commented))
             return 1;
         p = end ? end + 1 : NULL;
     }
@@ -559,11 +570,35 @@ int config_save_all(const char *path, const Editor *e)
         char *tpl = NULL;
         size_t tlen = 0;
         FILE *mf = open_memstream(&tpl, &tlen);
+        Editor *cp = xmalloc(sizeof *cp);
 
+        /* Les claus comunes i de Recerca que són al fitxer però no a e (escrites
+         * per una altra eina, o a mà) van a la plantilla amb el seu valor */
+        *cp = *e;
+        for (const char *p = old; p && *p; ) {
+            const char *end = strchr(p, '\n'), *eq;
+            size_t ln = end ? (size_t)(end - p) : strlen(p);
+            int sk;
+
+            line_key(p, k, sizeof k);
+            if (*k && (sk = cm_shared_key(k)) >= 0 && !cp->shared[sk][0] &&
+                (eq = memchr(p, '=', ln))) {
+                const char *v = eq + 1, *ve = p + ln;
+
+                while (v < ve && (*v == ' ' || *v == '\t'))
+                    v++;
+                while (ve > v && (ve[-1] == ' ' || ve[-1] == '\t' || ve[-1] == '\r'))
+                    ve--;
+                if ((size_t)(ve - v) < sizeof cp->shared[sk])
+                    snprintf(cp->shared[sk], sizeof cp->shared[sk], "%.*s", (int)(ve - v), v);
+            }
+            p = end ? end + 1 : NULL;
+        }
         if (mf) {
-            config_template(mf, e);
+            config_template(mf, cp);
             fclose(mf);
         }
+        free(cp);
         if (!tpl) {
             err = ENOMEM;
             fclose(f);
@@ -605,6 +640,16 @@ out:
     return err ? -1 : 0;
 }
 
+/* Una clau comuna o de Recerca: amb el valor, si n'hi ha; si no, comentada
+ * amb un exemple */
+static void shared_line(FILE *f, const Editor *e, int k, const char *example)
+{
+    if (e->shared[k][0])
+        fprintf(f, "%s = %s\n", cm_shared_keys[k], e->shared[k]);
+    else
+        fprintf(f, "# %s = %s\n", cm_shared_keys[k], example);
+}
+
 void config_template(FILE *f, const Editor *e)
 {
     const short *th = theme_at((size_t)e->theme)->pal;
@@ -626,6 +671,24 @@ void config_template(FILE *f, const Editor *e)
             "# Les opcions de la línia d'ordres (-c, -a, -d) manen sobre tots dos.\n"
             "# Les opcions que es canvien des dels menús (centrar, colors, enfocament,\n"
             "# màquina d'escriure, tema i tipografia) es desen soles en aquest fitxer.\n"
+            "#\n"
+            "# El llegeixen Phileas, Fàbula i Recerca: les opcions de la primera secció\n"
+            "# i el tema i els colors són de totes tres; les altres, de cadascuna.\n"
+            "\n"
+            "# ===== Comú: Phileas, Fàbula i Recerca =====\n"
+            "\n"
+            "# L'editor que obren Fàbula i Recerca (FABULA_EDITOR i RECERCA_EDITOR, si\n"
+            "# hi són, hi manen). Els llocs: textos, projectes de Fàbula i carpeta dels\n"
+            "# vaults de Recerca (a la BYOK, els fan servir els triadors i les ordres\n"
+            "# envia, rep i exporta). Els comentats no estan definits.\n");
+    shared_line(f, e, CM_K_EDITOR, "phileas");
+    shared_line(f, e, CM_K_TEXTOS, "/data/textos");
+    shared_line(f, e, CM_K_PROJECTES, "/data/projectes");
+    shared_line(f, e, CM_K_RECERQUES, "/data/recerca");
+    fprintf(f, "\n"
+            "# El tema i els colors (més avall) també són comuns.\n"
+            "\n"
+            "# ===== Phileas =====\n"
             "\n"
             "# Text\n"
             "columnes = %-24d# amplada de la columna de text\n"
@@ -716,6 +779,15 @@ void config_template(FILE *f, const Editor *e)
           "# Per assignar-hi una tecla, la línia tecla. va després de la definició.\n"
           "# (Les del fitxer del sistema ja hi són; no cal repetir-les.)\n"
           "# externa.terminal = sh\n"
-          "# externa-breu.paraules = wc -w\n",
+          "# externa-breu.paraules = wc -w\n"
+          "\n"
+          "# ===== Recerca =====\n"
+          "\n"
+          "# El vault que obre «recerca» sense arguments. En una rèplica del PC (la\n"
+          "# que porta «rep», que ja ho sap sola), només s'escriu a la carpeta\n"
+          "# d'entrada.\n",
           f);
+    shared_line(f, e, CM_K_RECERCA_VAULT, "~/Documents/Recerca");
+    shared_line(f, e, CM_K_RECERCA_REPLICA, "no");
+    shared_line(f, e, CM_K_RECERCA_ENTRADA, "_pi");
 }

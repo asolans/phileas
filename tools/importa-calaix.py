@@ -27,18 +27,25 @@ def dir_config():
         os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "phileas"))
 
 
+COMENTARI = re.compile(r"(^|[ \t])#.*")
+
+
 def llegeix_phileasrc():
-    """Les opcions «clau = valor» del phileasrc de l'usuari (les de Phileas)."""
+    """Les opcions «clau = valor» del phileasrc, com les llegeix Phileas: el
+    del sistema (/etc/phileas/phileasrc) i després el de l'usuari, que hi
+    mana. Els comentaris són # al principi o després d'un espai."""
     opcions = {}
-    try:
-        for linia in (dir_config() / "phileasrc").read_text(encoding="utf-8").splitlines():
-            linia = linia.strip()
-            if not linia or linia.startswith("#") or "=" not in linia:
+    for fitxer in (Path("/etc/phileas/phileasrc"), dir_config() / "phileasrc"):
+        try:
+            text = fitxer.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for linia in text.splitlines():
+            linia = COMENTARI.sub("", linia, count=1).strip()
+            if not linia or "=" not in linia:
                 continue
             k, v = linia.split("=", 1)
-            opcions[k.strip()] = v.split("  #")[0].strip()
-    except OSError:
-        pass
+            opcions[k.strip()] = v.strip()
     return opcions
 
 

@@ -1,6 +1,6 @@
 # Manual d'ús de Phileas
 
-*Versió 2.7.2*
+*Versió 2.8.0*
 
 Aquest manual t'acompanya pas a pas: des d'obrir Phileas per primera vegada
 fins a organitzar un llibre llarg. No cal llegir-lo de dalt a baix. Si només
@@ -662,6 +662,26 @@ ordres externes i les claus de Recerca i Fàbula, com `recerca-vault`) es
 conserven al final, sota «Del fitxer anterior». Si edites el fitxer a mà amb Phileas
 obert, **Ctrl+P** → `recarregar-configuracio` el torna a llegir.
 
+### Una configuració per a les tres eines
+
+El mateix `phileasrc` serveix per a Phileas, Fàbula i Recerca. El fitxer
+complet (`desar-configuracio`) té tres seccions: **Comú**, **Phileas** i
+**Recerca**. El tema i els colors també són comuns: si canvies el tema a
+Phileas, Fàbula i Recerca el fan servir.
+
+Les opcions comunes són aquestes:
+
+```ini
+editor = phileas              # el que obren Fàbula (Retorn) i Recerca (e)
+textos = /data/textos         # on són els textos
+projectes = /data/projectes   # els projectes de Fàbula
+recerques = /data/recerca     # els vaults de Recerca
+```
+
+Les de la Pi ja estan posades. Al PC no cal posar-les si no les fas servir.
+Per saber quin valor té una opció (el del sistema o el teu), pots fer
+`phileas --valor projectes`. Les ordres de la BYOK ho fan així.
+
 ### Canviar una tecla
 
 ```ini
@@ -863,8 +883,9 @@ fabula                            # obre el de la carpeta actual
 fabula --resum la-casa-del-pou    # el resum en text, sense pantalla
 ```
 
-Fàbula agafa el tema (`tema =` al `phileasrc`) de Phileas. Si vols un altre
-editor, defineix `FABULA_EDITOR` (ordre i arguments separats per espais).
+Fàbula agafa el tema i els colors del `phileasrc`, com Phileas. Si vols un
+altre editor, posa `editor = ORDRE` al `phileasrc` (ordre i arguments separats
+per espais); la variable `FABULA_EDITOR`, si hi és, hi mana.
 
 ### La pantalla
 
@@ -1223,9 +1244,10 @@ Al phileasrc, com Phileas (també el tema):
 
 ```ini
 recerca-vault = ~/Documents/Recerca   # el vault per defecte
+editor = phileas                      # l'editor de «e» (comú amb Fàbula)
 ```
 
-`RECERCA_EDITOR` canvia l'editor de `e` (per defecte, Phileas).
+La variable `RECERCA_EDITOR`, si hi és, mana sobre `editor`.
 
 ---
 

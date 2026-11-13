@@ -106,6 +106,29 @@ static void test_rc(void)
     cm_rc_path("/data/recerca", path, sizeof path);
     CHECK(!strcmp(path, "/data/recerca"));
     CHECK(cm_ncolor_keys == 15 && !strcmp(cm_color_keys[0].key, "color-capcalera-1"));
+    CHECK(cm_shared_key("projectes") == CM_K_PROJECTES && cm_shared_key("columnes") < 0);
+
+    /* cm_rc_get: el phileasrc de l'usuari, amb els comentaris com a Phileas */
+    {
+        char dir[600], rc[700], val[256], *old = getenv("PHILEAS_CONFIG") ? strdup(getenv("PHILEAS_CONFIG")) : NULL;
+        FILE *f;
+
+        snprintf(dir, sizeof dir, "%s/rc", tmpdir);
+        mkdir(dir, 0755);
+        snprintf(rc, sizeof rc, "%s/phileasrc", dir);
+        f = fopen(rc, "w");
+        fputs("# prova-x = no\nprova-x = u   # comentari\nprova-y = a#b\nprova-x = dos\n", f);
+        fclose(f);
+        setenv("PHILEAS_CONFIG", dir, 1);
+        CHECK(cm_rc_get("prova-x", val, sizeof val) && !strcmp(val, "dos"));
+        CHECK(cm_rc_get("prova-y", val, sizeof val) && !strcmp(val, "a#b"));
+        CHECK(!cm_rc_get("prova-z", val, sizeof val) && !val[0]);
+        if (old)
+            setenv("PHILEAS_CONFIG", old, 1);
+        else
+            unsetenv("PHILEAS_CONFIG");
+        free(old);
+    }
 }
 
 /* ---------- front ---------- */

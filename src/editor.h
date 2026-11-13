@@ -4,6 +4,7 @@
 #include "buffer.h"
 #include "calaix.h"
 #include "palette.h"
+#include "rc.h"
 #include "theme.h"
 
 /* Accions que s'agrupen en un sol pas de desfer si es repeteixen seguides */
@@ -75,6 +76,7 @@ typedef struct {
     char    obs_vault[1024];   /* vault d'Obsidian (opció «obsidian-vault»); buit = cap */
     char    obs_inbox[128];    /* carpeta d'entrada del vault («obsidian-inbox») */
     char    obs_tipus[64];     /* propietat del tipus de nota («obsidian-tipus») */
+    char    shared[CM_NSHARED][1024]; /* claus comunes i de Recerca (comu/rc.h); "" = cap */
     CalaixState cstate;        /* font activa del calaix i fonts recents */
     char    langs[MAX_LANGS][16]; /* rotació de F8 */
     int     nlangs;

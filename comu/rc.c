@@ -15,8 +15,18 @@ static void read_file(const char *path, cm_rc_fn fn, void *ud)
     if (!f)
         return;
     while (fgets(line, sizeof line, f)) {
-        char *k = line, *eq = strchr(line, '='), *v;
+        char *k = line, *eq, *v, *hash;
         size_t l;
+
+        /* Comentaris: # al principi o després d'un espai (com a Phileas) */
+        for (hash = line; (hash = strchr(hash, '#'));) {
+            if (hash == line || hash[-1] == ' ' || hash[-1] == '\t') {
+                *hash = '\0';
+                break;
+            }
+            hash++;
+        }
+        eq = strchr(line, '=');
 
         while (*k == ' ' || *k == '\t')
             k++;
@@ -119,4 +129,44 @@ void cm_rc_path(const char *v, char *out, size_t size)
         snprintf(out, size, "%s%s", home, v + 1);
     else
         snprintf(out, size, "%s", v);
+}
+
+const char *const cm_shared_keys[CM_NSHARED] = {
+    "editor", "textos", "projectes", "recerques",
+    "recerca-vault", "recerca-replica", "recerca-entrada",
+};
+
+int cm_shared_key(const char *key)
+{
+    for (int i = 0; i < CM_NSHARED; i++)
+        if (!strcmp(key, cm_shared_keys[i]))
+            return i;
+    return -1;
+}
+
+typedef struct {
+    const char *key;
+    char       *out;
+    size_t      size;
+    int         found;
+} Get;
+
+static void get_cb(const char *k, const char *v, void *ud)
+{
+    Get *g = ud;
+
+    if (!strcmp(k, g->key)) {
+        cm_rc_path(v, g->out, g->size);
+        g->found = 1;
+    }
+}
+
+int cm_rc_get(const char *key, char *out, size_t size)
+{
+    Get g = { key, out, size, 0 };
+
+    if (size)
+        out[0] = '\0';
+    cm_rc_read(get_cb, &g);
+    return g.found;
 }

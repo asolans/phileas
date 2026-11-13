@@ -1,6 +1,7 @@
 #include "rc.h"
 #include "fterm.h"
 #include "ui.h"
+#include "launch.h"
 #include "fview.h"
 #include "project.h"
 #include "compile.h"
@@ -168,10 +169,12 @@ static void quit_hook(int sig)
     _exit(128 + sig);
 }
 
-/* Tema, paleta i colors del phileasrc (del sistema i de l'usuari), com a Phileas */
+/* Tema, paleta i colors del phileasrc (del sistema i de l'usuari), com a
+ * Phileas, i l'editor */
 static void rc_cb(const char *k, const char *v, void *ud)
 {
-    cm_look_key(ud, k, v);
+    if (!cm_look_key(ud, k, v) && !strcmp(k, "editor"))
+        launch_set_editor(v);
 }
 
 int main(int argc, char **argv)
@@ -193,9 +196,10 @@ int main(int argc, char **argv)
              "Obre el projecte literari de CARPETA (la que té projecte.md; per defecte, la\n"
              "carpeta actual). «nou» crea la carpeta del projecte (TÍTOL en minúscules i amb\n"
              "guions) dins de DIRECTORI (per defecte, l'actual) i l'obre.\n\n"
-             "Retorn obre el capítol o la fitxa a Phileas (o a l'editor de FABULA_EDITOR).\n"
+             "Retorn obre el capítol o la fitxa a Phileas (o a l'editor de «editor =» del\n"
+             "phileasrc, o de FABULA_EDITOR, que hi mana).\n"
              "«b» obre Recerca amb el vault de «recerca:» de projecte.md; en sortir, torna.\n"
-             "El tema es llegeix del phileasrc de Phileas. F1 mostra les tecles.");
+             "El tema i els colors es llegeixen del phileasrc, com a Phileas. F1 mostra les tecles.");
         return 0;
     }
     if (argc > 1 && !strcmp(argv[1], "compila"))
