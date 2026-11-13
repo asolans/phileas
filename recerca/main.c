@@ -40,7 +40,8 @@ static void ajuda(void)
          "«e» edita a Phileas (o a l'editor de RECERCA_EDITOR). Al phileasrc:\n"
          "  recerca-vault = CARPETA     el vault per defecte\n"
          "  recerca-replica = si        el vault és una còpia del PC: només s'escriu\n"
-         "  recerca-entrada = _pi       a aquesta carpeta (fitxes noves i anotacions)");
+         "  recerca-entrada = _pi       a aquesta carpeta (fitxes noves i anotacions)\n"
+         "Els vaults que porta «rep» a la Pi ja són rèpliques (VAULT/.recerca/replica).");
 }
 
 static int tty;
@@ -281,6 +282,24 @@ static int pantalla(Vault *v, const Rc *rc)
     }
     {
         RviewOpts o = { rc->replica, rc->entrada[0] ? rc->entrada : "_pi" };
+        char path[4200], line[300];
+        static char entrada[300];
+        FILE *f;
+
+        /* .recerca/replica (el crea rep a la Pi): el vault és una còpia del PC */
+        snprintf(path, sizeof path, "%s/" VAULT_DIR "/replica", vault_root(v));
+        if ((f = fopen(path, "r"))) {
+            o.replica = 1;
+            while (fgets(line, sizeof line, f))
+                if (!strncmp(line, "entrada=", 8)) {
+                    line[strcspn(line, "\r\n")] = '\0';
+                    if (line[8]) {
+                        snprintf(entrada, sizeof entrada, "%s", line + 8);
+                        o.entrada = entrada;
+                    }
+                }
+            fclose(f);
+        }
         const char *ed = getenv("RECERCA_EDITOR");
 
         if (ed && *ed)                      /* launch_editor llegeix FABULA_EDITOR */
